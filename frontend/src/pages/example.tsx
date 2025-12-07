@@ -28,12 +28,12 @@ const chartData = [
 
 const chartConfig = {
   arctic: {
-    label: "Arctic Blue",
-    color: "#2D9CDB",
+    label: "Active Bids",
+    color: "#0EA5E9",
   },
   coral: {
-    label: "Coral Red",
-    color: "#EB5757",
+    label: "Settled Auctions",
+    color: "#F43F5E",
   },
 } satisfies ChartConfig
 
@@ -60,7 +60,7 @@ export default function ExamplePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">Arctic UI Showcase</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Fairdrop UI Showcase</h1>
           </div>
           <Button onClick={toggleTheme} variant="outline" size="icon">
             {theme === "light" ? "🌙" : "☀️"}
@@ -70,73 +70,205 @@ export default function ExamplePage() {
 
       <main className="container mx-auto px-8 py-12">
         {/* Hero Section */}
-        <section className="mb-16 text-center animate-fade-in">
+        <section className="mb-20 text-center animate-fade-in">
           <div className="mb-8 inline-block">
-            <Badge className="mb-4 animate-slide-up bg-gradient-to-r from-[#2D9CDB] to-[#56CCF2] text-white hover:opacity-90">
-              New Theme
+            <Badge variant="info" className="mb-4 animate-slide-up">
+              Enhanced Design System
             </Badge>
           </div>
-          <h2 className="mb-4 text-4xl font-bold tracking-tight text-foreground animate-slide-up" style={{ animationDelay: "0.1s" }}>
-            Arctic Blue + Coral Red
+          <h2 className="mb-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+            <span className="text-gradient-primary">Fairdrop Auction Platform</span>
           </h2>
-          <p className="mx-auto max-w-2xl text-lg text-muted-foreground animate-slide-up" style={{ animationDelay: "0.2s" }}>
-            A sleek, modern, and elegant design system with subtle animations.
-            Clean and app-like, perfect for user-friendly onboarding flows.
+          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground animate-slide-up" style={{ animationDelay: "0.2s" }}>
+            Industry-standard UI/UX with vibrant colors, smooth animations, and delightful micro-interactions.
+            Built for blockchain auctions on Linera.
           </p>
+          <div className="mt-8 flex justify-center gap-4 animate-slide-up" style={{ animationDelay: "0.3s" }}>
+            <Button variant="gradient" size="lg" className="shadow-glow-primary">
+              Explore Auctions
+            </Button>
+            <Button variant="outline" size="lg">
+              Learn More
+            </Button>
+          </div>
         </section>
 
         {/* Buttons Section */}
         <section className="mb-16">
-          <Card className="p-8 shadow-lg transition-all duration-300 hover:shadow-xl animate-fade-in">
-            <h3 className="mb-6 text-2xl font-semibold text-foreground">Buttons</h3>
-            <div className="flex flex-wrap gap-4">
-              <Button className="transition-transform duration-200 hover:scale-105">Primary Arctic</Button>
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="outline">Outline</Button>
-              <Button variant="ghost">Ghost</Button>
-              <Button variant="link">Link</Button>
-              <Button className="bg-[#EB5757] hover:bg-[#EB5757]/90 transition-transform duration-200 hover:scale-105">
-                Coral Accent
-              </Button>
-              <Button className="gradient-arctic hover:opacity-90 transition-all duration-200 hover:scale-105 shadow-lg">
-                Arctic Gradient
-              </Button>
-              <Button className="gradient-primary-accent hover:opacity-90 transition-all duration-200 hover:scale-105 shadow-lg">
-                Primary to Accent
-              </Button>
-              <Button className="gradient-accent-gray hover:opacity-90 transition-all duration-200 hover:scale-105 shadow-lg">
-                Accent + Gray
-              </Button>
-              <Button className="gradient-accent-dark hover:opacity-90 transition-all duration-200 hover:scale-105 shadow-lg">
-                Accent + Dark
-              </Button>
-              <Button disabled>Disabled</Button>
-              <Button size="sm">Small</Button>
-              <Button size="lg">Large</Button>
+          <Card className="p-8 hover-lift animate-fade-in">
+            <h3 className="mb-6">Button Variants</h3>
+            <div className="space-y-6">
+              <div>
+                <h4 className="mb-3 text-sm font-medium text-muted-foreground">Primary Actions</h4>
+                <div className="flex flex-wrap gap-3">
+                  <Button>Primary</Button>
+                  <Button variant="gradient">Gradient</Button>
+                  <Button variant="success">Success</Button>
+                  <Button variant="warning">Warning</Button>
+                  <Button variant="destructive">Destructive</Button>
+                </div>
+              </div>
+              <div>
+                <h4 className="mb-3 text-sm font-medium text-muted-foreground">Secondary Actions</h4>
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="secondary">Secondary</Button>
+                  <Button variant="outline">Outline</Button>
+                  <Button variant="ghost">Ghost</Button>
+                  <Button variant="link">Link</Button>
+                </div>
+              </div>
+              <div>
+                <h4 className="mb-3 text-sm font-medium text-muted-foreground">Sizes</h4>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button size="sm">Small</Button>
+                  <Button size="default">Default</Button>
+                  <Button size="lg">Large</Button>
+                  <Button size="xl">Extra Large</Button>
+                </div>
+              </div>
+              <div>
+                <h4 className="mb-3 text-sm font-medium text-muted-foreground">States</h4>
+                <div className="flex flex-wrap gap-3">
+                  <Button disabled>Disabled</Button>
+                  <Button variant="outline" disabled>Disabled Outline</Button>
+                </div>
+              </div>
             </div>
           </Card>
         </section>
 
         {/* Badges Section */}
         <section className="mb-16">
-          <Card className="p-8 shadow-lg transition-all duration-300 hover:shadow-xl animate-fade-in">
-            <h3 className="mb-6 text-2xl font-semibold text-foreground">Badges</h3>
-            <div className="flex flex-wrap gap-3">
-              <Badge>Default</Badge>
-              <Badge variant="secondary">Secondary</Badge>
-              <Badge variant="outline">Outline</Badge>
-              <Badge variant="destructive">Destructive</Badge>
-              <Badge className="bg-[#2D9CDB] text-white">Arctic Blue</Badge>
-              <Badge className="bg-[#EB5757] text-white">Coral Red</Badge>
-              <Badge className="bg-gradient-to-r from-[#2D9CDB] to-[#56CCF2] text-white">Gradient</Badge>
+          <Card className="p-8 hover-lift animate-fade-in">
+            <h3 className="mb-6">Badge Variants</h3>
+            <div className="space-y-6">
+              <div>
+                <h4 className="mb-3 text-sm font-medium text-muted-foreground">Standard Badges</h4>
+                <div className="flex flex-wrap gap-3">
+                  <Badge>Default</Badge>
+                  <Badge variant="secondary">Secondary</Badge>
+                  <Badge variant="outline">Outline</Badge>
+                  <Badge variant="destructive">Destructive</Badge>
+                </div>
+              </div>
+              <div>
+                <h4 className="mb-3 text-sm font-medium text-muted-foreground">Status Badges</h4>
+                <div className="flex flex-wrap gap-3">
+                  <Badge variant="success">Success</Badge>
+                  <Badge variant="warning">Warning</Badge>
+                  <Badge variant="info">Info</Badge>
+                </div>
+              </div>
+              <div>
+                <h4 className="mb-3 text-sm font-medium text-muted-foreground">Auction Status Badges</h4>
+                <div className="flex flex-wrap gap-3">
+                  <Badge variant="active">Active Auction</Badge>
+                  <Badge variant="ending">Ending Soon</Badge>
+                  <Badge variant="winning">You're Winning!</Badge>
+                  <Badge variant="outbid">Outbid</Badge>
+                </div>
+              </div>
             </div>
           </Card>
         </section>
 
+        {/* Auction Card Preview */}
+        <section className="mb-16">
+          <h3 className="mb-6">Auction Card Preview</h3>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="hover-lift animate-slide-in-left overflow-hidden">
+              <div className="aspect-video bg-gradient-primary flex items-center justify-center">
+                <div className="text-6xl">🎨</div>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Digital Art NFT #1234</h4>
+                    <p className="text-sm text-muted-foreground">by CryptoArtist</p>
+                  </div>
+                  <Badge variant="active">Active</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Current Price</span>
+                    <div className="text-2xl font-bold text-gradient-primary">$2,450</div>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Sold</span>
+                    <span className="font-medium">124 / 500</span>
+                  </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full gradient-primary w-1/4"></div>
+                  </div>
+                </div>
+                <Button variant="gradient" className="w-full">Place Bid</Button>
+              </div>
+            </Card>
+
+            <Card className="hover-lift animate-slide-up overflow-hidden">
+              <div className="aspect-video bg-gradient-warning flex items-center justify-center">
+                <div className="text-6xl">⚡</div>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Lightning NFT Pack</h4>
+                    <p className="text-sm text-muted-foreground">by ThunderStudio</p>
+                  </div>
+                  <Badge variant="ending">5m left</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Current Price</span>
+                    <div className="text-2xl font-bold text-gradient-accent">$890</div>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Sold</span>
+                    <span className="font-medium">456 / 500</span>
+                  </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full gradient-warning w-11/12 animate-pulse-subtle"></div>
+                  </div>
+                </div>
+                <Button variant="warning" className="w-full">Quick Bid</Button>
+              </div>
+            </Card>
+
+            <Card className="hover-lift animate-slide-in-right overflow-hidden">
+              <div className="aspect-video bg-gradient-success flex items-center justify-center">
+                <div className="text-6xl">🏆</div>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Premium Badge #999</h4>
+                    <p className="text-sm text-muted-foreground">by MetaLabs</p>
+                  </div>
+                  <Badge variant="winning">Winning!</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-muted-foreground">Your Bid</span>
+                    <div className="text-2xl font-bold text-success">$5,200</div>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Position</span>
+                    <span className="font-medium text-success">1st / 89 bids</span>
+                  </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full gradient-success w-full"></div>
+                  </div>
+                </div>
+                <Button variant="success" className="w-full">Increase Bid</Button>
+              </div>
+            </Card>
+          </div>
+        </section>
+
         {/* Forms Section */}
         <section className="mb-16">
-          <Card className="p-8 shadow-lg transition-all duration-300 hover:shadow-xl animate-fade-in">
-            <h3 className="mb-6 text-2xl font-semibold text-foreground">Form Components</h3>
+          <Card className="p-8 hover-lift animate-fade-in">
+            <h3 className="mb-6">Form Components</h3>
             <div className="grid gap-6 md:grid-cols-2">
               <FieldGroup>
                 <Field>
@@ -314,8 +446,8 @@ export default function ExamplePage() {
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Legend />
-                  <Bar dataKey="arctic" fill="#2D9CDB" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="coral" fill="#EB5757" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="arctic" fill="#0EA5E9" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="coral" fill="#F43F5E" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ChartContainer>
             </Card>
@@ -410,14 +542,14 @@ export default function ExamplePage() {
         <section className="mb-16">
           <h3 className="mb-6 text-2xl font-semibold text-foreground">Gradient Cards</h3>
           <div className="grid gap-6 md:grid-cols-3 mb-6">
-            <Card className="gradient-arctic-br p-8 text-white shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 animate-fade-in">
+            <Card className="gradient-primary-br p-8 text-white shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 animate-fade-in">
               <div className="mb-4">
                 <svg className="size-12 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h4 className="mb-2 text-xl font-bold">Arctic Gradient</h4>
-              <p className="text-white/90">Beautiful gradient from Arctic Blue to Light Arctic, perfect for primary actions and highlights.</p>
+              <h4 className="mb-2 text-xl font-bold">Primary Gradient</h4>
+              <p className="text-white/90">Beautiful gradient from deep blue to sky blue, perfect for primary actions and highlights.</p>
             </Card>
 
             <Card className="gradient-primary-accent p-8 text-white shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 animate-fade-in">
@@ -427,7 +559,7 @@ export default function ExamplePage() {
                 </svg>
               </div>
               <h4 className="mb-2 text-xl font-bold">Primary + Accent</h4>
-              <p className="text-white/90">Dynamic blend from Arctic Blue to Coral Red, creating a vibrant and energetic visual.</p>
+              <p className="text-white/90">Dynamic blend from sky blue to rose, creating a vibrant and energetic visual.</p>
             </Card>
 
             <Card className="gradient-multi p-8 text-white shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 animate-fade-in">
@@ -437,7 +569,7 @@ export default function ExamplePage() {
                 </svg>
               </div>
               <h4 className="mb-2 text-xl font-bold">Full Spectrum</h4>
-              <p className="text-white/90">Complete theme gradient spanning from Light Arctic through Arctic Blue to Coral Red.</p>
+              <p className="text-white/90">Complete theme gradient spanning from blue through purple to rose.</p>
             </Card>
           </div>
 
@@ -450,7 +582,7 @@ export default function ExamplePage() {
                 </svg>
               </div>
               <h4 className="mb-2 text-xl font-bold">Accent + Gray</h4>
-              <p className="text-white/90">Subtle blend of Coral Red accent with soft gray tones for a sophisticated look.</p>
+              <p className="text-white/90">Refined blend of deep red with slate gray tones for a sophisticated look.</p>
             </Card>
 
             <Card className="gradient-accent-dark p-8 text-white shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 animate-fade-in">
@@ -460,7 +592,7 @@ export default function ExamplePage() {
                 </svg>
               </div>
               <h4 className="mb-2 text-xl font-bold">Accent + Dark</h4>
-              <p className="text-white/90">Rich gradient from Coral Red to deep dark tones for premium, dramatic effect.</p>
+              <p className="text-white/90">Rich gradient from rose to deep dark tones for premium, dramatic effect.</p>
             </Card>
 
             <Card className="gradient-accent-muted p-8 text-white shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-105 animate-fade-in">
@@ -470,7 +602,7 @@ export default function ExamplePage() {
                 </svg>
               </div>
               <h4 className="mb-2 text-xl font-bold">Accent + Muted</h4>
-              <p className="text-white/90">Gentle transition from Coral Red to muted gray for elegant, understated designs.</p>
+              <p className="text-white/90">Gentle transition from deep red to muted gray for elegant, understated designs.</p>
             </Card>
           </div>
         </section>
@@ -479,13 +611,13 @@ export default function ExamplePage() {
         <section className="mb-16">
           <h3 className="mb-6 text-2xl font-semibold text-foreground">Gradient Backgrounds</h3>
           <div className="space-y-6">
-            <div className="relative overflow-hidden rounded-xl gradient-arctic-r p-12 shadow-2xl transition-all duration-300 hover:shadow-3xl animate-fade-in">
+            <div className="relative overflow-hidden rounded-xl gradient-primary-r p-12 shadow-2xl transition-all duration-300 hover:shadow-3xl animate-fade-in">
               <div className="relative z-10">
-                <h4 className="mb-3 text-3xl font-bold text-white">Horizontal Arctic Flow</h4>
+                <h4 className="mb-3 text-3xl font-bold text-white">Horizontal Primary Flow</h4>
                 <p className="mb-6 max-w-2xl text-lg text-white/90">
                   A smooth left-to-right gradient perfect for hero sections and feature highlights.
                 </p>
-                <Button className="bg-white text-[#2D9CDB] hover:bg-white/90 transition-transform duration-200 hover:scale-105">
+                <Button className="bg-white text-primary hover:bg-white/90 transition-transform duration-200 hover:scale-105">
                   Get Started
                 </Button>
               </div>
@@ -515,11 +647,11 @@ export default function ExamplePage() {
                 </div>
               </div>
 
-              <div className="relative overflow-hidden rounded-xl gradient-arctic-br p-8 shadow-xl transition-all duration-300 hover:shadow-2xl animate-fade-in">
+              <div className="relative overflow-hidden rounded-xl gradient-primary-br p-8 shadow-xl transition-all duration-300 hover:shadow-2xl animate-fade-in">
                 <div className="relative z-10">
                   <Badge className="mb-4 bg-white/20 text-white border-white/30">Popular</Badge>
-                  <h4 className="mb-2 text-2xl font-bold text-white">Arctic Fade</h4>
-                  <p className="text-white/90">Bottom-right gradient with subtle Arctic Blue transition.</p>
+                  <h4 className="mb-2 text-2xl font-bold text-white">Primary Fade</h4>
+                  <p className="text-white/90">Bottom-right gradient with subtle blue transition.</p>
                 </div>
               </div>
             </div>
@@ -528,11 +660,11 @@ export default function ExamplePage() {
             <div className="space-y-6">
               <div className="relative overflow-hidden rounded-xl gradient-accent-gray p-12 shadow-2xl transition-all duration-300 hover:shadow-3xl animate-fade-in">
                 <div className="relative z-10">
-                  <h4 className="mb-3 text-3xl font-bold text-white">Subtle Accent Flow</h4>
+                  <h4 className="mb-3 text-3xl font-bold text-white">Accent Flow</h4>
                   <p className="mb-6 max-w-2xl text-lg text-white/90">
-                    A refined gradient from Coral Red to gray that brings warmth and sophistication to your design.
+                    A refined gradient from deep red to slate that brings warmth and sophistication to your design.
                   </p>
-                  <Button className="bg-white text-[#EB5757] hover:bg-white/90 transition-transform duration-200 hover:scale-105">
+                  <Button className="bg-white text-destructive hover:bg-white/90 transition-transform duration-200 hover:scale-105">
                     Get Started
                   </Button>
                 </div>
@@ -628,11 +760,48 @@ export default function ExamplePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card py-8">
-        <div className="container mx-auto px-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Arctic Blue + Coral Red Theme • Clean, App-like, Elegant, Human-friendly
-          </p>
+      <footer className="border-t border-border/50 bg-card py-12">
+        <div className="container mx-auto px-8">
+          <div className="grid gap-8 md:grid-cols-3 mb-8">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex size-10 items-center justify-center rounded-lg gradient-primary shadow-lg">
+                  <svg className="size-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h5 className="font-semibold">Fairdrop</h5>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Modern auction platform built on Linera blockchain with industry-standard UI/UX.
+              </p>
+            </div>
+            <div>
+              <h6 className="font-semibold mb-3">Features</h6>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li>• Vibrant color system</li>
+                <li>• Smooth animations</li>
+                <li>• Responsive design</li>
+                <li>• Auction-specific components</li>
+              </ul>
+            </div>
+            <div>
+              <h6 className="font-semibold mb-3">Design System</h6>
+              <div className="flex gap-2">
+                <Badge variant="info">Modern</Badge>
+                <Badge variant="success">Accessible</Badge>
+                <Badge variant="outline">Fast</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                Enhanced with gradient utilities, micro-interactions, and delightful UX
+              </p>
+            </div>
+          </div>
+          <div className="border-t border-border/50 pt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Fairdrop UI Showcase • Built with React, Tailwind CSS, and Radix UI
+            </p>
+          </div>
         </div>
       </footer>
     </div>
