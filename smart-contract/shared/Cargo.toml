@@ -1,0 +1,12 @@
+[package]
+name = "shared"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+async-graphql.workspace = true
+linera-sdk.workspace = true
+serde.workspace = true

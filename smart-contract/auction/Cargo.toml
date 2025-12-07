@@ -1,0 +1,29 @@
+[package]
+name = "auction"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+async-graphql.workspace = true
+async-trait.workspace = true
+linera-sdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# Local dependencies
+shared = { path = "../shared" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "auction-contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "auction-service"
+path = "src/service.rs"
