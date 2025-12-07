@@ -25,7 +25,7 @@ impl Contract for IndexerContract {
     type Message = ();  // Indexer doesn't receive messages, only events
     type Parameters = IndexerParameters;
     type InstantiationArgument = ();
-    type EventValue = ();  // Indexer doesn't emit events
+    type EventValue = AuctionEvent;  // Event type for reading auction events
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
         let state = IndexerState::load(runtime.root_view_storage_context())
@@ -35,28 +35,41 @@ impl Contract for IndexerContract {
     }
 
     async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
-        // Validate that the application parameters were configured correctly
-        self.runtime.application_parameters();
+        // Indexer is ready to be initialized via the Initialize operation
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
         match operation {
-            IndexerOperation::Initialize => {
+            IndexerOperation::Initialize {
+                aac_chain,
+                auction_app,
+            } => {
+                // Check if already initialized - can only initialize once
                 if *self.state.initialized.get() {
-                    return IndexerResponse::Ok;
+                    panic!("Indexer already initialized. Deploy a new indexer instance to subscribe to a different chain/app.");
                 }
 
-                let params = self.runtime.application_parameters();
-
                 // Subscribe to Auction app's event stream
+                // Note: No access control is implemented. 
+                // Initialize indexer once per chain for an auction_app
                 self.runtime.subscribe_to_events(
-                    params.aac_chain, // AAC chain ID
-                    params.auction_app.forget_abi(),
+                    aac_chain,
+                    auction_app,
                     AUCTION_STREAM.into(),
                 );
 
+                // Store subscription information
+                self.state.subscription.set(Some(state::SubscriptionInfo {
+                    aac_chain,
+                    auction_app,
+                }));
+
                 self.state.initialized.set(true);
-                IndexerResponse::Ok
+
+                IndexerResponse::Initialized {
+                    aac_chain,
+                    auction_app,
+                }
             }
         }
     }
@@ -71,11 +84,9 @@ impl Contract for IndexerContract {
             assert_eq!(update.stream_id.stream_name, AUCTION_STREAM.into());
 
             for index in update.new_indices() {
-                let event = self.runtime.read_event(
-                    update.chain_id,
-                    AUCTION_STREAM.into(),
-                    index,
-                );
+                let event: AuctionEvent = self
+                    .runtime
+                    .read_event(update.chain_id, AUCTION_STREAM.into(), index);
 
                 self.handle_event(event).await;
             }

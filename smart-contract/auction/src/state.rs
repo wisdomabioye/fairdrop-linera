@@ -6,7 +6,7 @@ use shared::types::{AuctionId, AuctionParams, AuctionStatus, BidRecord, UserComm
 /// Different chain types use different subsets of this state:
 /// - AAC Chain: Uses auctions, bids, user_totals (auction authority data)
 /// - UIC Chains: Uses my_commitments (user-specific data)
-#[derive(RootView, Clone)]
+#[derive(RootView)]
 #[view(context = ViewStorageContext)]
 pub struct AuctionState {
     // ─────────────────────────────────────────────────────────
@@ -62,3 +62,4 @@ impl AuctionData {
         }
     }
 }
+

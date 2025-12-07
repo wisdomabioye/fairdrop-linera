@@ -15,7 +15,7 @@ license = "Apache-2.0"
 
 [workspace.dependencies]
 # Linera SDK
-linera-sdk = "0.15.4"
+linera-sdk = "0.15.5"
 
 # Async/GraphQL
 async-graphql = "7.0"

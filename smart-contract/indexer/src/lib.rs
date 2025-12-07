@@ -1,5 +1,4 @@
 use async_graphql::{Request, Response};
-use auction::AuctionAbi;
 use linera_sdk::linera_base_types::{ApplicationId, ChainId, ContractAbi, ServiceAbi};
 use linera_sdk::graphql::GraphQLMutationRoot;
 use serde::{Deserialize, Serialize};
@@ -22,20 +21,25 @@ impl ServiceAbi for IndexerAbi {
 
 #[derive(Debug, Deserialize, Serialize, GraphQLMutationRoot)]
 pub enum IndexerOperation {
-    /// Initialize subscription to Auction app's event stream
-    Initialize,
+    /// Initialize subscription to Auction app's event stream.
+    /// Can only be called once per indexer instance.
+    Initialize {
+        aac_chain: ChainId,
+        auction_app: ApplicationId,
+    },
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub enum IndexerResponse {
     #[default]
     Ok,
+
+    Initialized {
+        aac_chain: ChainId,
+        auction_app: ApplicationId,
+    },
 }
 
-/// Indexer Parameters
-/// Needs to know which Auction application to subscribe to
+/// Indexer Parameters - Empty, configuration is done via Initialize operation
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct IndexerParameters {
-    pub aac_chain: ChainId, // Which AAC chain to subscribe to
-    pub auction_app: ApplicationId<AuctionAbi>, // AAC ApplicationId
-}
+pub struct IndexerParameters {}

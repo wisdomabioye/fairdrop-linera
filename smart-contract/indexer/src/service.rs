@@ -4,11 +4,11 @@ mod state;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
 use linera_sdk::graphql::GraphQLMutationRoot;
-use linera_sdk::linera_base_types::WithServiceAbi;
+use linera_sdk::linera_base_types::{WithServiceAbi};
 use linera_sdk::views::View;
 use linera_sdk::{Service, ServiceRuntime};
 use std::sync::Arc;
-use self::state::IndexerState;
+use self::state::{IndexerState, SubscriptionInfoView};
 use indexer::IndexerAbi;
 use shared::types::{AuctionId, AuctionStatus, AuctionSummary, BidRecord};
 
@@ -156,5 +156,29 @@ impl QueryRoot {
         }
 
         Ok(result)
+    }
+
+    /// Get current subscription information
+    /// Returns which AAC chain and auction app this indexer is subscribed to.
+    /// Returns None if not yet initialized.
+    async fn subscription_info(&self) -> Result<Option<SubscriptionInfoView>, String> {
+        let initialized = *self.state.initialized.get();
+
+        if !initialized {
+            return Ok(None);
+        }
+
+        let subscription = self
+            .state
+            .subscription
+            .get()
+            .clone()
+            .ok_or("Indexer initialized but subscription info missing")?;
+
+        Ok(Some(SubscriptionInfoView {
+            aac_chain: subscription.aac_chain,
+            auction_app: subscription.auction_app,
+            initialized: true,
+        }))
     }
 }

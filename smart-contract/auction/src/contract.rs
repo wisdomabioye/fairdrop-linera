@@ -73,8 +73,8 @@ impl Contract for AuctionContract {
 
                 AuctionResponse::AuctionCreated { auction_id }
             }
-            
-            /// Is this really needed? We should be able to compute the from auction params at any given time
+
+            // Is this really needed? We should be able to compute the from auction params at any given time
             AuctionOperation::UpdatePrice { auction_id } => {
                 let auction = self
                     .state
@@ -90,7 +90,7 @@ impl Contract for AuctionContract {
                 let intervals = elapsed / auction.params.price_decay_interval;
 
                 if intervals > 0 {
-                    let mut auction_mut = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+                    let auction_mut = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
                     let total_decay = auction_mut
                         .params
                         .price_decay_amount
@@ -250,7 +250,7 @@ impl Contract for AuctionContract {
                 }
 
                 // Now get mutable reference to auction for bid processing
-                let mut auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+                let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
                 let current_price = auction.current_price;
 
                 // Check if auction still active
@@ -327,7 +327,8 @@ impl Contract for AuctionContract {
                     auction.clearing_price = Some(current_price);
                     auction.status = shared::types::AuctionStatus::Ended;
                 }
-                drop(auction); // Drop mutable reference before calling count_bids
+                // Release mutable reference before calling count_bids
+                let _ = auction;
 
                 if supply_exhausted {
                     let total_bids = self.count_bids_for_auction(auction_id).await;
@@ -393,34 +394,6 @@ impl Contract for AuctionContract {
 }
 
 impl AuctionContract {
-    /// Update price if interval has passed
-    fn update_price_if_needed(&mut self, auction: &mut AuctionData) {
-        let now = self.runtime.system_time();
-        let elapsed = now.delta_since(auction.last_price_update).as_micros();
-        let intervals = elapsed / auction.params.price_decay_interval;
-
-        if intervals > 0 {
-            let total_decay = auction
-                .params
-                .price_decay_amount
-                .saturating_mul(intervals as u128);
-            let new_price = auction
-                .current_price
-                .saturating_sub(total_decay)
-                .max(auction.params.floor_price);
-
-            auction.current_price = new_price;
-            auction.last_price_update = now;
-
-            let event = AuctionEvent::PriceUpdated {
-                auction_id: auction.params.auction_id,
-                new_price,
-                timestamp: now,
-            };
-            self.runtime.emit(AUCTION_STREAM.into(), &event);
-        }
-    }
-
     /// Settle auction and send settlement results to all bidders
     async fn settle_auction(&mut self, auction_id: u64) {
         let auction = self
