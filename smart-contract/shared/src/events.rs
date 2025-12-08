@@ -1,4 +1,4 @@
-use linera_sdk::linera_base_types::{Amount, ChainId, Timestamp};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 use crate::types::AuctionId;
@@ -16,15 +16,11 @@ pub enum AuctionEvent {
         total_supply: u64,
         start_price: Amount,
         floor_price: Amount,
+        price_decay_interval: u64, // Microseconds between price drops
+        price_decay_amount: Amount, // Amount to decrease per interval
         start_time: Timestamp,
         end_time: Timestamp,
-    },
-
-    /// Price updated (interval passed)
-    PriceUpdated {
-        auction_id: AuctionId,
-        new_price: Amount,
-        timestamp: Timestamp,
+        creator: AccountOwner, // Creator's account (for fund transfers)
     },
 
     /// Bid accepted
@@ -33,7 +29,7 @@ pub enum AuctionEvent {
         bid_id: u64,
         user_chain: ChainId,
         quantity: u64,
-        price_at_bid: Amount,
+        amount_paid: Amount, // Total amount paid by user
         total_sold: u64,
         remaining: u64,
     },
@@ -59,6 +55,22 @@ pub enum AuctionEvent {
         clearing_price: Amount,
         total_bidders: u64,
         total_sold: u64,
+    },
+
+    /// User claimed settlement
+    SettlementClaimed {
+        auction_id: AuctionId,
+        user_chain: ChainId,
+        allocated_quantity: u64,
+        clearing_price: Amount,
+        total_cost: Amount,
+        refund: Amount,
+    },
+
+    /// Auction cancelled by creator
+    AuctionCancelled {
+        auction_id: AuctionId,
+        reason: String,
     },
 }
 

@@ -1,13 +1,12 @@
 use async_graphql::{scalar, InputObject, SimpleObject};
-use linera_sdk::linera_base_types::{Amount, ChainId, Timestamp};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 pub type AuctionId = u64;
 
 /// Auction configuration parameters
-#[derive(Debug, Clone, Serialize, Deserialize, InputObject)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, InputObject, SimpleObject)]
 pub struct AuctionParams {
-    pub auction_id: AuctionId,
     pub item_name: String,
     pub total_supply: u64, // Total quantity for sale
     pub start_price: Amount, // Starting price per unit
@@ -16,16 +15,17 @@ pub struct AuctionParams {
     pub price_decay_amount: Amount, // Amount to decrease per interval
     pub start_time: Timestamp,
     pub end_time: Timestamp,
-    pub creator: ChainId,
+    pub creator: AccountOwner, // Creator's account (for fund transfers)
 }
 
 scalar!(AuctionStatus);
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
 pub enum AuctionStatus {
-    Active, // Accepting bids
+    Scheduled, // Created but not yet started (current_time < start_time)
+    Active, // Accepting bids (started and not ended)
     Ended, // Supply exhausted or time expired, ready for settlement
     Settled, // Settlement complete
-    Cancelled, // Cancelled by creator
+    Cancelled, // Cancelled by creator (only Scheduled auctions can be cancelled)
 }
 
 /// Individual bid record (stored on AAC)
@@ -35,8 +35,9 @@ pub struct BidRecord {
     pub auction_id: AuctionId,
     pub user_chain: ChainId,
     pub quantity: u64,
-    pub price_at_bid: Amount,
+    pub amount_paid: Amount,
     pub timestamp: Timestamp,
+    pub claimed: bool,
 }
 
 /// User's local commitment (stored on UIC)
@@ -56,12 +57,27 @@ pub struct SettlementResult {
 }
 
 /// Auction summary (materialized by Indexer)
+/// Flattened structure combining original params + derived state
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 pub struct AuctionSummary {
+    // ──────────────────────────────────────────────────────────
+    // Original Auction Parameters (from AuctionParams)
+    // ──────────────────────────────────────────────────────────
     pub auction_id: AuctionId,
     pub item_name: String,
-    pub current_price: Amount,
     pub total_supply: u64,
+    pub start_price: Amount,
+    pub floor_price: Amount,
+    pub price_decay_interval: u64,
+    pub price_decay_amount: Amount,
+    pub start_time: Timestamp,
+    pub end_time: Timestamp,
+    pub creator: AccountOwner,
+
+    // ──────────────────────────────────────────────────────────
+    // Derived State (computed/updated during auction lifecycle)
+    // ──────────────────────────────────────────────────────────
+    pub current_price: Amount,
     pub sold: u64,
     pub clearing_price: Option<Amount>,
     pub status: AuctionStatus,

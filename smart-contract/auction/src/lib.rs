@@ -23,8 +23,8 @@ impl ServiceAbi for AuctionAbi {
 
 /// Operations that can be executed on the Auction Application
 /// Different operations are relevant for different chain types:
-/// - AAC Chain: CreateAuction, UpdatePrice, PruneSettledAuction
-/// - UIC Chains: Buy, SubscribeToAuction, UnsubscribeFromAuction
+/// - AAC Chain: CreateAuction, PruneSettledAuction, CancelAuction
+/// - UIC Chains: Buy, SubscribeToAuction, UnsubscribeFromAuction, ClaimSettlement
 #[derive(Debug, Deserialize, Serialize, GraphQLMutationRoot)]
 pub enum AuctionOperation {
     // ─────────────────────────────────────────────────────────
@@ -36,13 +36,13 @@ pub enum AuctionOperation {
         params: AuctionParams,
     },
 
-    /// Manually trigger price update (optional, auto-updates on bid)
-    UpdatePrice {
+    /// Prune settled auction bids (after Indexer archives)
+    PruneSettledAuction {
         auction_id: u64,
     },
 
-    /// Prune settled auction bids (after Indexer archives)
-    PruneSettledAuction {
+    /// Cancel an auction (AAC chain only, creator only, before start or zero bids)
+    CancelAuction {
         auction_id: u64,
     },
 
@@ -64,6 +64,11 @@ pub enum AuctionOperation {
     /// Unsubscribe from AAC events
     UnsubscribeFromAuction {
         aac_chain: ChainId,
+    },
+
+    /// Claim settlement for a settled auction (UIC operation)
+    ClaimSettlement {
+        auction_id: u64,
     },
 }
 

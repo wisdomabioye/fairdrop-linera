@@ -22,10 +22,10 @@ impl WithContractAbi for IndexerContract {
 }
 
 impl Contract for IndexerContract {
-    type Message = ();  // Indexer doesn't receive messages, only events
+    type Message = ();
     type Parameters = IndexerParameters;
     type InstantiationArgument = ();
-    type EventValue = AuctionEvent;  // Event type for reading auction events
+    type EventValue = AuctionEvent;
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
         let state = IndexerState::load(runtime.root_view_storage_context())
@@ -46,12 +46,9 @@ impl Contract for IndexerContract {
             } => {
                 // Check if already initialized - can only initialize once
                 if *self.state.initialized.get() {
-                    panic!("Indexer already initialized. Deploy a new indexer instance to subscribe to a different chain/app.");
+                    panic!("Indexer already initialized. Instantiate a new indexer instance to subscribe to auction chain/app.");
                 }
 
-                // Subscribe to Auction app's event stream
-                // Note: No access control is implemented. 
-                // Initialize indexer once per chain for an auction_app
                 self.runtime.subscribe_to_events(
                     aac_chain,
                     auction_app,
@@ -105,17 +102,39 @@ impl IndexerContract {
                 auction_id,
                 item_name,
                 total_supply,
-                start_price, 
-                ..
+                start_price,
+                floor_price,
+                price_decay_interval,
+                price_decay_amount,
+                start_time,
+                end_time,
+                creator,
             } => {
+                // Determine initial status: Scheduled if start_time is in the future, otherwise Active
+                let now = self.runtime.system_time();
+                let initial_status = if now < start_time {
+                    AuctionStatus::Scheduled
+                } else {
+                    AuctionStatus::Active
+                };
+
                 let summary = AuctionSummary {
+                    // Original auction parameters
                     auction_id,
                     item_name,
-                    current_price: start_price,
                     total_supply,
+                    start_price,
+                    floor_price,
+                    price_decay_interval,
+                    price_decay_amount,
+                    start_time,
+                    end_time,
+                    creator,
+                    // Derived state
+                    current_price: start_price,
                     sold: 0,
                     clearing_price: None,
-                    status: AuctionStatus::Active,
+                    status: initial_status,
                     total_bids: 0,
                     total_bidders: 0,
                 };
@@ -125,26 +144,21 @@ impl IndexerContract {
                     .insert(&auction_id, summary)
                     .unwrap();
                 self.state.bid_history.insert(&auction_id, Vec::new()).unwrap();
-            }
 
-            AuctionEvent::PriceUpdated {
-                auction_id,
-                new_price,
-                timestamp: _,
-            } => {
-                if let Some(mut summary) = self
+                // Update creator index - add auction_id to creator's auction list
+                let mut creator_auctions = self
                     .state
-                    .auction_summaries
-                    .get(&auction_id)
+                    .auctions_by_creator
+                    .get(&creator)
                     .await
                     .unwrap()
-                {
-                    summary.current_price = new_price;
-                    self.state
-                        .auction_summaries
-                        .insert(&auction_id, summary)
-                        .unwrap();
-                }
+                    .unwrap_or_default();
+
+                creator_auctions.push(auction_id);
+                self.state
+                    .auctions_by_creator
+                    .insert(&creator, creator_auctions)
+                    .unwrap();
             }
 
             AuctionEvent::BidAccepted {
@@ -152,7 +166,7 @@ impl IndexerContract {
                 bid_id,
                 user_chain,
                 quantity,
-                price_at_bid,
+                amount_paid,
                 total_sold,
                 remaining: _,
             } => {
@@ -179,8 +193,9 @@ impl IndexerContract {
                         auction_id,
                         user_chain,
                         quantity,
-                        price_at_bid,
+                        amount_paid,
                         timestamp: self.runtime.system_time(),
+                        claimed: false,  // Not yet claimed
                     });
                     self.state.bid_history.insert(&auction_id, history).unwrap();
                 }
@@ -231,6 +246,37 @@ impl IndexerContract {
                 {
                     summary.status = AuctionStatus::Settled;
                     summary.total_bidders = total_bidders;
+                    self.state
+                        .auction_summaries
+                        .insert(&auction_id, summary)
+                        .unwrap();
+                }
+            }
+
+            AuctionEvent::SettlementClaimed {
+                auction_id: _,
+                user_chain: _,
+                allocated_quantity: _,
+                clearing_price: _,
+                total_cost: _,
+                refund: _,
+            } => {
+                // Log only, no state changes needed
+                // Settlement claims are tracked on AAC chain, not in indexer
+            }
+
+            AuctionEvent::AuctionCancelled {
+                auction_id,
+                reason: _,
+            } => {
+                if let Some(mut summary) = self
+                    .state
+                    .auction_summaries
+                    .get(&auction_id)
+                    .await
+                    .unwrap()
+                {
+                    summary.status = AuctionStatus::Cancelled;
                     self.state
                         .auction_summaries
                         .insert(&auction_id, summary)

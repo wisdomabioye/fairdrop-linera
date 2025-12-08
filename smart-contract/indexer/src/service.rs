@@ -4,7 +4,7 @@ mod state;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
 use linera_sdk::graphql::GraphQLMutationRoot;
-use linera_sdk::linera_base_types::{WithServiceAbi};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, WithServiceAbi};
 use linera_sdk::views::View;
 use linera_sdk::{Service, ServiceRuntime};
 use std::sync::Arc;
@@ -56,8 +56,14 @@ struct QueryRoot {
 
 #[Object]
 impl QueryRoot {
-    /// Get all active auctions
-    async fn active_auctions(&self) -> Result<Vec<AuctionSummary>, String> {
+    /// Get all active auctions with pagination
+    /// - offset: Skip the first N auctions (default: 0)
+    /// - limit: Return at most N auctions (default: unlimited)
+    async fn active_auctions(
+        &self,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<AuctionSummary>, String> {
         let indices = self
             .state
             .auction_summaries
@@ -80,6 +86,16 @@ impl QueryRoot {
             }
         }
 
+        // Apply pagination
+        let offset = offset.unwrap_or(0);
+        let result = result.into_iter().skip(offset);
+
+        let result = if let Some(limit) = limit {
+            result.take(limit).collect()
+        } else {
+            result.collect()
+        };
+
         Ok(result)
     }
 
@@ -95,19 +111,44 @@ impl QueryRoot {
             .map_err(|e| e.to_string())
     }
 
-    /// Get bid history for an auction
-    async fn bid_history(&self, auction_id: AuctionId) -> Result<Vec<BidRecord>, String> {
-        Ok(self
+    /// Get bid history for an auction with pagination
+    /// - offset: Skip the first N bids (default: 0)
+    /// - limit: Return at most N bids (default: unlimited)
+    async fn bid_history(
+        &self,
+        auction_id: AuctionId,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<BidRecord>, String> {
+        let bids = self
             .state
             .bid_history
             .get(&auction_id)
             .await
             .map_err(|e| e.to_string())?
-            .unwrap_or_default())
+            .unwrap_or_default();
+
+        // Apply pagination
+        let offset = offset.unwrap_or(0);
+        let bids = bids.into_iter().skip(offset);
+
+        let bids = if let Some(limit) = limit {
+            bids.take(limit).collect()
+        } else {
+            bids.collect()
+        };
+
+        Ok(bids)
     }
 
-    /// Get all settled auctions
-    async fn settled_auctions(&self) -> Result<Vec<AuctionSummary>, String> {
+    /// Get all settled auctions with pagination
+    /// - offset: Skip the first N auctions (default: 0)
+    /// - limit: Return at most N auctions (default: unlimited)
+    async fn settled_auctions(
+        &self,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<AuctionSummary>, String> {
         let indices = self
             .state
             .auction_summaries
@@ -130,11 +171,27 @@ impl QueryRoot {
             }
         }
 
+        // Apply pagination
+        let offset = offset.unwrap_or(0);
+        let result = result.into_iter().skip(offset);
+
+        let result = if let Some(limit) = limit {
+            result.take(limit).collect()
+        } else {
+            result.collect()
+        };
+
         Ok(result)
     }
 
-    /// Get all auctions (any status)
-    async fn all_auctions(&self) -> Result<Vec<AuctionSummary>, String> {
+    /// Get all auctions (any status) with pagination
+    /// - offset: Skip the first N auctions (default: 0)
+    /// - limit: Return at most N auctions (default: unlimited)
+    async fn all_auctions(
+        &self,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<AuctionSummary>, String> {
         let indices = self
             .state
             .auction_summaries
@@ -154,6 +211,16 @@ impl QueryRoot {
                 result.push(summary);
             }
         }
+
+        // Apply pagination
+        let offset = offset.unwrap_or(0);
+        let result = result.into_iter().skip(offset);
+
+        let result = if let Some(limit) = limit {
+            result.take(limit).collect()
+        } else {
+            result.collect()
+        };
 
         Ok(result)
     }
@@ -180,5 +247,79 @@ impl QueryRoot {
             auction_app: subscription.auction_app,
             initialized: true,
         }))
+    }
+
+    /// Calculate current price for an auction
+    /// Price is calculated on-demand based on auction parameters and current time
+    async fn current_price(&self, auction_id: AuctionId) -> Result<Amount, String> {
+        let summary = self
+            .state
+            .auction_summaries
+            .get(&auction_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Auction not found".to_string())?;
+
+        // Get current time - Note: This is the indexer's local time
+        let current_time = linera_sdk::linera_base_types::Timestamp::now();
+
+        // Use shared utility function
+        let price = shared::calculate_current_price(
+            summary.start_price,
+            summary.floor_price,
+            summary.price_decay_amount,
+            summary.price_decay_interval,
+            summary.start_time,
+            current_time,
+        );
+
+        Ok(price)
+    }
+
+    /// Get all auctions created by a specific user with pagination
+    /// - creator: The account owner to query auctions for
+    /// - offset: Skip the first N auctions (default: 0)
+    /// - limit: Return at most N auctions (default: unlimited)
+    async fn auctions_by_creator(
+        &self,
+        creator: AccountOwner,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<AuctionSummary>, String> {
+        // Get auction IDs for this creator
+        let auction_ids = self
+            .state
+            .auctions_by_creator
+            .get(&creator)
+            .await
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
+
+        let mut result = Vec::new();
+
+        // Fetch full auction summaries
+        for auction_id in auction_ids {
+            if let Some(summary) = self
+                .state
+                .auction_summaries
+                .get(&auction_id)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                result.push(summary);
+            }
+        }
+
+        // Apply pagination
+        let offset = offset.unwrap_or(0);
+        let result = result.into_iter().skip(offset);
+
+        let result = if let Some(limit) = limit {
+            result.take(limit).collect()
+        } else {
+            result.collect()
+        };
+
+        Ok(result)
     }
 }
