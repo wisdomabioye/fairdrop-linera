@@ -2,7 +2,7 @@ use async_graphql::{Request, Response};
 use linera_sdk::linera_base_types::{ChainId, ContractAbi, ServiceAbi};
 use linera_sdk::graphql::GraphQLMutationRoot;
 use serde::{Deserialize, Serialize};
-use shared::types::AuctionParams;
+use shared::types::AuctionParamsInput;
 
 pub use shared;
 
@@ -33,7 +33,7 @@ pub enum AuctionOperation {
 
     /// Create a new auction (AAC chain only)
     CreateAuction {
-        params: AuctionParams,
+        params: AuctionParamsInput,
     },
 
     /// Prune settled auction bids (after Indexer archives)

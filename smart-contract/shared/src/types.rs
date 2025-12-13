@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 
 pub type AuctionId = u64;
 
-/// Auction configuration parameters
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, InputObject, SimpleObject)]
-pub struct AuctionParams {
+/// Auction configuration parameters (for GraphQL input)
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, InputObject)]
+#[graphql(name = "AuctionParamsInput")]
+pub struct AuctionParamsInput {
     pub item_name: String,
     pub total_supply: u64, // Total quantity for sale
     pub start_price: Amount, // Starting price per unit
@@ -16,6 +17,37 @@ pub struct AuctionParams {
     pub start_time: Timestamp,
     pub end_time: Timestamp,
     pub creator: AccountOwner, // Creator's account (for fund transfers)
+}
+
+/// Auction configuration parameters (for output and internal use)
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, SimpleObject)]
+pub struct AuctionParams {
+    pub item_name: String,
+    pub total_supply: u64,
+    pub start_price: Amount,
+    pub floor_price: Amount,
+    pub price_decay_interval: u64,
+    pub price_decay_amount: Amount,
+    pub start_time: Timestamp,
+    pub end_time: Timestamp,
+    pub creator: AccountOwner,
+}
+
+// Conversion from input to internal type
+impl From<AuctionParamsInput> for AuctionParams {
+    fn from(input: AuctionParamsInput) -> Self {
+        Self {
+            item_name: input.item_name,
+            total_supply: input.total_supply,
+            start_price: input.start_price,
+            floor_price: input.floor_price,
+            price_decay_interval: input.price_decay_interval,
+            price_decay_amount: input.price_decay_amount,
+            start_time: input.start_time,
+            end_time: input.end_time,
+            creator: input.creator,
+        }
+    }
 }
 
 scalar!(AuctionStatus);
