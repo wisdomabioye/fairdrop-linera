@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useLineraApplication } from 'linera-react-client';
 import { useAuctionMutations, useCachedMyCommitment } from '@/hooks';
 import { UIC_APP_ID } from '@/config/app.config';
-import type { AuctionSummary } from '@/lib/gql/types';
+import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import {
   calculateCurrentPrice,
   formatTimeRemaining,
@@ -82,7 +82,7 @@ export function BidForm({
   const totalCommitmentAfterBid = currentCommitment + quantity;
 
   // Validation
-  const isAuctionActive = auction.status === 1; // AuctionStatus.Active
+  const isAuctionActive = auction.status === AuctionStatus.Active; // AuctionStatus.Active
   const isQuantityValid = quantity >= 1 && quantity <= availableSupply;
   const canSubmit = isAuctionActive && isQuantityValid && uicApp.app && !isBuying;
 

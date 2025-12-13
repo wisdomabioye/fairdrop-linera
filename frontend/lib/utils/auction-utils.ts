@@ -80,13 +80,13 @@ export function calculateCurrentPrice(
   const intervals = Math.floor(elapsed / (priceDecayInterval * 1000));
 
   // Calculate total decay
-  const decay = BigInt(priceDecayAmount) * BigInt(intervals);
+  const decay = BigInt(parseInt(priceDecayAmount)) * BigInt((intervals));
 
   // Calculate current price
-  const currentPrice = BigInt(startPrice) - decay;
+  const currentPrice = BigInt(parseInt(startPrice)) - decay;
 
   // Price cannot go below floor price
-  return currentPrice < BigInt(floorPrice)
+  return currentPrice < BigInt(parseInt(floorPrice))
     ? floorPrice
     : currentPrice.toString();
 }
@@ -209,7 +209,7 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
     };
   }
 
-  if (status === AuctionStatus.Schedule) {
+  if (status === AuctionStatus.Scheduled) {
     return {
       variant: 'default',
       text: 'Scheduled',
@@ -248,11 +248,11 @@ export function truncateAddress(
  */
 export function formatTokenAmount(
   amount: string,
-  decimals: number = 18,
-  maxDecimals: number = 4
+  decimals: number = 0,
+  maxDecimals: number = 0
 ): string {
   try {
-    const value = BigInt(amount);
+    const value = BigInt(parseInt(amount));
     const divisor = BigInt(10 ** decimals);
     const whole = value / divisor;
     const remainder = value % divisor;
@@ -327,7 +327,7 @@ export function isEndingVerySoon(endTime: number): boolean {
  * quantity × currentPrice
  */
 export function calculateBidCost(quantity: number, currentPrice: string): string {
-  const price = BigInt(currentPrice);
+  const price = BigInt(parseInt(currentPrice));
   const total = price * BigInt(quantity);
   return total.toString();
 }

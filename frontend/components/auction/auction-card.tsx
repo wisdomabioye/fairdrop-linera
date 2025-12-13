@@ -7,7 +7,7 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import type { AuctionSummary } from '@/lib/gql/types';
+import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import {
   calculateCurrentPrice,
   formatTimeRemaining,
@@ -18,6 +18,7 @@ import {
   isEndingVerySoon
 } from '@/lib/utils/auction-utils';
 import { cn } from '@/lib/utils';
+import { APP_ROUTES } from '@/config/app.route';
 
 export interface AuctionCardProps {
   auction: AuctionSummary;
@@ -61,7 +62,7 @@ export function AuctionCard({
     if (onViewDetails) {
       onViewDetails(auction.auctionId);
     } else {
-      router.push(`/auction-detail?id=${auction.auctionId}`);
+      router.push(`${APP_ROUTES.auctionDetail(auction.auctionId)}`);
     }
   };
 
@@ -182,7 +183,7 @@ export function AuctionCard({
           >
             View Details
           </Button>
-          {showQuickBid && auction.status === 1 && ( // AuctionStatus.Active
+          {showQuickBid && auction.status === AuctionStatus.Active && ( // AuctionStatus.Active
             <Button
               variant="default"
               className="flex-1"

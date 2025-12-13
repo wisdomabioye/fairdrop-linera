@@ -19,21 +19,25 @@ import { pollingManager } from '@/lib/utils/polling-manager';
 import {
     INDEXER_QUERY,
     INDEXER_MUTATION,
-    // AAC_QUERY,
+    AAC_QUERY,
     UIC_QUERY
 } from '@/lib/gql/queries';
-import type {
-    AuctionSummary,
-    BidRecord,
-    UserCommitment,
-    SubscriptionInfo
+import {
+    type AuctionSummary,
+    type AuctionWithId,
+    type BidRecord,
+    type UserCommitment,
+    type SubscriptionInfo,
+    transformAuctionWithId,
+    AuctionStatus
 } from '@/lib/gql/types';
 import type { ApplicationClient } from 'linera-react-client';
 import {
-    getStoredInitState,
-    setStoredInitState,
+    // getStoredInitState,
+    // setStoredInitState,
     clearStoredInitState
 } from '@/lib/utils/storage-helpers';
+
 
 // TTL constants (in milliseconds)
 const AUCTION_DATA_TTL = 5000; // 5 seconds - active auction data changes frequently
@@ -116,11 +120,12 @@ export interface AuctionStore {
     resetIndexer: () => void;
 
     // ============ Fetch Actions ============
-    fetchAuctionSummary: (auctionId: string, indexerApp: ApplicationClient) => Promise<void>;
-    fetchActiveAuctions: (offset: number, limit: number, indexerApp: ApplicationClient) => Promise<void>;
-    fetchSettledAuctions: (offset: number, limit: number, indexerApp: ApplicationClient) => Promise<void>;
-    fetchAuctionsByCreator: (creator: string, offset: number, limit: number, indexerApp: ApplicationClient) => Promise<void>;
-    fetchBidHistory: (auctionId: string, offset: number, limit: number, indexerApp: ApplicationClient) => Promise<void>;
+    // TEMPORARY: Using AAC queries while indexer event streaming is fixed
+    fetchAuctionSummary: (auctionId: string, aacApp: ApplicationClient) => Promise<void>;
+    fetchActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
+    fetchSettledAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
+    fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
+    fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchMyCommitment: (auctionId: string, uicApp: ApplicationClient) => Promise<void>;
 
     // ============ Invalidation Actions ============
@@ -133,8 +138,9 @@ export interface AuctionStore {
     invalidateAll: () => void;
 
     // ============ Polling Actions ============
-    startPollingAuction: (auctionId: string, indexerApp: ApplicationClient, interval?: number) => () => void;
-    startPollingActiveAuctions: (offset: number, limit: number, indexerApp: ApplicationClient, interval?: number) => () => void;
+    // TEMPORARY: Using AAC app while indexer event streaming is fixed
+    startPollingAuction: (auctionId: string, aacApp: ApplicationClient, interval?: number) => () => void;
+    startPollingActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient, interval?: number) => () => void;
 
     // ============ Utility Actions ============
     isStale: (
@@ -190,9 +196,9 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const infoResult = await indexerApp.publicClient.query<string>(
                     JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
                 );
-                console.log('SubscriptionInfo', infoResult)
                 const { data } = JSON.parse(infoResult) as { data: { subscriptionInfo: SubscriptionInfo | null } };
                 const info = data.subscriptionInfo;
+                console.log('subscriptionInfo', infoResult)
 
                 if (info?.initialized) {
                     // Already initialized, cache and return
@@ -202,31 +208,48 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                         indexerInitialized: true,
                         indexerInitializing: false,
                         subscriptionInfo: info
+
                     });
                     return;
                 }
 
                 // Not initialized, perform mutation
-                console.log('[AuctionStore] Initializing indexer...');
                 await indexerApp.publicClient.systemMutate<string>(
                     JSON.stringify(INDEXER_MUTATION.Initialize(aacChain, auctionApp))
                 );
 
-                const newInfo: SubscriptionInfo = {
-                    aacChain,
-                    auctionApp,
-                    initialized: true
-                };
+                const postInitResult = await indexerApp.publicClient.query<string>(
+                    JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
+                );
 
-                // setStoredInitState(indexerChainId, newInfo);
-                set({
-                    indexerInitialized: true,
-                    indexerInitializing: false,
-                    subscriptionInfo: newInfo
-                });
+                const postData = JSON.parse(postInitResult) as { data: { subscriptionInfo: SubscriptionInfo | null } };
+                const verifiedInfo = postData.data.subscriptionInfo;
 
-            } catch (err) {
-                const error = err instanceof Error ? err : new Error('Indexer initialization failed');
+                if (verifiedInfo?.initialized) {
+                    console.log('✅ State verified: indexer successfully initialized on-chain');
+                    set({
+                        indexerInitialized: true,
+                        indexerInitializing: false,
+                        subscriptionInfo: verifiedInfo
+                    });
+                } else {
+                    console.error('⚠️ WARNING: Mutation succeeded but state not persisted!');
+                    // Fall back to local state
+                    const newInfo: SubscriptionInfo = {
+                        aacChain,
+                        auctionApp,
+                        initialized: true
+                    };
+                    set({
+                        indexerInitialized: true,
+                        indexerInitializing: false,
+                        subscriptionInfo: newInfo
+                    });
+                }
+
+            } catch (err: any) {
+                const error = new Error('Indexer initialization failed');
+                console.error('❌ Indexer initialization error:', error);
                 set({
                     indexerError: error,
                     indexerInitializing: false
@@ -270,11 +293,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     // ============ Fetch Actions ============
-    fetchAuctionSummary: async (auctionId, indexerApp) => {
-        // Guard: Ensure indexer is initialized
-        if (!get().indexerInitialized) {
-            throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        }
+    fetchAuctionSummary: async (auctionId, aacApp) => {
+        // TEMPORARY: Skip indexer check - using AAC directly
+        // if (!get().indexerInitialized) {
+        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
+        // }
 
         const key = `auction-summary-${auctionId}`;
 
@@ -293,20 +316,26 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             });
 
             try {
-                const result = await indexerApp.publicClient.query<string>(
-                    JSON.stringify(INDEXER_QUERY.AuctionSummary(auctionId))
+                // TEMPORARY: Use AAC.AuctionInfo instead of INDEXER.AuctionSummary
+                const result = await aacApp.publicClient.query<string>(
+                    JSON.stringify(AAC_QUERY.AuctionInfo(Number(auctionId)))
                 );
-                console.log('AuctionSummary', result)
+                console.log('AuctionInfo (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
-                    data: { auctionSummary: AuctionSummary | null } 
+                    data: { auctionInfo: AuctionWithId | null }
                 };
+
+                // Transform AuctionWithId to AuctionSummary
+                const auctionSummary = data.auctionInfo
+                    ? transformAuctionWithId(data.auctionInfo)
+                    : null;
 
                 // Update cache with success
                 set((state) => {
                     const newAuctions = new Map(state.auctions);
                     newAuctions.set(auctionId, {
-                        data: data.auctionSummary,
+                        data: auctionSummary,
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
@@ -334,10 +363,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchActiveAuctions: async (offset, limit, indexerApp) => {
-        if (!get().indexerInitialized) {
-            throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        }
+    fetchActiveAuctions: async (offset, limit, aacApp) => {
+        // TEMPORARY: Skip indexer check - using AAC directly
+        // if (!get().indexerInitialized) {
+        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
+        // }
 
         const key = `active-auctions-${offset}-${limit}`;
 
@@ -354,18 +384,25 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             }));
 
             try {
-                const result = await indexerApp.publicClient.query<string>(
-                    JSON.stringify(INDEXER_QUERY.ActiveAuctions(offset, limit))
+                // TEMPORARY: Use AAC.AllAuctions instead of INDEXER.ActiveAuctions
+                const result = await aacApp.publicClient.query<string>(
+                    JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
-                console.log('ActiveAuctions', result)
+                console.log('AllAuctions (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
-                    data: { activeAuctions: AuctionSummary[] | null }
+                    data: { allAuctions: AuctionWithId[] | null }
                 };
+
+                // Transform AuctionWithId[] to AuctionSummary[] and filter by Active status
+                const allAuctions = data.allAuctions || [];
+                const activeAuctions = allAuctions
+                    .map(transformAuctionWithId)
+                    .filter(auction => auction.status === AuctionStatus.Active); // Status 1 = Active
 
                 set({
                     activeAuctions: {
-                        data: data.activeAuctions,
+                        data: activeAuctions,
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
@@ -392,10 +429,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchSettledAuctions: async (offset, limit, indexerApp) => {
-        if (!get().indexerInitialized) {
-            throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        }
+    fetchSettledAuctions: async (offset, limit, aacApp) => {
+        // TEMPORARY: Skip indexer check - using AAC directly
+        // if (!get().indexerInitialized) {
+        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
+        // }
 
         const key = `settled-auctions-${offset}-${limit}`;
 
@@ -412,18 +450,25 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             }));
 
             try {
-                const result = await indexerApp.publicClient.query<string>(
-                    JSON.stringify(INDEXER_QUERY.SettledAuctions(offset, limit))
+                // TEMPORARY: Use AAC.AllAuctions instead of INDEXER.SettledAuctions
+                const result = await aacApp.publicClient.query<string>(
+                    JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
-                console.log('SettledAuctions', result)
+                console.log('AllAuctions (AAC) for settled', result);
 
                 const { data } = JSON.parse(result) as {
-                    data: { settledAuctions: AuctionSummary[] | null } 
+                    data: { allAuctions: AuctionWithId[] | null }
                 };
+
+                // Transform AuctionWithId[] to AuctionSummary[] and filter by Settled status
+                const allAuctions = data.allAuctions || [];
+                const settledAuctions = allAuctions
+                    .map(transformAuctionWithId)
+                    .filter(auction => auction.status === AuctionStatus.Settled); // Status 3 = Settled
 
                 set({
                     settledAuctions: {
-                        data: data.settledAuctions,
+                        data: settledAuctions,
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
@@ -450,12 +495,14 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchAuctionsByCreator: async (creator, offset, limit, indexerApp) => {
-        if (!get().indexerInitialized) {
-            throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        }
+    fetchAuctionsByCreator: async (creator, aacApp) => {
+        // TEMPORARY: Skip indexer check - using AAC directly
+        // TEMPORARY: No offset/limit - returns all creator's auctions
+        // if (!get().indexerInitialized) {
+        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
+        // }
 
-        const key = `auctions-by-creator-${creator}-${offset}-${limit}`;
+        const key = `auctions-by-creator-${creator}`;
 
         await queryDeduplicator.deduplicate(key, async () => {
             set((state) => {
@@ -466,31 +513,35 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     timestamp: existing?.timestamp ?? Date.now(),
                     status: 'loading',
                     error: null,
-                    offset,
-                    limit,
+                    offset: 0,
+                    limit: 999, // No real limit for temporary workaround
                 });
                 return { auctionsByCreator: newMap };
             });
 
             try {
-                const result = await indexerApp.publicClient.query<string>(
-                    JSON.stringify(INDEXER_QUERY.AuctionsByCreator(creator, offset, limit))
+                // TEMPORARY: Use AAC.AuctionsByCreator (no pagination)
+                const result = await aacApp.publicClient.query<string>(
+                    JSON.stringify(AAC_QUERY.AuctionsByCreator(creator))
                 );
-                console.log('AuctionsByCreator', result)
+                console.log('AuctionsByCreator (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
-                    data: { auctionsByCreator: AuctionSummary[] | null } 
+                    data: { auctionsByCreator: AuctionWithId[] | null }
                 };
+
+                // Transform AuctionWithId[] to AuctionSummary[]
+                const auctions = (data.auctionsByCreator || []).map(transformAuctionWithId);
 
                 set((state) => {
                     const newMap = new Map(state.auctionsByCreator);
                     newMap.set(creator, {
-                        data: data.auctionsByCreator,
+                        data: auctions,
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
-                        offset,
-                        limit,
+                        offset: 0,
+                        limit: 999,
                     });
                     return { auctionsByCreator: newMap };
                 });
@@ -505,8 +556,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                         timestamp: existing?.timestamp ?? Date.now(),
                         status: 'error',
                         error,
-                        offset,
-                        limit,
+                        offset: 0,
+                        limit: 999,
                     });
                     return { auctionsByCreator: newMap };
                 });
@@ -516,10 +567,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchBidHistory: async (auctionId, offset, limit, indexerApp) => {
-        if (!get().indexerInitialized) {
-            throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        }
+    fetchBidHistory: async (auctionId, offset, limit, aacApp) => {
+        // TEMPORARY: Skip indexer check - using AAC directly
+        // if (!get().indexerInitialized) {
+        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
+        // }
 
         const key = `bid-history-${auctionId}-${offset}-${limit}`;
 
@@ -537,13 +589,14 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             });
 
             try {
-                const result = await indexerApp.publicClient.query<string>(
-                    JSON.stringify(INDEXER_QUERY.BidHistory(auctionId, offset, limit))
+                // TEMPORARY: Use AAC.BidHistory instead of INDEXER.BidHistory
+                const result = await aacApp.publicClient.query<string>(
+                    JSON.stringify(AAC_QUERY.BidHistory(Number(auctionId), offset, limit))
                 );
-                console.log('BidHistory', result)
+                console.log('BidHistory (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
-                    data: { bidHistory: BidRecord[] | null } 
+                    data: { bidHistory: BidRecord[] | null }
                 };
 
                 set((state) => {
@@ -577,6 +630,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     fetchMyCommitment: async (auctionId, uicApp) => {
+        
         const key = `my-commitment-${auctionId}`;
         const userChain = uicApp.walletClient?.getChainId(); // Get current user's chain
 
@@ -597,12 +651,16 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             });
 
             try {
-                const result = await uicApp.walletClient?.query<string>(
+                if (!uicApp.walletClient) {
+                    throw new Error('Wallet is not connected');
+                }
+                
+                const result = await uicApp.walletClient.query<string>(
                     JSON.stringify(UIC_QUERY.MyCommitmentForAuction(Number(auctionId)))
                 );
                 console.log('MyCommitmentForAuction', result)
 
-                const { data } = JSON.parse(result || '') as {
+                const { data } = JSON.parse(result) as {
                     data: { myCommitmentForAuction: UserCommitment | null } 
                 };
 
@@ -746,22 +804,22 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     // ============ Polling Actions ============
-    startPollingAuction: (auctionId, indexerApp, interval = 5000) => {
+    startPollingAuction: (auctionId, aacApp, interval = 5000) => {
         const key = `auction-${auctionId}`;
 
         return pollingManager.subscribe(
             key,
-            () => get().fetchAuctionSummary(auctionId, indexerApp),
+            () => get().fetchAuctionSummary(auctionId, aacApp),
             interval
         );
     },
 
-    startPollingActiveAuctions: (offset, limit, indexerApp, interval = 10000) => {
+    startPollingActiveAuctions: (offset, limit, aacApp, interval = 10000) => {
         const key = `active-auctions-${offset}-${limit}`;
 
         return pollingManager.subscribe(
             key,
-            () => get().fetchActiveAuctions(offset, limit, indexerApp),
+            () => get().fetchActiveAuctions(offset, limit, aacApp),
             interval
         );
     },

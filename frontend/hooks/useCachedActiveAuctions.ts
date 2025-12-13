@@ -2,6 +2,7 @@
  * useCachedActiveAuctions Hook
  *
  * Optimized hook for accessing active auctions list with intelligent caching.
+ * TEMPORARY: Uses AAC directly while indexer event streaming is fixed.
  *
  * Features:
  * - Reads from centralized store (instant)
@@ -14,7 +15,7 @@
  * const { auctions, loading, error, refetch, isStale } = useCachedActiveAuctions({
  *   offset: 0,
  *   limit: 20,
- *   indexerApp,
+ *   aacApp,
  *   enablePolling: true
  * });
  * ```
@@ -30,8 +31,8 @@ export interface UseCachedActiveAuctionsOptions {
     offset: number;
     /** Pagination limit */
     limit: number;
-    /** The indexer application client */
-    indexerApp: ApplicationClient | null;
+    /** The AAC (Auction Authority Chain) application client */
+    aacApp: ApplicationClient | null;
     /** Enable automatic polling (default: false) */
     enablePolling?: boolean;
     /** Polling interval in milliseconds (default: 10000ms) */
@@ -63,7 +64,7 @@ export function useCachedActiveAuctions(
     const {
         offset,
         limit,
-        indexerApp,
+        aacApp,
         enablePolling = false,
         pollInterval = 300000,
         skip = false
@@ -72,7 +73,6 @@ export function useCachedActiveAuctions(
     // Subscribe to store
     const {
         activeAuctions,
-        indexerInitialized,
         fetchActiveAuctions,
         isStale: checkIsStale,
         startPollingActiveAuctions
@@ -93,39 +93,39 @@ export function useCachedActiveAuctions(
      * Fetch active auctions
      */
     const refetch = useCallback(async () => {
-        if (!indexerInitialized || !indexerApp || skip) return;
+        if (!aacApp || skip) return;
 
         try {
-            await fetchActiveAuctions(offset, limit, indexerApp);
+            await fetchActiveAuctions(offset, limit, aacApp);
         } catch (err) {
             console.error('[useCachedActiveAuctions] Refetch failed:', err);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [indexerInitialized, indexerApp, skip, offset, limit]);
+    }, [aacApp, skip, offset, limit]);
 
     /**
      * Initial fetch - only run once when conditions are met
      */
     useEffect(() => {
-        if (skip || !indexerInitialized || !indexerApp) return;
+        if (skip || !aacApp) return;
 
         // Only fetch if we have no data at all, or if data is stale AND not currently loading
         if ((!activeAuctions || isStale) && !isFetching) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, indexerInitialized, indexerApp]);
+    }, [skip, aacApp]);
 
     /**
      * Setup polling if enabled
      */
     useEffect(() => {
-        if (!enablePolling || skip || !indexerInitialized || !indexerApp) {
+        if (!enablePolling || skip || !aacApp) {
             return;
         }
 
         // Start polling
-        const unsubscribe = startPollingActiveAuctions(offset, limit, indexerApp, pollInterval);
+        const unsubscribe = startPollingActiveAuctions(offset, limit, aacApp, pollInterval);
         setPollingUnsubscribe(() => unsubscribe);
 
         // Cleanup
@@ -134,7 +134,7 @@ export function useCachedActiveAuctions(
             setPollingUnsubscribe(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enablePolling, skip, indexerInitialized, indexerApp, offset, limit, pollInterval]);
+    }, [enablePolling, skip, aacApp, offset, limit, pollInterval]);
 
     return {
         auctions,

@@ -29,8 +29,8 @@ export interface UseCachedSettledAuctionsOptions {
     offset: number;
     /** Pagination limit */
     limit: number;
-    /** The indexer application client */
-    indexerApp: ApplicationClient | null;
+    /** The AAC (Auction Authority Chain) application client */
+    aacApp: ApplicationClient | null;
     /** Enable automatic polling (default: false - settled auctions don't change) */
     enablePolling?: boolean;
     /** Polling interval in milliseconds (default: 60000ms / 1 minute) */
@@ -62,7 +62,7 @@ export function useCachedSettledAuctions(
     const {
         offset,
         limit,
-        indexerApp,
+        aacApp,
         enablePolling = false,
         pollInterval = 300000,
         skip = false
@@ -71,7 +71,6 @@ export function useCachedSettledAuctions(
     // Subscribe to store
     const {
         settledAuctions,
-        indexerInitialized,
         fetchSettledAuctions,
         isStale: checkIsStale
     } = useAuctionStore();
@@ -91,35 +90,35 @@ export function useCachedSettledAuctions(
      * Fetch settled auctions
      */
     const refetch = useCallback(async () => {
-        if (!indexerInitialized || !indexerApp || skip) return;
+        if (!aacApp || skip) return;
 
         try {
-            await fetchSettledAuctions(offset, limit, indexerApp);
+            await fetchSettledAuctions(offset, limit, aacApp);
         } catch (err) {
             console.error('[useCachedSettledAuctions] Refetch failed:', err);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [indexerInitialized, indexerApp, skip, offset, limit]);
+    }, [aacApp, skip, offset, limit]);
 
     /**
      * Initial fetch - only run once when conditions are met
      */
     useEffect(() => {
-        if (skip || !indexerInitialized || !indexerApp) return;
+        if (skip || !aacApp) return;
 
         // Only fetch if we have no data at all, or if data is stale AND not currently loading
         if ((!settledAuctions || isStale) && !isFetching) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, indexerInitialized, indexerApp]);
+    }, [skip, aacApp]);
 
     /**
      * Setup polling if enabled
      * Note: Polling is typically not needed for settled auctions since they're immutable
      */
     useEffect(() => {
-        if (!enablePolling || skip || !indexerInitialized || !indexerApp) {
+        if (!enablePolling || skip || !aacApp) {
             return;
         }
 
@@ -136,7 +135,7 @@ export function useCachedSettledAuctions(
             setPollingInterval(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enablePolling, skip, indexerInitialized, indexerApp, pollInterval]);
+    }, [enablePolling, skip, pollInterval]);
 
     return {
         auctions,

@@ -27,8 +27,8 @@ import type { AuctionSummary } from '@/lib/gql/types';
 export interface UseCachedAuctionSummaryOptions {
     /** Auction ID to fetch */
     auctionId: string;
-    /** The indexer application client */
-    indexerApp: ApplicationClient | null;
+    /** The AAC application client */
+    aacApp: ApplicationClient | null;
     /** Enable automatic polling (default: true for active auctions) */
     enablePolling?: boolean;
     /** Polling interval in milliseconds (default: 5000ms) */
@@ -59,7 +59,7 @@ export function useCachedAuctionSummary(
 ): UseCachedAuctionSummaryResult {
     const {
         auctionId,
-        indexerApp,
+        aacApp,
         enablePolling = true,
         pollInterval = 50000,
         skip = false
@@ -68,7 +68,6 @@ export function useCachedAuctionSummary(
     // Subscribe to store
     const {
         auctions,
-        indexerInitialized,
         fetchAuctionSummary,
         isStale: checkIsStale,
         startPollingAuction
@@ -92,37 +91,37 @@ export function useCachedAuctionSummary(
      * Fetch auction summary
      */
     const refetch = useCallback(async () => {
-        if (!indexerInitialized || !indexerApp || skip) return;
+        if (!aacApp || skip) return;
 
         try {
-            await fetchAuctionSummary(auctionId, indexerApp);
+            await fetchAuctionSummary(auctionId, aacApp);
         } catch (err) {
             console.error('[useCachedAuctionSummary] Refetch failed:', err);
         }
-    }, [indexerInitialized, indexerApp, skip, auctionId, fetchAuctionSummary]);
+    }, [aacApp, skip, auctionId, fetchAuctionSummary]);
 
     /**
      * Initial fetch
      */
     useEffect(() => {
-        if (skip || !indexerInitialized || !indexerApp) return;
+        if (skip || !aacApp) return;
 
         // Fetch if no data or stale
         if (!entry || isStale) {
             refetch();
         }
-    }, [skip, indexerInitialized, indexerApp, auctionId, isStale]);
+    }, [skip, aacApp, auctionId, isStale]);
 
     /**
      * Setup polling if enabled
      */
     useEffect(() => {
-        if (!enablePolling || skip || !indexerInitialized || !indexerApp) {
+        if (!enablePolling || !aacApp|| skip) {
             return;
         }
 
         // Start polling
-        const unsubscribe = startPollingAuction(auctionId, indexerApp, pollInterval);
+        const unsubscribe = startPollingAuction(auctionId, aacApp, pollInterval);
         setPollingUnsubscribe(() => unsubscribe);
 
         // Cleanup
@@ -130,7 +129,7 @@ export function useCachedAuctionSummary(
             unsubscribe();
             setPollingUnsubscribe(null);
         };
-    }, [enablePolling, skip, indexerInitialized, indexerApp, auctionId, pollInterval]);
+    }, [enablePolling, skip, aacApp, auctionId, pollInterval]);
 
     return {
         auction,

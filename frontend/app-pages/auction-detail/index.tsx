@@ -1,10 +1,13 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Package, Share2 } from 'lucide-react';
 import { useLineraApplication } from 'linera-react-client';
 import { useCachedAuctionSummary, useCachedMyCommitment } from '@/hooks';
-import { INDEXER_APP_ID, UIC_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 import { BidForm } from '@/components/auction/bid-form';
 import { BidHistory } from '@/components/auction/bid-history';
 import { Button } from '@/components/ui/button';
@@ -21,17 +24,13 @@ import {
   formatTokenAmount,
   formatAbsoluteTime
 } from '@/lib/utils/auction-utils';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
 
 export default function AuctionDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const auctionId = searchParams?.get('id') || '';
 
-  const indexerApp = useLineraApplication(INDEXER_APP_ID);
-  const uicApp = useLineraApplication(UIC_APP_ID);
+  const aacApp = useLineraApplication(AAC_APP_ID);
 
   const [currentPrice, setCurrentPrice] = useState('0');
   const [timeRemaining, setTimeRemaining] = useState('');
@@ -44,16 +43,16 @@ export default function AuctionDetailPage() {
     refetch
   } = useCachedAuctionSummary({
     auctionId,
-    indexerApp: indexerApp.app,
+    aacApp: aacApp.app,
     enablePolling: true,
-    skip: !auctionId || !indexerApp.app
+    skip: !auctionId || !aacApp.app
   });
 
   // Fetch user's commitment
   const { commitment } = useCachedMyCommitment({
     auctionId,
-    uicApp: uicApp.app,
-    skip: !auctionId || !uicApp.app
+    uicApp: aacApp.app,
+    skip: !auctionId || !aacApp.app?.walletClient
   });
 
   // Update price and countdown
@@ -248,7 +247,7 @@ export default function AuctionDetailPage() {
           {/* Bid History */}
           <BidHistory
             auctionId={auctionId}
-            currentUserChain={uicApp.app?.publicClient.getAddress()}
+            currentUserChain={aacApp.app?.walletClient?.getChainId()}
           />
         </div>
 

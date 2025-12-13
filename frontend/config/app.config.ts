@@ -1,7 +1,7 @@
 /** Indexer App Id */
 export const INDEXER_APP_ID = process.env.NEXT_PUBLIC_INDEXER_APP!;
 /** Auction app AAC App Id */
-export const AUCTION_APP_ID = process.env.NEXT_PUBLIC_AAC_APP!;
+export const AAC_APP_ID = process.env.NEXT_PUBLIC_AAC_APP!;
 /** UIC App Id - same as AAC App Id */
 export const UIC_APP_ID = process.env.NEXT_PUBLIC_AAC_APP!;
 /** The chain where AAC app is running */

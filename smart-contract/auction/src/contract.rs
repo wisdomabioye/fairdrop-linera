@@ -37,7 +37,14 @@ impl Contract for AuctionContract {
 
     async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
         // Validate that the application parameters were configured correctly
-        self.runtime.application_parameters();
+        let app_params = self.runtime.application_parameters();
+
+        // Emit initialization event to create the stream
+        // This ensures the stream exists on every chain where the app is deployed
+        let event = AuctionEvent::ApplicationInitialized {
+            aac_chain: app_params.aac_chain,
+        };
+        self.runtime.emit(AUCTION_STREAM.into(), &event);
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {

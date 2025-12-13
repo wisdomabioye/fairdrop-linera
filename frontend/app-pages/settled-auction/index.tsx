@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { useLineraApplication } from 'linera-react-client';
 import { useCachedSettledAuctions, useAuctionMutations, useCachedMyCommitment } from '@/hooks';
-import { INDEXER_APP_ID, UIC_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID, UIC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 
 export default function SettledAuctions() {
     const router = useRouter();
-    const indexerApp = useLineraApplication(INDEXER_APP_ID);
+    const aacApp = useLineraApplication(AAC_APP_ID);
     const uicApp = useLineraApplication(UIC_APP_ID);
 
     const {
@@ -28,7 +28,7 @@ export default function SettledAuctions() {
     } = useCachedSettledAuctions({
         offset: 0,
         limit: 20,
-        indexerApp: indexerApp.app
+        aacApp: aacApp.app
     });
 
     const { claimSettlement, isClaiming } = useAuctionMutations({

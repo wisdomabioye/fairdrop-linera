@@ -154,9 +154,8 @@ export const INDEXER_QUERY = {
  */
 export const INDEXER_MUTATION = {
     Initialize (aac_chain: string, auction_app: string) {
-        return {
-            query: `mutation { initialize(aacChain: ${aac_chain}, auctionApp: ${auction_app}) }`
-        }
+        const query = `mutation { initialize(aacChain: "${aac_chain}", auctionApp: "${auction_app}") }`;
+        return { query };
     }
 }
 
@@ -172,8 +171,9 @@ export const AAC_QUERY = {
 
     AuctionInfo (auction_id: number) {
         return {
-            query: `query { 
+            query: `query {
                 auctionInfo(auctionId: ${auction_id}) {
+                    auctionId
                     currentPrice
                     lastPriceUpdate
                     totalSupply
@@ -184,7 +184,7 @@ export const AAC_QUERY = {
                     bidsPruned
                     totalBids
                     totalBidders
-                    
+
                     params {
                         itemName
                         totalSupply
@@ -196,24 +196,112 @@ export const AAC_QUERY = {
                         endTime
                         creator
                     }
-                } 
+                }
             }`
         }
     },
 
     ClaimableSettlement (auction_id: number, user_chain: string) {
         return {
-            query: `query { 
+            query: `query {
                 claimableSettlement(auctionId: ${auction_id}, userChain: "${user_chain}") {
                     totalQuantity
-                    
+
                     settlement {
                         allocatedQuantity
                         clearingPrice
                         totalCost
                         refund
                     }
-                } 
+                }
+            }`
+        }
+    },
+
+    // ─────────────────────────────────────────────────────────
+    // Temporary Indexer Replacement Queries
+    // TODO: Switch back to INDEXER_QUERY once event streaming is stable
+    // ─────────────────────────────────────────────────────────
+
+    /** Get all auctions (temporary indexer replacement) */
+    AllAuctions (offset: number, limit: number) {
+        return {
+            query: `query {
+                allAuctions(offset: ${offset}, limit: ${limit}) {
+                    auctionId
+                    currentPrice
+                    lastPriceUpdate
+                    totalSupply
+                    sold
+                    clearingPrice
+                    status
+                    settledAt
+                    bidsPruned
+                    totalBids
+                    totalBidders
+
+                    params {
+                        itemName
+                        totalSupply
+                        startPrice
+                        floorPrice
+                        priceDecayInterval
+                        priceDecayAmount
+                        startTime
+                        endTime
+                        creator
+                    }
+                }
+            }`
+        }
+    },
+
+    /** Get auctions by creator (temporary indexer replacement) */
+    AuctionsByCreator (creator: string) {
+        return {
+            query: `query {
+                auctionsByCreator(creator: "${creator}") {
+                    auctionId
+                    currentPrice
+                    lastPriceUpdate
+                    totalSupply
+                    sold
+                    clearingPrice
+                    status
+                    settledAt
+                    bidsPruned
+                    totalBids
+                    totalBidders
+
+                    params {
+                        itemName
+                        totalSupply
+                        startPrice
+                        floorPrice
+                        priceDecayInterval
+                        priceDecayAmount
+                        startTime
+                        endTime
+                        creator
+                    }
+                }
+            }`
+        }
+    },
+
+    /** Get bid history for an auction (temporary indexer replacement) */
+    BidHistory (auction_id: number, offset: number, limit: number) {
+        return {
+            query: `query {
+                bidHistory(auctionId: ${auction_id}, offset: ${offset}, limit: ${limit}) {
+                    bidId
+                    auctionId
+                    userChain
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }
             }`
         }
     },
@@ -244,24 +332,23 @@ export const AAC_MUTATION = {
         endTime: number;
         creator: string;
     }) {
-        return {
-            query: `mutation { 
-                createAuction(
-                    params: {
-                        itemName: "${itemName}",
-                        totalSupply: ${totalSupply},
-                        startPrice: "${Number(startPrice)}",
-                        floorPrice: "${Number(floorPrice)}",
-                        priceDecayInterval: ${priceDecayInterval},
-                        priceDecayAmount: "${Number(priceDecayAmount).toFixed(1)}",
-                        startTime: ${startTime},
-                        endTime: ${endTime},
-                        creator: "${creator}"
-                    }
-                
-                )    
-            }`
-        }
+        const query = `mutation {
+            createAuction(
+                params: {
+                    itemName: "${itemName}",
+                    totalSupply: ${totalSupply},
+                    startPrice: "${startPrice}",
+                    floorPrice: "${floorPrice}",
+                    priceDecayInterval: ${priceDecayInterval},
+                    priceDecayAmount: "${priceDecayAmount}",
+                    startTime: ${startTime},
+                    endTime: ${endTime},
+                    creator: "${creator}"
+                }
+            )
+        }`;
+        console.log('🔧 CreateAuction (AAC) mutation:', query);
+        return { query };
     },
 
     CancelAuction (auction_id: number) {
@@ -347,24 +434,23 @@ export const UIC_MUTATION = {
         endTime: number;
         creator: string;
     }) {
-        return {
-            query: `mutation { 
-                createAuction(
-                    params: {
-                        itemName: "${itemName}",
-                        totalSupply: ${totalSupply},
-                        startPrice: "${Number(startPrice)}",
-                        floorPrice: "${Number(floorPrice)}",
-                        priceDecayInterval: ${priceDecayInterval},
-                        priceDecayAmount: "${Number(priceDecayAmount).toFixed(1)}",
-                        startTime: ${startTime},
-                        endTime: ${endTime},
-                        creator: "${creator}"
-                    }
-                
-                )    
-            }`
-        }
+        const query = `mutation {
+            createAuction(
+                params: {
+                    itemName: "${itemName}",
+                    totalSupply: ${totalSupply},
+                    startPrice: "${startPrice}",
+                    floorPrice: "${floorPrice}",
+                    priceDecayInterval: ${priceDecayInterval},
+                    priceDecayAmount: "${priceDecayAmount}",
+                    startTime: ${startTime},
+                    endTime: ${endTime},
+                    creator: "${creator}"
+                }
+            )
+        }`;
+        console.log('🔧 CreateAuction (UIC) mutation:', query);
+        return { query };
     },
 
     Buy (auction_id: number, quantity: number) {
@@ -375,13 +461,13 @@ export const UIC_MUTATION = {
 
     SubscribeToAuction (aac_chain: string) {
         return {
-            query: `mutation { subscribeToAuction(aacChain: ${aac_chain}) }`
+            query: `mutation { subscribeToAuction(aacChain: "${aac_chain}") }`
         }
     },
 
     UnsubscribeFromAuction (aac_chain: string) {
         return {
-            query: `mutation { unsubscribeFromAuction(aacChain: ${aac_chain}) }`
+            query: `mutation { unsubscribeFromAuction(aacChain: "${aac_chain}") }`
         }
     },
 

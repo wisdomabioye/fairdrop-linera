@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, RefreshCw } from 'lucide-react';
 import { useLineraApplication } from 'linera-react-client';
 import { useCachedActiveAuctions } from '@/hooks';
-import { INDEXER_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
@@ -16,7 +16,7 @@ import type { AuctionSummary } from '@/lib/gql/types';
 
 export default function ActiveAuctions() {
     const router = useRouter();
-    const indexerApp = useLineraApplication(INDEXER_APP_ID);
+    const aacApp = useLineraApplication(AAC_APP_ID);
 
     const [bidDialog, setBidDialog] = useState<{
         open: boolean;
@@ -36,7 +36,7 @@ export default function ActiveAuctions() {
     } = useCachedActiveAuctions({
         offset: 0,
         limit: 20,
-        indexerApp: indexerApp.app,
+        aacApp: aacApp.app,
         pollInterval: 30000,
         enablePolling: true
     });

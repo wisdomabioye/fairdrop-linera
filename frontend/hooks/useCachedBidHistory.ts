@@ -32,8 +32,8 @@ export interface UseCachedBidHistoryOptions {
     offset: number;
     /** Pagination limit */
     limit: number;
-    /** The indexer application client */
-    indexerApp: ApplicationClient | null;
+    /** The AAC (Auction Authority Chain) application client */
+    aacApp: ApplicationClient | null;
     /** Skip fetching (useful when conditionally loading) */
     skip?: boolean;
 }
@@ -62,14 +62,13 @@ export function useCachedBidHistory(
         auctionId,
         offset,
         limit,
-        indexerApp,
+        aacApp,
         skip = false
     } = options;
 
     // Subscribe to store
     const {
         bidHistory,
-        indexerInitialized,
         fetchBidHistory,
         isStale: checkIsStale
     } = useAuctionStore();
@@ -89,26 +88,26 @@ export function useCachedBidHistory(
      * Fetch bid history
      */
     const refetch = useCallback(async () => {
-        if (!indexerInitialized || !indexerApp || skip) return;
+        if (!aacApp || skip) return;
 
         try {
-            await fetchBidHistory(auctionId, offset, limit, indexerApp);
+            await fetchBidHistory(auctionId, offset, limit, aacApp);
         } catch (err) {
             console.error('[useCachedBidHistory] Refetch failed:', err);
         }
-    }, [indexerInitialized, indexerApp, skip, auctionId, offset, limit, fetchBidHistory]);
+    }, [aacApp, skip, auctionId, offset, limit, fetchBidHistory]);
 
     /**
      * Initial fetch
      */
     useEffect(() => {
-        if (skip || !indexerInitialized || !indexerApp) return;
+        if (skip || !aacApp) return;
 
         // Fetch if no data or stale
         if (!entry || isStale) {
             refetch();
         }
-    }, [skip, indexerInitialized, indexerApp, auctionId, isStale]);
+    }, [skip, aacApp, auctionId, isStale]);
 
     return {
         bids,

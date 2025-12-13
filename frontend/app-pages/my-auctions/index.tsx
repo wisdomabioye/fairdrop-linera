@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Hammer, TrendingDown, Plus } from 'lucide-react';
 import { useLineraApplication } from 'linera-react-client';
 import { useCachedAuctionsByCreator } from '@/hooks';
-import { INDEXER_APP_ID, UIC_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
@@ -14,12 +14,11 @@ import { EmptyState } from '@/components/loading/empty-state';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { APP_ROUTES } from '@/config/app.route';
-import type { AuctionSummary } from '@/lib/gql/types';
+import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 
 export default function MyAuctionsPage() {
     const router = useRouter();
-    const indexerApp = useLineraApplication(INDEXER_APP_ID);
-    const uicApp = useLineraApplication(UIC_APP_ID);
+    const aacApp = useLineraApplication(AAC_APP_ID);
 
     const [bidDialog, setBidDialog] = useState<{
         open: boolean;
@@ -30,7 +29,7 @@ export default function MyAuctionsPage() {
     });
 
     // Get current user's address
-    const userAddress = uicApp.app?.walletClient?.getAddress() || '';
+    const userAddress = aacApp.app?.walletClient?.getAddress() || '';
 
     // Fetch auctions created by user
     const {
@@ -42,8 +41,8 @@ export default function MyAuctionsPage() {
         creator: userAddress,
         offset: 0,
         limit: 50,
-        indexerApp: indexerApp.app,
-        skip: !userAddress || !indexerApp.app
+        aacApp: aacApp.app,
+        skip: !userAddress || !aacApp.app
     });
 
     const handleBidClick = (auctionId: number) => {
@@ -112,20 +111,31 @@ export default function MyAuctionsPage() {
                         <div className="space-y-6">
                             {/* Group by status */}
                             <AuctionGroup
+                                title="Scheduled"
+                                auctions={createdAuctions.filter(a => a.status === AuctionStatus.Scheduled)}
+                                onBidClick={handleBidClick}
+                            />
+                            <AuctionGroup
                                 title="Active"
-                                auctions={createdAuctions.filter(a => a.status === 1)}
+                                auctions={createdAuctions.filter(a => a.status === AuctionStatus.Active)}
                                 onBidClick={handleBidClick}
                             />
                             <AuctionGroup
                                 title="Ended"
-                                auctions={createdAuctions.filter(a => a.status === 2)}
+                                auctions={createdAuctions.filter(a => a.status === AuctionStatus.Ended)}
                                 onBidClick={handleBidClick}
                             />
                             <AuctionGroup
                                 title="Settled"
-                                auctions={createdAuctions.filter(a => a.status === 3)}
+                                auctions={createdAuctions.filter(a => a.status === AuctionStatus.Settled)}
                                 onBidClick={handleBidClick}
                             />
+                            <AuctionGroup
+                                title="Cancelled"
+                                auctions={createdAuctions.filter(a => a.status === AuctionStatus.Cancelled)}
+                                onBidClick={handleBidClick}
+                            />
+
                         </div>
                     )}
                 </TabsContent>
@@ -177,7 +187,7 @@ function AuctionGroup({
                     <AuctionCard
                         key={auction.auctionId}
                         auction={auction}
-                        showQuickBid={auction.status === 1}
+                        showQuickBid={auction.status === AuctionStatus.Active}
                         onBidClick={onBidClick}
                     />
                 ))}

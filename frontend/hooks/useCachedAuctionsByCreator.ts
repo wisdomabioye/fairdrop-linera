@@ -28,12 +28,12 @@ import type { AuctionSummary } from '@/lib/gql/types';
 export interface UseCachedAuctionsByCreatorOptions {
     /** Creator's chain address */
     creator: string;
-    /** Pagination offset */
+    /** Pagination offset (TEMPORARY: ignored, returns all) */
     offset: number;
-    /** Pagination limit */
+    /** Pagination limit (TEMPORARY: ignored, returns all) */
     limit: number;
-    /** The indexer application client */
-    indexerApp: ApplicationClient | null;
+    /** The AAC (Auction Authority Chain) application client */
+    aacApp: ApplicationClient | null;
     /** Enable automatic polling (default: false) */
     enablePolling?: boolean;
     /** Polling interval in milliseconds (default: 30000ms / 30 seconds) */
@@ -64,9 +64,9 @@ export function useCachedAuctionsByCreator(
 ): UseCachedAuctionsByCreatorResult {
     const {
         creator,
-        offset,
-        limit,
-        indexerApp,
+        // offset,  // TEMPORARY: not used, AAC returns all creator's auctions
+        // limit,   // TEMPORARY: not used, AAC returns all creator's auctions
+        aacApp,
         enablePolling = false,
         pollInterval = 300000,
         skip = false
@@ -75,7 +75,6 @@ export function useCachedAuctionsByCreator(
     // Subscribe to store
     const {
         auctionsByCreator,
-        indexerInitialized,
         fetchAuctionsByCreator,
         isStale: checkIsStale
     } = useAuctionStore();
@@ -98,34 +97,35 @@ export function useCachedAuctionsByCreator(
      * Fetch auctions by creator
      */
     const refetch = useCallback(async () => {
-        if (!indexerInitialized || !indexerApp || skip || !creator) return;
+        if (!aacApp || skip || !creator) return;
 
         try {
-            await fetchAuctionsByCreator(creator, offset, limit, indexerApp);
+            // TEMPORARY: offset and limit not passed - AAC returns all creator's auctions
+            await fetchAuctionsByCreator(creator, aacApp);
         } catch (err) {
             console.error('[useCachedAuctionsByCreator] Refetch failed:', err);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [indexerInitialized, indexerApp, skip, creator, offset, limit]);
+    }, [aacApp, skip, creator]);
 
     /**
      * Initial fetch - only run once when conditions are met
      */
     useEffect(() => {
-        if (skip || !indexerInitialized || !indexerApp || !creator) return;
+        if (skip || !aacApp || !creator) return;
 
         // Only fetch if we have no data at all, or if data is stale AND not currently loading
         if ((!creatorAuctions || isStale) && !isFetching) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, indexerInitialized, indexerApp, creator]);
+    }, [skip, aacApp, creator]);
 
     /**
      * Setup polling if enabled
      */
     useEffect(() => {
-        if (!enablePolling || skip || !indexerInitialized || !indexerApp || !creator) {
+        if (!enablePolling || skip || !aacApp || !creator) {
             return;
         }
 
@@ -142,7 +142,7 @@ export function useCachedAuctionsByCreator(
             setPollingInterval(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enablePolling, skip, indexerInitialized, indexerApp, creator, pollInterval]);
+    }, [enablePolling, skip, creator, pollInterval]);
 
     return {
         auctions,

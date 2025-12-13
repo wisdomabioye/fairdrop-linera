@@ -1,10 +1,10 @@
 
 export const AuctionStatus = {
-    Schedule: 0,
-    Active: 1,
-    Ended: 2,
-    Settled: 3,
-    Cancelled: 4
+    Scheduled: 'Scheduled',
+    Active: 'Active',
+    Ended: 'Ended',
+    Settled: 'Settled',
+    Cancelled: 'Cancelled'
 } as const;
 
 export type AuctionStatus = typeof AuctionStatus[keyof typeof AuctionStatus];
@@ -62,4 +62,53 @@ export interface SubscriptionInfo {
     aacChain: string;
     auctionApp: string;
     initialized: boolean;
+}
+
+
+// ============ Data Transformers ============
+// Transform AuctionWithId (from AAC) to AuctionSummary (frontend format)
+export interface AuctionWithId {
+    auctionId: number;
+    currentPrice: string;
+    lastPriceUpdate: number;
+    totalSupply: number;
+    sold: number;
+    clearingPrice: string | null;
+    status: AuctionStatus;
+    settledAt: number | null;
+    bidsPruned: boolean;
+    totalBids: number;
+    totalBidders: number;
+    params: {
+        itemName: string;
+        totalSupply: number;
+        startPrice: string;
+        floorPrice: string;
+        priceDecayInterval: number;
+        priceDecayAmount: string;
+        startTime: number;
+        endTime: number;
+        creator: string;
+    };
+}
+
+export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
+    return {
+        auctionId: auction.auctionId,
+        itemName: auction.params.itemName,
+        totalSupply: auction.params.totalSupply,
+        startPrice: auction.params.startPrice,
+        floorPrice: auction.params.floorPrice,
+        priceDecayInterval: auction.params.priceDecayInterval,
+        priceDecayAmount: auction.params.priceDecayAmount,
+        startTime: auction.params.startTime,
+        endTime: auction.params.endTime,
+        creator: auction.params.creator,
+        currentPrice: auction.currentPrice,
+        sold: auction.sold,
+        clearingPrice: auction.clearingPrice,
+        status: auction.status,
+        totalBids: auction.totalBids,
+        totalBidders: auction.totalBidders,
+    };
 }

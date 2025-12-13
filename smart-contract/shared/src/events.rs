@@ -9,6 +9,11 @@ pub const AUCTION_STREAM: &[u8] = b"fairdrop_auctions";
 /// Events emitted by AAC (Auction Authority Chain)
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum AuctionEvent {
+    /// Application initialized (emitted on deployment to create stream)
+    ApplicationInitialized {
+        aac_chain: ChainId,
+    },
+
     /// Auction created
     AuctionCreated {
         auction_id: AuctionId,

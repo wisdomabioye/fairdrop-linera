@@ -98,6 +98,10 @@ impl Contract for IndexerContract {
 impl IndexerContract {
     async fn handle_event(&mut self, event: AuctionEvent) {
         match event {
+            AuctionEvent::ApplicationInitialized { aac_chain: _ } => {
+                // Initialization event - just confirms stream exists, no action needed
+            }
+
             AuctionEvent::AuctionCreated {
                 auction_id,
                 item_name,

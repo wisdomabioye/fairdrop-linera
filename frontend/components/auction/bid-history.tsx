@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCachedBidHistory } from '@/hooks';
-import { INDEXER_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 import type { BidRecord } from '@/lib/gql/types';
 import {
   truncateAddress,
@@ -30,7 +30,7 @@ export function BidHistory({
   compact = false,
   currentUserChain
 }: BidHistoryProps) {
-  const indexerApp = useLineraApplication(INDEXER_APP_ID);
+  const aacApp = useLineraApplication(AAC_APP_ID);
   const [offset, setOffset] = useState(0);
 
   const {
@@ -43,8 +43,8 @@ export function BidHistory({
     auctionId,
     offset,
     limit,
-    indexerApp: indexerApp.app,
-    skip: !indexerApp.app
+    aacApp: aacApp.app,
+    skip: !aacApp.app
   });
 
   const handleLoadMore = () => {
