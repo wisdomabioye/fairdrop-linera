@@ -27,8 +27,10 @@ import {
     type AuctionWithId,
     type BidRecord,
     type UserCommitment,
+    type AuctionCommitment,
     type SubscriptionInfo,
     transformAuctionWithId,
+    transformBidRecord,
     AuctionStatus
 } from '@/lib/gql/types';
 import type { ApplicationClient } from 'linera-react-client';
@@ -91,6 +93,16 @@ export interface UserCommitmentCacheEntry {
 }
 
 /**
+ * Cache entry for all user commitments
+ */
+export interface AllCommitmentsCacheEntry {
+    data: AuctionCommitment[] | null;
+    timestamp: number;
+    status: FetchStatus;
+    error: Error | null;
+}
+
+/**
  * Main auction store interface
  */
 export interface AuctionStore {
@@ -108,6 +120,7 @@ export interface AuctionStore {
     auctionsByCreator: Map<string, AuctionListCacheEntry>; // creator -> auctions
     bidHistory: Map<string, BidHistoryCacheEntry>; // auctionId -> bids
     userCommitments: Map<string, Map<string, UserCommitmentCacheEntry>>; // auctionId -> userChain -> commitment
+    allMyCommitments: Map<string, AllCommitmentsCacheEntry>; // userChain -> all commitments
 
     // ============ Indexer Actions ============
     initializeIndexer: (
@@ -127,6 +140,7 @@ export interface AuctionStore {
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchMyCommitment: (auctionId: string, userChain: string, uicApp: ApplicationClient) => Promise<void>;
+    fetchAllMyCommitments: (userChain: string, uicApp: ApplicationClient) => Promise<void>;
 
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId: string) => void;
@@ -135,6 +149,7 @@ export interface AuctionStore {
     invalidateAuctionsByCreator: (creator: string) => void;
     invalidateBidHistory: (auctionId: string) => void;
     invalidateUserCommitment: (auctionId: string, userChain?: string) => void;
+    invalidateAllMyCommitments: (userChain?: string) => void;
     invalidateAll: () => void;
 
     // ============ Polling Actions ============
@@ -144,7 +159,7 @@ export interface AuctionStore {
 
     // ============ Utility Actions ============
     isStale: (
-        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userCommitment',
+        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userCommitment' | 'allMyCommitments',
         key?: string
     ) => boolean;
 }
@@ -166,6 +181,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     auctionsByCreator: new Map(),
     bidHistory: new Map(),
     userCommitments: new Map(),
+    allMyCommitments: new Map(),
 
     // ============ Indexer Initialization ============
     initializeIndexer: async (indexerChainId, aacChain, auctionApp, indexerApp) => {
@@ -608,10 +624,13 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     data: { bidHistory: BidRecord[] | null }
                 };
 
+                // Transform bid records to convert timestamps from microseconds to milliseconds
+                const transformedBids = data.bidHistory?.map(transformBidRecord) || null;
+
                 set((state) => {
                     const newMap = new Map(state.bidHistory);
                     newMap.set(auctionId, {
-                        data: data.bidHistory,
+                        data: transformedBids,
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
@@ -667,13 +686,13 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 if (!uicApp.walletClient) {
                     throw new Error('Wallet is not connected');
                 }
-                
+
                 const result = await uicApp.walletClient.query<string>(
                     JSON.stringify(UIC_QUERY.MyCommitmentForAuction(Number(auctionId)))
                 );
 
                 const { data } = JSON.parse(result) as {
-                    data: { myCommitmentForAuction: UserCommitment | null } 
+                    data: { myCommitmentForAuction: UserCommitment | null }
                 };
 
                 set((state) => {
@@ -705,6 +724,74 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     });
                     newMap.set(auctionId, auctionMap);
                     return { userCommitments: newMap };
+                });
+
+                throw error;
+            }
+        });
+    },
+
+    fetchAllMyCommitments: async (userChain, uicApp) => {
+        // Validate userChain to prevent undefined keys in cache
+        if (!userChain) {
+            console.warn('[fetchAllMyCommitments] userChain is required');
+            return;
+        }
+
+        const key = `all-my-commitments-${userChain}`;
+
+        await queryDeduplicator.deduplicate(key, async () => {
+            set((state) => {
+                const newMap = new Map(state.allMyCommitments);
+                const existing = newMap.get(userChain);
+
+                newMap.set(userChain, {
+                    data: existing?.data ?? null,
+                    timestamp: existing?.timestamp ?? Date.now(),
+                    status: 'loading',
+                    error: null,
+                });
+                return { allMyCommitments: newMap };
+            });
+
+            try {
+                if (!uicApp.walletClient) {
+                    throw new Error('Wallet is not connected');
+                }
+
+                const result = await uicApp.walletClient.query<string>(
+                    JSON.stringify(UIC_QUERY.MyAuctionCommitments())
+                );
+                // console.log('MyAuctionCommitments', JSON.parse(result))
+                const { data } = JSON.parse(result) as {
+                    data: { myAuctionCommitment: AuctionCommitment[] | null }
+                };
+
+                set((state) => {
+                    const newMap = new Map(state.allMyCommitments);
+
+                    newMap.set(userChain, {
+                        data: data.myAuctionCommitment,
+                        timestamp: Date.now(),
+                        status: 'success',
+                        error: null,
+                    });
+                    return { allMyCommitments: newMap };
+                });
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch all commitments');
+
+                set((state) => {
+                    const newMap = new Map(state.allMyCommitments);
+                    const existing = newMap.get(userChain);
+
+                    newMap.set(userChain, {
+                        data: existing?.data ?? null,
+                        timestamp: existing?.timestamp ?? Date.now(),
+                        status: 'error',
+                        error,
+                    });
+                    return { allMyCommitments: newMap };
                 });
 
                 throw error;
@@ -804,6 +891,33 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
+    invalidateAllMyCommitments: (userChain) => {
+        set((state) => {
+            const newMap = new Map(state.allMyCommitments);
+
+            if (userChain) {
+                // Invalidate specific user
+                const existing = newMap.get(userChain);
+                if (existing) {
+                    newMap.set(userChain, {
+                        ...existing,
+                        timestamp: 0
+                    });
+                }
+            } else {
+                // Invalidate all users
+                newMap.forEach((value, key) => {
+                    newMap.set(key, {
+                        ...value,
+                        timestamp: 0
+                    });
+                });
+            }
+
+            return { allMyCommitments: newMap };
+        });
+    },
+
     invalidateAll: () => {
         set((state) => {
             // Mark all auctions as stale (timestamp = 0) instead of deleting
@@ -842,6 +956,12 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 newUserCommitments.set(auctionId, newAuctionMap);
             });
 
+            // Mark all my commitments as stale
+            const newAllMyCommitments = new Map(state.allMyCommitments);
+            newAllMyCommitments.forEach((value, key) => {
+                newAllMyCommitments.set(key, { ...value, timestamp: 0 });
+            });
+
             return {
                 auctions: newAuctions,
                 activeAuctions: newActiveAuctions,
@@ -849,6 +969,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 auctionsByCreator: newAuctionsByCreator,
                 bidHistory: newBidHistory,
                 userCommitments: newUserCommitments,
+                allMyCommitments: newAllMyCommitments,
             };
         });
     },
@@ -913,6 +1034,12 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const auctionMap = get().userCommitments.get(auctionId);
                 if (!auctionMap || !userChain) return true;
                 const entry = auctionMap.get(userChain);
+                if (!entry || entry.status === 'idle') return true;
+                return now - entry.timestamp > USER_COMMITMENT_TTL;
+            }
+            case 'allMyCommitments': {
+                if (!key) return true;
+                const entry = get().allMyCommitments.get(key);
                 if (!entry || entry.status === 'idle') return true;
                 return now - entry.timestamp > USER_COMMITMENT_TTL;
             }

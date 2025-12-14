@@ -386,7 +386,7 @@ export const UIC_QUERY = {
     },
 
     /** Get my commit for all auctions */
-    MyAuctionCommitment () {
+    MyAuctionCommitments () {
         return {
             query: `query {
                 myAuctionCommitment {

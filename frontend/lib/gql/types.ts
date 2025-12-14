@@ -114,3 +114,11 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
         totalBidders: auction.totalBidders,
     };
 }
+
+export function transformBidRecord(bid: BidRecord): BidRecord {
+    return {
+        ...bid,
+        // Convert timestamp from microseconds (backend) to milliseconds (JavaScript)
+        timestamp: microsecondsToMilliseconds(bid.timestamp)
+    };
+}

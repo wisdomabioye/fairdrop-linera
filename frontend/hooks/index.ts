@@ -36,6 +36,12 @@ export type {
     UseCachedMyCommitmentResult
 } from './useCachedMyCommitment';
 
+export { useCachedAllMyCommitments } from './useCachedAllMyCommitments';
+export type {
+    UseCachedAllMyCommitmentsOptions,
+    UseCachedAllMyCommitmentsResult
+} from './useCachedAllMyCommitments';
+
 export { useCachedSettledAuctions } from './useCachedSettledAuctions';
 export type {
     UseCachedSettledAuctionsOptions,

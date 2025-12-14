@@ -197,7 +197,7 @@ export function CreateAuctionForm({
                 min="1"
                 value={formData.totalSupply}
                 onChange={handleInputChange}
-                placeholder="e.g., 100"
+                placeholder="e.g., 1000"
                 disabled={isCreating}
               />
               {errors.totalSupply && (
@@ -212,14 +212,14 @@ export function CreateAuctionForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startPrice">Start Price (wei) *</Label>
+                <Label htmlFor="startPrice">Start Price (per unit of supply) *</Label>
                 <Input
                   id="startPrice"
                   name="startPrice"
                   type="text"
                   value={formData.startPrice}
                   onChange={handleInputChange}
-                  placeholder="e.g., 1000000000000000000"
+                  placeholder="e.g., 18"
                   disabled={isCreating}
                 />
                 {errors.startPrice && (
@@ -228,14 +228,14 @@ export function CreateAuctionForm({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="floorPrice">Floor Price (wei) *</Label>
+                <Label htmlFor="floorPrice">Floor Price (per unit of supply) *</Label>
                 <Input
                   id="floorPrice"
                   name="floorPrice"
                   type="text"
                   value={formData.floorPrice}
                   onChange={handleInputChange}
-                  placeholder="e.g., 100000000000000000"
+                  placeholder="e.g., 3"
                   disabled={isCreating}
                 />
                 {errors.floorPrice && (
@@ -246,14 +246,14 @@ export function CreateAuctionForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="priceDecayAmount">Price Decay Amount (wei) *</Label>
+                <Label htmlFor="priceDecayAmount">Price Decay Amount *</Label>
                 <Input
                   id="priceDecayAmount"
                   name="priceDecayAmount"
                   type="text"
                   value={formData.priceDecayAmount}
                   onChange={handleInputChange}
-                  placeholder="e.g., 10000000000000000"
+                  placeholder="e.g., 1"
                   disabled={isCreating}
                 />
                 {errors.priceDecayAmount && (
@@ -270,7 +270,7 @@ export function CreateAuctionForm({
                   min="1"
                   value={formData.priceDecayInterval}
                   onChange={handleInputChange}
-                  placeholder="e.g., 60"
+                  placeholder="e.g., 3000"
                   disabled={isCreating}
                 />
                 {errors.priceDecayInterval && (
