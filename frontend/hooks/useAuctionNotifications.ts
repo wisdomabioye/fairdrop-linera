@@ -20,6 +20,8 @@
 import { useEffect } from 'react';
 import { useLineraClient } from 'linera-react-client';
 import { useAuctionStore } from '@/store/auction-store';
+import { AAC_APP_ID } from '@/config/app.config';
+
 
 export interface UseAuctionNotificationsOptions {
     /** Whether to enable notifications (default: true) */
@@ -31,22 +33,22 @@ export function useAuctionNotifications(
 ): void {
     const { enabled = true } = options;
 
-    const { client } = useLineraClient();
+    const { publicClient, walletClient } = useLineraClient();
     const { invalidateAll } = useAuctionStore();
 
     /**
      * Set up Linera client notification listener
      */
     useEffect(() => {
-        if (!client || !enabled) {
+        if (!publicClient || !enabled) {
             return;
         }
 
-        console.log('[useAuctionNotifications] Setting up notification listener');
+        console.log('[useAuctionNotifications publicClient] Setting up notification listener');
 
         // Subscribe to notifications
-        client.onNotification(() => {
-            console.log('[useAuctionNotifications] Received notification, invalidating all caches');
+        publicClient.onNotification((notification: unknown) => {
+            console.log('[useAuctionNotifications publicClient] Received notification, invalidating all caches', notification);
 
             // Invalidate all cached data - this will trigger re-fetches
             // in all active hooks that depend on stale data
@@ -57,5 +59,25 @@ export function useAuctionNotifications(
         return () => {
             console.log('[useAuctionNotifications] Component unmounting');
         };
-    }, [client, enabled, invalidateAll]);
+    }, [publicClient, enabled, invalidateAll]);
+
+    useEffect(() => {
+        if (!walletClient || !enabled) {
+            return;
+        }
+
+        console.log('[useAuctionNotifications walletClient] Setting up notification listener');
+
+        // Subscribe to notifications
+        walletClient.onNotification((notification: unknown) => {
+            console.log('[useAuctionNotifications walletClient] Received notification, invalidating all caches', notification);
+            invalidateAll();
+        });
+
+        // Cleanup on unmount
+        return () => {
+            console.log('[useAuctionNotifications] Component unmounting');
+        };
+    }, [walletClient, enabled, invalidateAll]);
+
 }

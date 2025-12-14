@@ -103,11 +103,16 @@ export function useCachedBidHistory(
     useEffect(() => {
         if (skip || !aacApp) return;
 
-        // Fetch if no data or stale
-        if (!entry || isStale) {
+        // Check if entry exists by reading from store directly
+        const currentEntry = bidHistory.get(auctionId);
+
+        // Only fetch if no entry exists OR entry has no data
+        // This handles both initial load and failed previous fetches
+        if (!currentEntry || !currentEntry.data) {
             refetch();
         }
-    }, [skip, aacApp, auctionId, isStale]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [skip, aacApp, auctionId]);
 
     return {
         bids,

@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar as CalendarIcon, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuctionMutations } from '@/hooks';
 import { UIC_APP_ID } from '@/config/app.config';
@@ -51,12 +50,12 @@ export function CreateAuctionForm({
     uicApp: uicApp.app,
     onCreateSuccess: (auctionId) => {
       toast.success('Auction created successfully!', {
-        description: `Auction ID: ${auctionId}`
+        description: ``
       });
       if (onSuccess) {
         onSuccess(auctionId);
       } else {
-        router.push(APP_ROUTES.activeAuctions);
+        router.push(APP_ROUTES.myAuctions);
       }
     },
     onError: (error) => {
@@ -117,8 +116,6 @@ export function CreateAuctionForm({
     // Date validation
     if (!startDate) {
       newErrors.startTime = 'Start time is required';
-    } else if (startDate.getTime() < Date.now()) {
-      newErrors.startTime = 'Start time must be in the future';
     }
 
     if (!endDate) {
@@ -301,29 +298,13 @@ export function CreateAuctionForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Time *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !startDate && 'text-muted-foreground'
-                      )}
-                      disabled={isCreating}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? formatAbsoluteTime(startDate.getTime()) : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      disabled={(date) => date < new Date()}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  date={startDate}
+                  setDate={setStartDate}
+                  disabled={(date) => date < new Date(Date.now() - 86400000)}
+                  formatDate={(date) => formatAbsoluteTime(date.getTime())}
+                  disablePicker={isCreating}
+                />
                 {errors.startTime && (
                   <p className="text-sm text-destructive">{errors.startTime}</p>
                 )}
@@ -331,29 +312,13 @@ export function CreateAuctionForm({
 
               <div className="space-y-2">
                 <Label>End Time *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !endDate && 'text-muted-foreground'
-                      )}
-                      disabled={isCreating}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? formatAbsoluteTime(endDate.getTime()) : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={setEndDate}
-                      disabled={(date) => !startDate || date <= startDate}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  date={endDate}
+                  setDate={setEndDate}
+                  disabled={(date) => !startDate || date <= startDate}
+                  formatDate={(date) => formatAbsoluteTime(date.getTime())}
+                  disablePicker={isCreating}
+                />
                 {errors.endTime && (
                   <p className="text-sm text-destructive">{errors.endTime}</p>
                 )}

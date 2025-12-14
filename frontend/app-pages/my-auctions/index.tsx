@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Hammer, TrendingDown, Plus } from 'lucide-react';
-import { useLineraApplication } from 'linera-react-client';
+import { useLineraApplication, useWalletConnection } from 'linera-react-client';
 import { useCachedAuctionsByCreator } from '@/hooks';
 import { AAC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
@@ -11,6 +11,7 @@ import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
+import { WalletConnectionPrompt } from '@/components/wallet/wallet-connection-prompt';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { APP_ROUTES } from '@/config/app.route';
@@ -19,6 +20,7 @@ import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 export default function MyAuctionsPage() {
     const router = useRouter();
     const aacApp = useLineraApplication(AAC_APP_ID);
+    const { isConnected, address } = useWalletConnection();
 
     const [bidDialog, setBidDialog] = useState<{
         open: boolean;
@@ -28,9 +30,6 @@ export default function MyAuctionsPage() {
         auction: null
     });
 
-    // Get current user's address
-    const userAddress = aacApp.app?.walletClient?.getAddress() || '';
-
     // Fetch auctions created by user
     const {
         auctions: createdAuctions,
@@ -38,11 +37,11 @@ export default function MyAuctionsPage() {
         error: errorCreated,
         refetch: refetchCreated
     } = useCachedAuctionsByCreator({
-        creator: userAddress,
+        creator: address!,
         offset: 0,
         limit: 50,
         aacApp: aacApp.app,
-        skip: !userAddress || !aacApp.app
+        skip: !address || !aacApp.app
     });
 
     const handleBidClick = (auctionId: number) => {
@@ -55,6 +54,27 @@ export default function MyAuctionsPage() {
     const handleCreateAuction = () => {
         router.push(APP_ROUTES.createAuction);
     };
+
+    // Show wallet connection section if not connected
+    if (!isConnected) {
+        return (
+            <div className="container mx-auto px-4 py-8">
+                {/* Header */}
+                <header className="mb-8">
+                    <h1 className="text-4xl font-bold mb-2">My Auctions</h1>
+                    <p className="text-muted-foreground">
+                        Manage auctions you've created and track your bids
+                    </p>
+                </header>
+
+                <WalletConnectionPrompt
+                    title="Connect Your Wallet"
+                    description="Connect your wallet to view and manage your auctions. You'll be able to create new auctions and track your bidding activity."
+                    className="max-w-2xl mx-auto"
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto px-4 py-8">

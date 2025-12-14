@@ -1,3 +1,4 @@
+import { microsecondsToMilliseconds } from '@/lib/utils/auction-utils';
 
 export const AuctionStatus = {
     Scheduled: 'Scheduled',
@@ -101,8 +102,9 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
         floorPrice: auction.params.floorPrice,
         priceDecayInterval: auction.params.priceDecayInterval,
         priceDecayAmount: auction.params.priceDecayAmount,
-        startTime: auction.params.startTime,
-        endTime: auction.params.endTime,
+        // Convert timestamps from microseconds (backend) to milliseconds (JavaScript)
+        startTime: microsecondsToMilliseconds(auction.params.startTime),
+        endTime: microsecondsToMilliseconds(auction.params.endTime),
         creator: auction.params.creator,
         currentPrice: auction.currentPrice,
         sold: auction.sold,

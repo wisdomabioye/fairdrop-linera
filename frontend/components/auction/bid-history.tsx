@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCachedBidHistory } from '@/hooks';
 import { AAC_APP_ID } from '@/config/app.config';
-import type { BidRecord } from '@/lib/gql/types';
+// import type { BidRecord } from '@/lib/gql/types';
 import {
   truncateAddress,
   formatTokenAmount,

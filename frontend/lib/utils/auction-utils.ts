@@ -80,13 +80,13 @@ export function calculateCurrentPrice(
   const intervals = Math.floor(elapsed / (priceDecayInterval * 1000));
 
   // Calculate total decay
-  const decay = BigInt(parseInt(priceDecayAmount)) * BigInt((intervals));
+  const decay = parseAmountSafe(priceDecayAmount) * BigInt((intervals));
 
   // Calculate current price
-  const currentPrice = BigInt(parseInt(startPrice)) - decay;
+  const currentPrice = parseAmountSafe(startPrice) - decay;
 
   // Price cannot go below floor price
-  return currentPrice < BigInt(parseInt(floorPrice))
+  return currentPrice < parseAmountSafe(floorPrice)
     ? floorPrice
     : currentPrice.toString();
 }
@@ -252,31 +252,55 @@ export function formatTokenAmount(
   maxDecimals: number = 0
 ): string {
   try {
-    const value = BigInt(parseInt(amount));
-    const divisor = BigInt(10 ** decimals);
-    const whole = value / divisor;
-    const remainder = value % divisor;
+    const value = parseAmountSafe(amount);
+    return value.toString();
+    // const divisor = BigInt(10 ** decimals);
+    // const whole = value / divisor;
+    // const remainder = value % divisor;
 
-    // If no remainder, just return whole number
-    if (remainder === BigInt(0)) {
-      return whole.toString();
-    }
+    // // If no remainder, just return whole number
+    // if (remainder === BigInt(0)) {
+    //   return whole.toString();
+    // }
 
-    // Format decimal part
-    const decimalPart = remainder
-      .toString()
-      .padStart(decimals, '0')
-      .slice(0, maxDecimals)
-      .replace(/0+$/, ''); // Remove trailing zeros
+    // // Format decimal part
+    // const decimalPart = remainder
+    //   .toString()
+    //   .padStart(decimals, '0')
+    //   .slice(0, maxDecimals)
+    //   .replace(/0+$/, ''); // Remove trailing zeros
 
-    if (decimalPart.length === 0) {
-      return whole.toString();
-    }
+    // if (decimalPart.length === 0) {
+    //   return whole.toString();
+    // }
 
-    return `${whole}.${decimalPart}`;
+    // return `${whole}.${decimalPart}`;
   } catch (error) {
     console.error('Error formatting token amount:', error);
     return '0';
+  }
+}
+
+/**
+ * Safely parse amount string to BigInt
+ * Handles trailing dots, empty strings, and invalid values
+ * Returns 0n for invalid inputs
+ */
+export function parseAmountSafe(amount: string | null | undefined): bigint {
+  if (!amount || amount.trim() === '') {
+    return BigInt(0);
+  }
+
+  try {
+    const parsed = parseInt(amount, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      console.warn(`Invalid amount parsed: "${amount}" -> NaN or negative`);
+      return BigInt(0);
+    }
+    return BigInt(parsed);
+  } catch (error) {
+    console.error(`Error parsing amount: "${amount}"`, error);
+    return BigInt(0);
   }
 }
 
@@ -327,7 +351,7 @@ export function isEndingVerySoon(endTime: number): boolean {
  * quantity × currentPrice
  */
 export function calculateBidCost(quantity: number, currentPrice: string): string {
-  const price = BigInt(parseInt(currentPrice));
+  const price = parseAmountSafe(currentPrice);
   const total = price * BigInt(quantity);
   return total.toString();
 }

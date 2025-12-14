@@ -83,7 +83,7 @@ export function useCachedAuctionsByCreator(
     const [_pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
     // Get auctions for this specific creator
-    const creatorAuctions = auctionsByCreator.get(creator) ?? null;
+    const creatorAuctions = creator ? auctionsByCreator.get(creator) ?? null : null;
 
     // Derived state
     const auctions = creatorAuctions?.data ?? null;

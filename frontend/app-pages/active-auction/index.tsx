@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
 import { Button } from '@/components/ui/button';
 import type { AuctionSummary } from '@/lib/gql/types';
+import { APP_ROUTES } from '@/config/app.route';
 
 export default function ActiveAuctions() {
     const router = useRouter();
@@ -49,7 +50,7 @@ export default function ActiveAuctions() {
     };
 
     const handleCreateAuction = () => {
-        router.push('/create-auction');
+        router.push(APP_ROUTES.createAuction);
     };
 
     return (
@@ -85,7 +86,7 @@ export default function ActiveAuctions() {
 
             {/* Loading State */}
             {loading && !hasLoadedOnce && (
-                <AuctionSkeletonGrid count={8} />
+                <AuctionSkeletonGrid count={4} />
             )}
 
             {/* Error State */}

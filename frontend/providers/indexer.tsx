@@ -1,19 +1,19 @@
 'use client';
 
 // import { useEffect } from 'react';
-import { useLineraApplication } from 'linera-react-client';
+// import { useLineraApplication } from 'linera-react-client';
 import { /* useIndexerInitialization, */ useAuctionNotifications } from '@/hooks';
 import {
-    INDEXER_APP_ID,
+    // INDEXER_APP_ID,
     // AAC_APP_ID,
 } from '@/config/app.config';
 // import { toast } from 'sonner';
 
 export function IndexerProvider({ children }: { children: React.ReactNode }) {
-    const indexerApp = useLineraApplication(INDEXER_APP_ID);
-    const publicChainId = indexerApp.app?.publicClient.getChainId()!;
+    // const indexerApp = useLineraApplication(INDEXER_APP_ID);
+    // const publicChainId = indexerApp.app?.publicClient.getChainId()!;
 
-    console.log('publicClient chainId: ', publicChainId)
+    // console.log('publicClient chainId: ', publicChainId)
     // Initialize indexer
     // const { initialized, initializing, error, recheck } = useIndexerInitialization({
     //     indexerChainId: publicChainId, // use the currently claimed chain

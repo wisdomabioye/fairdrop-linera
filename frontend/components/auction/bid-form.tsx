@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { useLineraApplication } from 'linera-react-client';
+import { useLineraApplication, useWalletConnection } from 'linera-react-client';
 import { useAuctionMutations, useCachedMyCommitment } from '@/hooks';
 import { UIC_APP_ID } from '@/config/app.config';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
@@ -15,7 +15,8 @@ import {
   calculateCurrentPrice,
   formatTimeRemaining,
   calculateBidCost,
-  formatTokenAmount
+  formatTokenAmount,
+  formatAbsoluteTime
 } from '@/lib/utils/auction-utils';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -34,6 +35,7 @@ export function BidForm({
   compact = false
 }: BidFormProps) {
   const uicApp = useLineraApplication(UIC_APP_ID);
+  const { isConnected, isConnecting, connect } = useWalletConnection();
   const [quantity, setQuantity] = useState(1);
   const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
 
@@ -116,13 +118,81 @@ export function BidForm({
     }
   };
 
-  if (!isAuctionActive) {
+  // Wallet connection guard - show before checking auction status
+  if (!isConnected) {
     return (
       <Card className={compact ? '' : undefined}>
-        <CardContent className="p-6">
-          <p className="text-center text-muted-foreground">
-            This auction is no longer active
+        <CardHeader>
+          <CardTitle>Place Your Bid</CardTitle>
+          <CardDescription>
+            Connect your wallet to participate in this auction
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          <div className="text-center space-y-4">
+            <p className="text-muted-foreground">
+              You need to connect your wallet to place bids on auctions.
+            </p>
+            <Button
+              onClick={connect}
+              disabled={isConnecting}
+              variant="default"
+              className="w-full"
+            >
+              {isConnecting ? (
+                <>
+                  <Spinner className="h-4 w-4 mr-2" />
+                  Connecting...
+                </>
+              ) : (
+                'Connect Wallet'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!isAuctionActive) {
+    let message: string;
+    let description: string | undefined;
+
+    switch (auction.status) {
+      case AuctionStatus.Scheduled:
+        message = 'Auction Not Started';
+        description = `Bidding opens ${formatAbsoluteTime(auction.startTime)}`;
+        break;
+      case AuctionStatus.Ended:
+        message = 'Auction Ended';
+        description = 'Bidding is closed. Waiting for settlement.';
+        break;
+      case AuctionStatus.Settled:
+        message = 'Auction Settled';
+        description = auction.clearingPrice
+          ? `Final clearing price: ${formatTokenAmount(auction.clearingPrice, 18, 4)}`
+          : 'Settlement complete';
+        break;
+      case AuctionStatus.Cancelled:
+        message = 'Auction Cancelled';
+        description = 'This auction has been cancelled by the creator.';
+        break;
+      default:
+        message = 'This auction is no longer active';
+        description = undefined;
+    }
+
+    return (
+      <Card className={compact ? '' : undefined}>
+        <CardContent className="p-6 space-y-3 text-center">
+          <p className="text-lg font-semibold text-muted-foreground">
+            {message}
           </p>
+          {description && (
+            <p className="text-sm text-muted-foreground/80">
+              {description}
+            </p>
+          )}
         </CardContent>
       </Card>
     );

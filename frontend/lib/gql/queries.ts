@@ -169,7 +169,7 @@ export const AAC_QUERY = {
         }
     },
 
-    AuctionInfo (auction_id: number) {
+    AuctionInfo (auction_id: string) {
         return {
             query: `query {
                 auctionInfo(auctionId: ${auction_id}) {
@@ -290,7 +290,7 @@ export const AAC_QUERY = {
     },
 
     /** Get bid history for an auction (temporary indexer replacement) */
-    BidHistory (auction_id: number, offset: number, limit: number) {
+    BidHistory (auction_id: string, offset: number, limit: number) {
         return {
             query: `query {
                 bidHistory(auctionId: ${auction_id}, offset: ${offset}, limit: ${limit}) {
@@ -347,7 +347,6 @@ export const AAC_MUTATION = {
                 }
             )
         }`;
-        console.log('🔧 CreateAuction (AAC) mutation:', query);
         return { query };
     },
 
@@ -449,11 +448,10 @@ export const UIC_MUTATION = {
                 }
             )
         }`;
-        console.log('🔧 CreateAuction (UIC) mutation:', query);
         return { query };
     },
 
-    Buy (auction_id: number, quantity: number) {
+    Buy (auction_id: string, quantity: string) {
         return {
             query: `mutation { buy(auctionId: ${auction_id}, quantity: ${quantity}) }`
         }

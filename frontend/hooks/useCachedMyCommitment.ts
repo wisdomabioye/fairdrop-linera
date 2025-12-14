@@ -18,7 +18,7 @@
  * ```
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import type { ApplicationClient } from 'linera-react-client';
 import type { UserCommitment, SettlementResult } from '@/lib/gql/types';
@@ -62,8 +62,11 @@ export function useCachedMyCommitment(
         skip = false
     } = options;
 
-    // Get user chain from UIC app
-    const userChain = uicApp?.publicClient.getChainId() ?? '';
+    // Get user chain from UIC app (memoized to prevent infinite loops)
+    const userChain = useMemo(
+        () => uicApp?.walletClient?.getChainId() ?? '',
+        [uicApp]
+    );
 
     // Subscribe to store
     const {
@@ -71,7 +74,6 @@ export function useCachedMyCommitment(
         fetchMyCommitment,
         isStale: checkIsStale
     } = useAuctionStore();
-
     // Get cached entry
     const auctionMap = userCommitments.get(auctionId);
     const entry = auctionMap?.get(userChain);
@@ -93,7 +95,7 @@ export function useCachedMyCommitment(
         if (!uicApp || skip || !userChain) return;
 
         try {
-            await fetchMyCommitment(auctionId, uicApp);
+            await fetchMyCommitment(auctionId, userChain, uicApp);
         } catch (err) {
             console.error('[useCachedMyCommitment] Refetch failed:', err);
         }
@@ -105,11 +107,17 @@ export function useCachedMyCommitment(
     useEffect(() => {
         if (skip || !uicApp || !userChain) return;
 
-        // Fetch if no data or stale
-        if (!entry || isStale) {
+        // Check if entry exists by reading from store directly
+        const auctionMap = userCommitments.get(auctionId);
+        const currentEntry = auctionMap?.get(userChain);
+
+        // Only fetch if no entry exists OR entry has no data
+        // This handles both initial load and failed previous fetches
+        if (!currentEntry || !currentEntry.data) {
             refetch();
         }
-    }, [skip, uicApp, userChain, auctionId, isStale]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [skip, uicApp, userChain, auctionId]);
 
     return {
         totalQuantity,

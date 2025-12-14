@@ -126,7 +126,7 @@ export interface AuctionStore {
     fetchSettledAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
-    fetchMyCommitment: (auctionId: string, uicApp: ApplicationClient) => Promise<void>;
+    fetchMyCommitment: (auctionId: string, userChain: string, uicApp: ApplicationClient) => Promise<void>;
 
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId: string) => void;
@@ -263,7 +263,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         const result = await indexerApp.publicClient.query<string>(
             JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
         );
-        console.log('checkSubscriptionInfo', result)
+        // console.log('checkSubscriptionInfo', result)
         const { data } = JSON.parse(result) as { data: { subscriptionInfo: SubscriptionInfo | null } };
         const info = data.subscriptionInfo;
 
@@ -318,17 +318,17 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             try {
                 // TEMPORARY: Use AAC.AuctionInfo instead of INDEXER.AuctionSummary
                 const result = await aacApp.publicClient.query<string>(
-                    JSON.stringify(AAC_QUERY.AuctionInfo(Number(auctionId)))
+                    JSON.stringify(AAC_QUERY.AuctionInfo(auctionId))
                 );
-                console.log('AuctionInfo (AAC)', result);
+                // console.log('AuctionInfo (AAC) response:', result);
 
-                const { data } = JSON.parse(result) as {
-                    data: { auctionInfo: AuctionWithId | null }
+                const parsed = JSON.parse(result) as {
+                    data: { auctionInfo: AuctionWithId | null } | null
                 };
 
                 // Transform AuctionWithId to AuctionSummary
-                const auctionSummary = data.auctionInfo
-                    ? transformAuctionWithId(data.auctionInfo)
+                const auctionSummary = parsed?.data?.auctionInfo
+                    ? transformAuctionWithId(parsed.data.auctionInfo)
                     : null;
 
                 // Update cache with success
@@ -388,7 +388,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.publicClient.query<string>(
                     JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
-                console.log('AllAuctions (AAC)', result);
+                // console.log('AllAuctions (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { allAuctions: AuctionWithId[] | null }
@@ -396,9 +396,16 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
                 // Transform AuctionWithId[] to AuctionSummary[] and filter by Active status
                 const allAuctions = data.allAuctions || [];
+                /** @todo We should add allAuctions to the store */
+                
+
                 const activeAuctions = allAuctions
                     .map(transformAuctionWithId)
-                    .filter(auction => auction.status === AuctionStatus.Active); // Status 1 = Active
+                    .filter(
+                        auction => auction.status === AuctionStatus.Active
+                        ||
+                        auction.status === AuctionStatus.Scheduled // Include scheduled Auction
+                    );
 
                 set({
                     activeAuctions: {
@@ -454,7 +461,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.publicClient.query<string>(
                     JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
-                console.log('AllAuctions (AAC) for settled', result);
+                // console.log('AllAuctions (AAC) for settled', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { allAuctions: AuctionWithId[] | null }
@@ -462,6 +469,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
                 // Transform AuctionWithId[] to AuctionSummary[] and filter by Settled status
                 const allAuctions = data.allAuctions || [];
+                /** @todo We should add allAuctions to the store */
+
                 const settledAuctions = allAuctions
                     .map(transformAuctionWithId)
                     .filter(auction => auction.status === AuctionStatus.Settled); // Status 3 = Settled
@@ -524,7 +533,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.publicClient.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionsByCreator(creator))
                 );
-                console.log('AuctionsByCreator (AAC)', result);
+                // console.log('AuctionsByCreator (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { auctionsByCreator: AuctionWithId[] | null }
@@ -591,9 +600,9 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             try {
                 // TEMPORARY: Use AAC.BidHistory instead of INDEXER.BidHistory
                 const result = await aacApp.publicClient.query<string>(
-                    JSON.stringify(AAC_QUERY.BidHistory(Number(auctionId), offset, limit))
+                    JSON.stringify(AAC_QUERY.BidHistory(auctionId, offset, limit))
                 );
-                console.log('BidHistory (AAC)', result);
+                // console.log('BidHistory (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { bidHistory: BidRecord[] | null }
@@ -629,10 +638,14 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchMyCommitment: async (auctionId, uicApp) => {
-        
-        const key = `my-commitment-${auctionId}`;
-        const userChain = uicApp.walletClient?.getChainId(); // Get current user's chain
+    fetchMyCommitment: async (auctionId, userChain, uicApp) => {
+        // Validate userChain to prevent undefined keys in cache
+        if (!userChain) {
+            console.warn('[fetchMyCommitment] userChain is required');
+            return;
+        }
+
+        const key = `my-commitment-${auctionId}-${userChain}`;
 
         await queryDeduplicator.deduplicate(key, async () => {
             set((state) => {
@@ -658,7 +671,6 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await uicApp.walletClient.query<string>(
                     JSON.stringify(UIC_QUERY.MyCommitmentForAuction(Number(auctionId)))
                 );
-                console.log('MyCommitmentForAuction', result)
 
                 const { data } = JSON.parse(result) as {
                     data: { myCommitmentForAuction: UserCommitment | null } 
@@ -793,13 +805,51 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     invalidateAll: () => {
-        set({
-            auctions: new Map(),
-            activeAuctions: null,
-            settledAuctions: null,
-            auctionsByCreator: new Map(),
-            bidHistory: new Map(),
-            userCommitments: new Map(),
+        set((state) => {
+            // Mark all auctions as stale (timestamp = 0) instead of deleting
+            const newAuctions = new Map(state.auctions);
+            newAuctions.forEach((value, key) => {
+                newAuctions.set(key, { ...value, timestamp: 0 });
+            });
+
+            // Mark auction lists as stale
+            const newActiveAuctions = state.activeAuctions
+                ? { ...state.activeAuctions, timestamp: 0 }
+                : null;
+            const newSettledAuctions = state.settledAuctions
+                ? { ...state.settledAuctions, timestamp: 0 }
+                : null;
+
+            // Mark auctions by creator as stale
+            const newAuctionsByCreator = new Map(state.auctionsByCreator);
+            newAuctionsByCreator.forEach((value, key) => {
+                newAuctionsByCreator.set(key, { ...value, timestamp: 0 });
+            });
+
+            // Mark bid history as stale
+            const newBidHistory = new Map(state.bidHistory);
+            newBidHistory.forEach((value, key) => {
+                newBidHistory.set(key, { ...value, timestamp: 0 });
+            });
+
+            // Mark user commitments as stale
+            const newUserCommitments = new Map(state.userCommitments);
+            newUserCommitments.forEach((auctionMap, auctionId) => {
+                const newAuctionMap = new Map(auctionMap);
+                newAuctionMap.forEach((value, userChain) => {
+                    newAuctionMap.set(userChain, { ...value, timestamp: 0 });
+                });
+                newUserCommitments.set(auctionId, newAuctionMap);
+            });
+
+            return {
+                auctions: newAuctions,
+                activeAuctions: newActiveAuctions,
+                settledAuctions: newSettledAuctions,
+                auctionsByCreator: newAuctionsByCreator,
+                bidHistory: newBidHistory,
+                userCommitments: newUserCommitments,
+            };
         });
     },
 
