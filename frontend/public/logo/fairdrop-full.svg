@@ -1,0 +1,17 @@
+<svg width="520" height="150" viewBox="0 0 520 150" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- Icon -->
+  <g transform="translate(0, 0)">
+    <rect width="150" height="150" rx="28" fill="#FFFFFF"></rect>
+    <path d="M50 35 H120 M50 75 H100 M50 35 V115" stroke="#111111" stroke-width="14" stroke-linecap="round"></path>
+    <path d="M132 95
+             C132 75 112 65 112 50
+             C112 65 92 75 92 95
+             C92 113 107 130 112 130
+             C117 130 132 113 132 95Z" fill="#111111"></path>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="180" y="95" font-family="Inter, sans-serif" font-size="56" font-weight="600" fill="#111111">
+    Fairdrop
+  </text>
+</svg>

@@ -93,6 +93,30 @@ export interface AuctionWithId {
     };
 }
 
+export function transformAuctionStatus(auction: AuctionWithId): AuctionStatus {
+    // Update status for UI
+    if (
+        auction.status === AuctionStatus.Scheduled 
+        &&
+        Date.now() >= microsecondsToMilliseconds(auction.params.startTime)
+        &&
+        Date.now() < microsecondsToMilliseconds(auction.params.endTime)
+    ) {
+        return AuctionStatus.Active;
+    }
+
+    if (
+        auction.status === AuctionStatus.Active
+        &&
+        Date.now() > microsecondsToMilliseconds(auction.params.endTime)
+    ) {
+        return AuctionStatus.Ended;
+    }
+
+    return auction.status;
+
+}
+
 export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
     return {
         auctionId: auction.auctionId,
@@ -109,7 +133,7 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
         currentPrice: auction.currentPrice,
         sold: auction.sold,
         clearingPrice: auction.clearingPrice,
-        status: auction.status,
+        status: transformAuctionStatus(auction),
         totalBids: auction.totalBids,
         totalBidders: auction.totalBidders,
     };

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { WalletConnect } from '@/components/wallet/wallet-connect';
 import { ThemeToggle } from '@/components/theme';
-import { APP_INFO } from '@/config/app.config';
+import { AppLogo } from './logo';
 import { APP_ROUTES } from '@/config/app.route';
 
 interface NavLink {
@@ -15,6 +15,15 @@ interface NavLink {
 }
 
 const NAV_LINKS: NavLink[] = [
+  {
+    label: 'Home',
+    href: APP_ROUTES.home,
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+  },
   {
     label: 'Active Auctions',
     href: APP_ROUTES.activeAuctions,
@@ -91,36 +100,7 @@ export function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link
-            href={APP_ROUTES.home}
-            className="flex items-center gap-3 group transition-transform hover:scale-105"
-          >
-            <div className="relative w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-all">
-              <svg
-                className="w-6 h-6 md:w-7 md:h-7 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary to-accent opacity-0 group-hover:opacity-30 blur-xl transition-opacity" />
-            </div>
-            <div className="hidden sm:block">
-              <div className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                {APP_INFO.name}
-              </div>
-              <div className="text-xs text-text-secondary -mt-1">
-                {APP_INFO.tagline}
-              </div>
-            </div>
-          </Link>
-
+          <AppLogo />
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-1">
             {NAV_LINKS.map((link) => (

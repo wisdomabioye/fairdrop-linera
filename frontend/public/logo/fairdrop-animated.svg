@@ -1,0 +1,16 @@
+<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <rect width="180" height="180" rx="24" fill="#FFFFFF"></rect>
+
+  <!-- F Shape -->
+  <path d="M55 42 H125 M55 90 H105 M55 42 V138" stroke="#111111" stroke-width="14" stroke-linecap="round"></path>
+
+  <!-- Animated drop -->
+  <path id="drop" d="M135 108
+           C135 88 115 76 115 60
+           C115 76 95 88 95 108
+           C95 128 110 143 115 143
+           C120 143 135 128 135 108Z" fill="#111111">
+    <animate attributeName="transform" type="scale" values="1; 1.05; 1" dur="2.2s" repeatCount="indefinite" additive="sum" transform-origin="115 108"></animate>
+    <animate attributeName="opacity" values="1; 0.8; 1" dur="2.2s" repeatCount="indefinite"></animate>
+  </path>
+</svg>

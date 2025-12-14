@@ -16,6 +16,7 @@ export interface AppInfo {
     tagline: string;
     email: string;
     version: string;
+    logo: Record<string, string>
 }
 
 export const APP_INFO: AppInfo = {
@@ -24,5 +25,12 @@ export const APP_INFO: AppInfo = {
     description: 'Decentralized, transparent, and market-driven auction protocol using descending-price (Dutch-style) model with uniform clearing. Every participant pays the same fair price discovered by true market demand on Linera blockchain.',
     tagline: 'Fair Price Discovery for Web3',
     email: 'xpldevelopers@gmail.com',
-    version: '1.0.0'
+    version: '1.0.0',
+    logo: {
+        favicon: '/logo/favicon.svg',
+        fairdropThemed: '/logo/fairdrop-themed.svg',
+        fairdropHorizontal: '/logo/fairdrop-full.svg',
+        fairdropModern: '/logo/fairdrop-modern.svg',
+        fairdropMono: '/logo/fairdrop.svg'
+    }
 } as const;

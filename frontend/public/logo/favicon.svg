@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <rect width="180" height="180" rx="28" fill="#FFFFFF"></rect>
+
+  <!-- Thickened F for small sizes -->
+  <path d="M58 48 H122 M58 90 H108 M58 48 V132" stroke="#000000" stroke-width="20" stroke-linecap="round"></path>
+
+  <!-- Simplified drop for small display -->
+  <path d="M132 108
+           C132 92 115 82 115 66
+           C115 82 98 92 98 108
+           C98 124 110 138 115 138
+           C120 138 132 124 132 108Z" fill="#000000"></path>
+</svg>
