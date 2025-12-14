@@ -60,9 +60,3 @@ export type {
     UseAuctionMutationsOptions,
     UseAuctionMutationsResult
 } from './useAuctionMutations';
-
-// Notification hooks
-export { useAuctionNotifications } from './useAuctionNotifications';
-export type {
-    UseAuctionNotificationsOptions
-} from './useAuctionNotifications';

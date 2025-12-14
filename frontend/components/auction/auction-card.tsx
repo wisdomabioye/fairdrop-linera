@@ -77,7 +77,7 @@ export function AuctionCard({
     <Card
       className={cn(
         'hover-lift cursor-pointer relative overflow-hidden animate-fade-in',
-        'group'
+        'group min-w-[280px] flex-1 basis-[280px] max-w-[400px]'
       )}
       onClick={handleViewDetails}
     >

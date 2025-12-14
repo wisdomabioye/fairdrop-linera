@@ -16,15 +16,6 @@ interface NavLink {
 
 const NAV_LINKS: NavLink[] = [
   {
-    label: 'Home',
-    href: APP_ROUTES.home,
-    icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
-  },
-  {
     label: 'Active Auctions',
     href: APP_ROUTES.activeAuctions,
     icon: (

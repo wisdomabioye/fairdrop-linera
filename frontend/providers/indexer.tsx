@@ -2,7 +2,7 @@
 
 // import { useEffect } from 'react';
 // import { useLineraApplication } from 'linera-react-client';
-import { /* useIndexerInitialization, */ useAuctionNotifications } from '@/hooks';
+import { /* useIndexerInitialization, */ } from '@/hooks';
 import {
     // INDEXER_APP_ID,
     // AAC_APP_ID,
@@ -21,9 +21,6 @@ export function IndexerProvider({ children }: { children: React.ReactNode }) {
     //     auctionApp: AAC_APP_ID,
     //     indexerApp: indexerApp.app
     // });
-
-    // Listen to notifications and auto-revalidate
-    useAuctionNotifications();
 
     // Show initialization toast
     // useEffect(() => {

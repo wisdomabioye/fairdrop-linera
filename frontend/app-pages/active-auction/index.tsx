@@ -26,7 +26,7 @@ export default function ActiveAuctions() {
         open: false,
         auction: null
     });
-
+    
     const {
         auctions,
         loading,
@@ -85,12 +85,12 @@ export default function ActiveAuctions() {
             </header>
 
             {/* Loading State */}
-            {loading && !hasLoadedOnce && (
+            {((loading)) && (
                 <AuctionSkeletonGrid count={4} />
             )}
 
             {/* Error State */}
-            {error && (
+            {error && !auctions?.length && (
                 <ErrorState
                     error={error}
                     onRetry={refetch}
@@ -115,7 +115,7 @@ export default function ActiveAuctions() {
 
             {/* Auctions Grid */}
             {auctions && auctions.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="flex flex-wrap gap-6">
                     {auctions.map((auction) => (
                         <AuctionCard
                             key={auction.auctionId}

@@ -23,6 +23,7 @@
 
 import { useEffect, useCallback, useState } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
+import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
 import type { AuctionSummary } from '@/lib/gql/types';
 
@@ -70,6 +71,8 @@ export function useCachedActiveAuctions(
         skip = false
     } = options;
 
+    const { isPublicClientSyncing } = useSyncStatus();
+
     // Subscribe to store
     const {
         activeAuctions,
@@ -80,41 +83,53 @@ export function useCachedActiveAuctions(
 
     // Local state for managing polling subscription
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
+    const [isRefetching, setIsRefetching] = useState(false);
 
     // Derived state
     const auctions = activeAuctions?.data ?? null;
-    const loading = activeAuctions?.status === 'loading' && !auctions;
     const isFetching = activeAuctions?.status === 'loading';
     const error = activeAuctions?.error ?? null;
     const hasLoadedOnce = activeAuctions?.status === 'success' || auctions !== null;
     const isStale = checkIsStale('activeAuctions');
 
+    // Loading state: show loading if no data exists AND (currently fetching OR syncing OR will fetch soon)
+    const loading = !auctions && (
+        activeAuctions?.status === 'loading' ||
+        isRefetching ||
+        isPublicClientSyncing ||
+        (!hasLoadedOnce && !skip && !!aacApp) // Initial load state
+    );
+
     /**
      * Fetch active auctions
      */
     const refetch = useCallback(async () => {
-        if (!aacApp || skip) return;
+        if (!aacApp || skip || isPublicClientSyncing) return;
 
         try {
+            setIsRefetching(true);
             await fetchActiveAuctions(offset, limit, aacApp);
         } catch (err) {
             console.error('[useCachedActiveAuctions] Refetch failed:', err);
+        } finally {
+            setIsRefetching(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [aacApp, skip, offset, limit]);
+    }, [aacApp, skip, offset, limit, isPublicClientSyncing]);
 
     /**
-     * Initial fetch - only run once when conditions are met
+     * Initial fetch and refetch on stale data
+     * Wait for sync to complete before fetching
      */
     useEffect(() => {
-        if (skip || !aacApp) return;
+        if (skip || !aacApp || isPublicClientSyncing) return;
 
-        // Only fetch if we have no data at all, or if data is stale AND not currently loading
+        // Fetch if we have no data at all, or if data is stale AND not currently loading
         if ((!activeAuctions || isStale) && !isFetching) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, aacApp]);
+    }, [skip, aacApp, isStale, isPublicClientSyncing]);
 
     /**
      * Setup polling if enabled

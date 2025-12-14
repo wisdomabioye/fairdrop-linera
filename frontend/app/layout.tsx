@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
-import { AppLineraProvider, IndexerProvider } from '@/providers';
+import { AppLineraProvider } from '@/providers';
 import { ThemeProvider } from '@/components/theme';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
@@ -54,13 +54,11 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AppLineraProvider>
-            <IndexerProvider>
               <Header />
               <main className="flex-1 flex flex-col">
                 {children}
               </main>
               <Footer />
-              </IndexerProvider>
           </AppLineraProvider>
 
           {/* Toast Notifications */}
