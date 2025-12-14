@@ -103,6 +103,17 @@ export interface AllCommitmentsCacheEntry {
 }
 
 /**
+ * Metadata for all auctions fetch operations
+ */
+export interface AllAuctionsMetadata {
+    lastFetchTime: number;
+    status: FetchStatus;
+    error: Error | null;
+    offset: number;
+    limit: number;
+}
+
+/**
  * Main auction store interface
  */
 export interface AuctionStore {
@@ -115,6 +126,8 @@ export interface AuctionStore {
 
     // ============ Normalized Caches ============
     auctions: Map<string, AuctionCacheEntry>; // auctionId -> auction summary
+    allAuctionsCache: Map<string, AuctionCacheEntry>; // auctionId -> auction (normalized, single source of truth)
+    allAuctionsMeta: AllAuctionsMetadata | null; // metadata for allAuctions fetches
     activeAuctions: AuctionListCacheEntry | null;
     settledAuctions: AuctionListCacheEntry | null;
     auctionsByCreator: Map<string, AuctionListCacheEntry>; // creator -> auctions
@@ -141,6 +154,9 @@ export interface AuctionStore {
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchMyCommitment: (auctionId: string, userChain: string, uicApp: ApplicationClient) => Promise<void>;
     fetchAllMyCommitments: (userChain: string, uicApp: ApplicationClient) => Promise<void>;
+
+    // ============ Internal Fetch Methods ============
+    _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
 
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId: string) => void;
@@ -176,6 +192,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     indexerChainId: null,
 
     auctions: new Map(),
+    allAuctionsCache: new Map(),
+    allAuctionsMeta: null,
     activeAuctions: null,
     settledAuctions: null,
     auctionsByCreator: new Map(),
@@ -308,17 +326,117 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
+    // ============ Internal Fetch Methods ============
+    /**
+     * Internal method to fetch all auctions and populate normalized cache.
+     * This is the ONLY method that calls AAC_QUERY.AllAuctions.
+     *
+     * @param offset - Pagination offset
+     * @param limit - Number of auctions to fetch
+     * @param aacApp - AAC application client
+     * @param force - Force fetch even if cache is fresh
+     */
+    _fetchAllAuctionsInternal: async (offset, limit, aacApp, force = false) => {
+        const key = `all-auctions-${offset}-${limit}`;
+
+        // Check if we can skip fetch (unless forced)
+        const meta = get().allAuctionsMeta;
+        if (!force && meta) {
+            const age = Date.now() - meta.lastFetchTime;
+            if (age < AUCTION_LIST_TTL && meta.status === 'success') {
+                // Cache is fresh, skip fetch
+                return;
+            }
+        }
+
+        await queryDeduplicator.deduplicate(key, async () => {
+            // Set loading state
+            set((state) => ({
+                allAuctionsMeta: {
+                    lastFetchTime: state.allAuctionsMeta?.lastFetchTime ?? Date.now(),
+                    status: 'loading',
+                    error: null,
+                    offset,
+                    limit
+                }
+            }));
+
+            try {
+                const result = await aacApp.publicClient.query<string>(
+                    JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
+                );
+
+                const { data } = JSON.parse(result) as {
+                    data: { allAuctions: AuctionWithId[] | null }
+                };
+
+                const allAuctions = (data.allAuctions || []).map(transformAuctionWithId);
+
+                // Populate normalized cache with ALL auctions
+                set((state) => {
+                    const newCache = new Map(state.allAuctionsCache);
+
+                    allAuctions.forEach(auction => {
+                        newCache.set(String(auction.auctionId), {
+                            data: auction,
+                            timestamp: Date.now(),
+                            status: 'success',
+                            error: null
+                        });
+                    });
+
+                    return {
+                        allAuctionsCache: newCache,
+                        allAuctionsMeta: {
+                            lastFetchTime: Date.now(),
+                            status: 'success',
+                            error: null,
+                            offset,
+                            limit
+                        }
+                    };
+                });
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch all auctions');
+
+                set((state) => ({
+                    allAuctionsMeta: {
+                        lastFetchTime: state.allAuctionsMeta?.lastFetchTime ?? Date.now(),
+                        status: 'error',
+                        error,
+                        offset,
+                        limit
+                    }
+                }));
+
+                throw error;
+            }
+        });
+    },
+
     // ============ Fetch Actions ============
     fetchAuctionSummary: async (auctionId, aacApp) => {
-        // TEMPORARY: Skip indexer check - using AAC directly
-        // if (!get().indexerInitialized) {
-        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        // }
+        // Check normalized cache first
+        const cached = get().allAuctionsCache.get(auctionId);
 
+        if (cached && cached.status === 'success' && cached.data) {
+            const age = Date.now() - cached.timestamp;
+            if (age < AUCTION_DATA_TTL) {
+                // Cache hit! Update auctions map and return
+                set((state) => {
+                    const newAuctions = new Map(state.auctions);
+                    newAuctions.set(auctionId, cached);
+                    return { auctions: newAuctions };
+                });
+                return; // No API call needed
+            }
+        }
+
+        // Cache miss or stale - fetch from API
         const key = `auction-summary-${auctionId}`;
 
         await queryDeduplicator.deduplicate(key, async () => {
-            // Update status to loading
+            // Set loading state
             set((state) => {
                 const newAuctions = new Map(state.auctions);
                 const existing = newAuctions.get(auctionId);
@@ -332,11 +450,10 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             });
 
             try {
-                // TEMPORARY: Use AAC.AuctionInfo instead of INDEXER.AuctionSummary
+                // Fetch from API
                 const result = await aacApp.publicClient.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionInfo(auctionId))
                 );
-                // console.log('AuctionInfo (AAC) response:', result);
 
                 const parsed = JSON.parse(result) as {
                     data: { auctionInfo: AuctionWithId | null } | null
@@ -347,16 +464,25 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     ? transformAuctionWithId(parsed.data.auctionInfo)
                     : null;
 
-                // Update cache with success
+                const cacheEntry: AuctionCacheEntry = {
+                    data: auctionSummary,
+                    timestamp: Date.now(),
+                    status: 'success',
+                    error: null,
+                };
+
+                // Update BOTH caches (auctions and allAuctionsCache)
                 set((state) => {
                     const newAuctions = new Map(state.auctions);
-                    newAuctions.set(auctionId, {
-                        data: auctionSummary,
-                        timestamp: Date.now(),
-                        status: 'success',
-                        error: null,
-                    });
-                    return { auctions: newAuctions };
+                    const newAllAuctions = new Map(state.allAuctionsCache);
+
+                    newAuctions.set(auctionId, cacheEntry);
+                    newAllAuctions.set(auctionId, cacheEntry);
+
+                    return {
+                        auctions: newAuctions,
+                        allAuctionsCache: newAllAuctions
+                    };
                 });
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to fetch auction summary');
@@ -380,144 +506,112 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     fetchActiveAuctions: async (offset, limit, aacApp) => {
-        // TEMPORARY: Skip indexer check - using AAC directly
-        // if (!get().indexerInitialized) {
-        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        // }
+        // Set loading state
+        set((state) => ({
+            activeAuctions: {
+                data: state.activeAuctions?.data ?? null,
+                timestamp: state.activeAuctions?.timestamp ?? Date.now(),
+                status: 'loading',
+                error: null,
+                offset,
+                limit,
+            }
+        }));
 
-        const key = `active-auctions-${offset}-${limit}`;
+        try {
+            // Fetch all auctions (will use cache if fresh)
+            await get()._fetchAllAuctionsInternal(offset, limit, aacApp);
 
-        await queryDeduplicator.deduplicate(key, async () => {
+            // Filter from normalized cache
+            const allAuctions = Array.from(get().allAuctionsCache.values())
+                .map(entry => entry.data)
+                .filter(Boolean) as AuctionSummary[];
+
+            const activeAuctions = allAuctions.filter(
+                auction => auction.status === AuctionStatus.Active ||
+                           auction.status === AuctionStatus.Scheduled
+            );
+
+            set({
+                activeAuctions: {
+                    data: activeAuctions,
+                    timestamp: Date.now(),
+                    status: 'success',
+                    error: null,
+                    offset,
+                    limit,
+                }
+            });
+        } catch (err) {
+            const error = err instanceof Error ? err : new Error('Failed to fetch active auctions');
+
             set((state) => ({
                 activeAuctions: {
                     data: state.activeAuctions?.data ?? null,
                     timestamp: state.activeAuctions?.timestamp ?? Date.now(),
-                    status: 'loading',
-                    error: null,
+                    status: 'error',
+                    error,
                     offset,
                     limit,
                 }
             }));
 
-            try {
-                // TEMPORARY: Use AAC.AllAuctions instead of INDEXER.ActiveAuctions
-                const result = await aacApp.publicClient.query<string>(
-                    JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
-                );
-                // console.log('AllAuctions (AAC)', result);
-
-                const { data } = JSON.parse(result) as {
-                    data: { allAuctions: AuctionWithId[] | null }
-                };
-
-                // Transform AuctionWithId[] to AuctionSummary[] and filter by Active status
-                const allAuctions = data.allAuctions || [];
-                /** @todo We should add allAuctions to the store */
-                
-
-                const activeAuctions = allAuctions
-                    .map(transformAuctionWithId)
-                    .filter(
-                        auction => auction.status === AuctionStatus.Active
-                        ||
-                        auction.status === AuctionStatus.Scheduled // Include scheduled Auction
-                    );
-
-                set({
-                    activeAuctions: {
-                        data: activeAuctions,
-                        timestamp: Date.now(),
-                        status: 'success',
-                        error: null,
-                        offset,
-                        limit,
-                    }
-                });
-            } catch (err) {
-                const error = err instanceof Error ? err : new Error('Failed to fetch active auctions');
-
-                set((state) => ({
-                    activeAuctions: {
-                        data: state.activeAuctions?.data ?? null,
-                        timestamp: state.activeAuctions?.timestamp ?? Date.now(),
-                        status: 'error',
-                        error,
-                        offset,
-                        limit,
-                    }
-                }));
-
-                throw error;
-            }
-        });
+            throw error;
+        }
     },
 
     fetchSettledAuctions: async (offset, limit, aacApp) => {
-        // TEMPORARY: Skip indexer check - using AAC directly
-        // if (!get().indexerInitialized) {
-        //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
-        // }
+        // Set loading state
+        set((state) => ({
+            settledAuctions: {
+                data: state.settledAuctions?.data ?? null,
+                timestamp: state.settledAuctions?.timestamp ?? Date.now(),
+                status: 'loading',
+                error: null,
+                offset,
+                limit,
+            }
+        }));
 
-        const key = `settled-auctions-${offset}-${limit}`;
+        try {
+            // Fetch all auctions (will use cache if fresh)
+            await get()._fetchAllAuctionsInternal(offset, limit, aacApp);
 
-        await queryDeduplicator.deduplicate(key, async () => {
+            // Filter from normalized cache
+            const allAuctions = Array.from(get().allAuctionsCache.values())
+                .map(entry => entry.data)
+                .filter(Boolean) as AuctionSummary[];
+
+            const settledAuctions = allAuctions.filter(
+                auction => auction.status === AuctionStatus.Settled
+            );
+
+            set({
+                settledAuctions: {
+                    data: settledAuctions,
+                    timestamp: Date.now(),
+                    status: 'success',
+                    error: null,
+                    offset,
+                    limit,
+                }
+            });
+        } catch (err) {
+            const error = err instanceof Error ? err : new Error('Failed to fetch settled auctions');
+
             set((state) => ({
                 settledAuctions: {
                     data: state.settledAuctions?.data ?? null,
                     timestamp: state.settledAuctions?.timestamp ?? Date.now(),
-                    status: 'loading',
-                    error: null,
+                    status: 'error',
+                    error,
                     offset,
                     limit,
                 }
             }));
 
-            try {
-                // TEMPORARY: Use AAC.AllAuctions instead of INDEXER.SettledAuctions
-                const result = await aacApp.publicClient.query<string>(
-                    JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
-                );
-                // console.log('AllAuctions (AAC) for settled', result);
-
-                const { data } = JSON.parse(result) as {
-                    data: { allAuctions: AuctionWithId[] | null }
-                };
-
-                // Transform AuctionWithId[] to AuctionSummary[] and filter by Settled status
-                const allAuctions = data.allAuctions || [];
-                /** @todo We should add allAuctions to the store */
-
-                const settledAuctions = allAuctions
-                    .map(transformAuctionWithId)
-                    .filter(auction => auction.status === AuctionStatus.Settled); // Status 3 = Settled
-
-                set({
-                    settledAuctions: {
-                        data: settledAuctions,
-                        timestamp: Date.now(),
-                        status: 'success',
-                        error: null,
-                        offset,
-                        limit,
-                    }
-                });
-            } catch (err) {
-                const error = err instanceof Error ? err : new Error('Failed to fetch settled auctions');
-
-                set((state) => ({
-                    settledAuctions: {
-                        data: state.settledAuctions?.data ?? null,
-                        timestamp: state.settledAuctions?.timestamp ?? Date.now(),
-                        status: 'error',
-                        error,
-                        offset,
-                        limit,
-                    }
-                }));
-
-                throw error;
-            }
-        });
+            throw error;
+        }
     },
 
     fetchAuctionsByCreator: async (creator, aacApp) => {
@@ -802,15 +896,28 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId) => {
         set((state) => {
+            // Invalidate in both caches
             const newAuctions = new Map(state.auctions);
+            const newAllAuctions = new Map(state.allAuctionsCache);
+
             const existing = newAuctions.get(auctionId);
             if (existing) {
-                newAuctions.set(auctionId, {
-                    ...existing,
-                    timestamp: 0, // Mark as stale
+                const stale = { ...existing, timestamp: 0 };
+                newAuctions.set(auctionId, stale);
+            }
+
+            const existingInAll = newAllAuctions.get(auctionId);
+            if (existingInAll) {
+                newAllAuctions.set(auctionId, {
+                    ...existingInAll,
+                    timestamp: 0
                 });
             }
-            return { auctions: newAuctions };
+
+            return {
+                auctions: newAuctions,
+                allAuctionsCache: newAllAuctions
+            };
         });
     },
 
@@ -926,6 +1033,12 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 newAuctions.set(key, { ...value, timestamp: 0 });
             });
 
+            // Mark normalized cache as stale
+            const newAllAuctions = new Map(state.allAuctionsCache);
+            newAllAuctions.forEach((value, key) => {
+                newAllAuctions.set(key, { ...value, timestamp: 0 });
+            });
+
             // Mark auction lists as stale
             const newActiveAuctions = state.activeAuctions
                 ? { ...state.activeAuctions, timestamp: 0 }
@@ -964,6 +1077,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             return {
                 auctions: newAuctions,
+                allAuctionsCache: newAllAuctions,
+                allAuctionsMeta: state.allAuctionsMeta ? {
+                    ...state.allAuctionsMeta,
+                    lastFetchTime: 0
+                } : null,
                 activeAuctions: newActiveAuctions,
                 settledAuctions: newSettledAuctions,
                 auctionsByCreator: newAuctionsByCreator,

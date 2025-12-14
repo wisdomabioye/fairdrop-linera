@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Hammer, TrendingDown, Plus } from 'lucide-react';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
 import { useCachedAuctionsByCreator, useCachedAllMyCommitments, useCachedAuctionSummary } from '@/hooks';
-import { AAC_APP_ID, UIC_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
@@ -20,7 +20,6 @@ import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 export default function MyAuctionsPage() {
     const router = useRouter();
     const aacApp = useLineraApplication(AAC_APP_ID);
-    const uicApp = useLineraApplication(UIC_APP_ID);
     const { isConnected, address } = useWalletConnection();
 
     const [bidDialog, setBidDialog] = useState<{
@@ -52,8 +51,8 @@ export default function MyAuctionsPage() {
         error: errorCommitments,
         refetch: refetchCommitments
     } = useCachedAllMyCommitments({
-        uicApp: uicApp.app,
-        skip: !uicApp.app
+        uicApp: aacApp.app, // Same app Id as uic (uic uses walletClient instead)
+        skip: !aacApp.app
     });
 
     const handleBidClick = (auctionId: number) => {
