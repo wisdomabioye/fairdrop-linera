@@ -3,7 +3,7 @@
 mod state;
 
 use fungible::{
-    FungibleOperation, FungibleResponse, FungibleTokenAbi, InitialState, Message, Parameters,
+    FungibleOperation, FungibleResponse, FungibleTokenAbi, Message, Parameters,
 };
 use linera_sdk::{
     linera_base_types::{Account, AccountOwner, Amount, WithContractAbi},
@@ -27,7 +27,7 @@ impl WithContractAbi for FungibleTokenContract {
 impl Contract for FungibleTokenContract {
     type Message = Message;
     type Parameters = Parameters;
-    type InstantiationArgument = InitialState;
+    type InstantiationArgument = ();
     type EventValue = ();
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
@@ -37,11 +37,9 @@ impl Contract for FungibleTokenContract {
         FungibleTokenContract { state, runtime }
     }
 
-    async fn instantiate(&mut self, state: Self::InstantiationArgument) {
+    async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
         // Validate that the application parameters were configured correctly
         let _ = self.runtime.application_parameters();
-
-        self.state.initialize_accounts(state).await;
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {

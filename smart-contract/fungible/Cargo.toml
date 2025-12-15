@@ -18,9 +18,9 @@ thiserror.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "fungible_contract"
+name = "fungible-contract"
 path = "src/contract.rs"
 
 [[bin]]
-name = "fungible_service"
+name = "fungible-service"
 path = "src/service.rs"

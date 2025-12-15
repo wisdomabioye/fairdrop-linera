@@ -146,3 +146,65 @@ export function transformBidRecord(bid: BidRecord): BidRecord {
         timestamp: microsecondsToMilliseconds(bid.timestamp)
     };
 }
+
+// ============ Fungible Token Types ============
+
+export interface AccountBalance {
+    key: string; // AccountOwner
+    value: string; // Amount
+}
+
+export interface Allowance {
+    key: string; // OwnerSpender (serialized scalar)
+    value: string; // Amount
+}
+
+export interface FungibleAccounts {
+    accounts: {
+        entries: AccountBalance[];
+    };
+}
+
+export interface FungibleAllowances {
+    allowances: {
+        entries: Allowance[];
+    };
+}
+
+export interface FungibleTokenInfo {
+    tickerSymbol: string;
+    tokenName: string;
+}
+
+// Mutation responses
+export interface MintResponse {
+    mint: null;
+}
+
+export interface ApproveResponse {
+    approve: null;
+}
+
+export interface TransferResponse {
+    transfer: null;
+}
+
+export interface TransferFromResponse {
+    transferFrom: null;
+}
+
+export interface ClaimResponse {
+    claim: null;
+}
+
+export interface BalanceResponse {
+    balance: string;
+}
+
+export interface TickerSymbolResponse {
+    tickerSymbol: string;
+}
+
+export interface TokenNameResponse {
+    tokenName: string;
+}

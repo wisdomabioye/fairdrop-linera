@@ -22,6 +22,7 @@ const FOOTER_SECTIONS: FooterSection[] = [
     links: [
       { label: 'Active Auctions', href: APP_ROUTES.activeAuctions },
       { label: 'Settled Auctions', href: APP_ROUTES.settledAuctions },
+      { label: 'Faucet', href: APP_ROUTES.faucet },
       { label: 'My Auctions', href: APP_ROUTES.myAuctions },
       { label: 'Create Auction', href: APP_ROUTES.createAuction },
     ],

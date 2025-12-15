@@ -34,22 +34,6 @@ impl Parameters {
     }
 }
 
-/// Initial state for the application
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct InitialState {
-    pub accounts: Vec<(AccountOwner, Amount)>,
-}
-
-impl InitialState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_account(mut self, owner: AccountOwner, amount: Amount) -> Self {
-        self.accounts.push((owner, amount));
-        self
-    }
-}
 
 /// Operations that can be performed on the fungible token
 #[derive(Debug, Deserialize, Serialize, GraphQLMutationRoot)]

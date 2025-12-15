@@ -6,6 +6,7 @@
 
 export const APP_ROUTES = {
   home: '/',
+  faucet: '/faucet',
   activeAuctions: '/active-auction',
   settledAuctions: '/settled-auction',
   createAuction: '/create-auction',

@@ -60,3 +60,16 @@ export type {
     UseAuctionMutationsOptions,
     UseAuctionMutationsResult
 } from './useAuctionMutations';
+
+// Fungible token hooks
+export { useFungibleQuery } from './useFungibleQuery';
+export type {
+    UseFungibleQueryOptions,
+    UseFungibleQueryResult
+} from './useFungibleQuery';
+
+export { useFungibleMutations } from './useFungibleMutation';
+export type {
+    UseFungibleMutationsOptions,
+    UseFungibleMutationsResult
+} from './useFungibleMutation';

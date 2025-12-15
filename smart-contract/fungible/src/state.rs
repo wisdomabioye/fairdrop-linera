@@ -1,4 +1,4 @@
-use fungible::{InitialState, OwnerSpender};
+use fungible::OwnerSpender;
 use linera_sdk::{
     linera_base_types::{AccountOwner, Amount},
     views::{linera_views, MapView, RootView, ViewStorageContext},
@@ -13,16 +13,6 @@ pub struct FungibleTokenState {
 }
 
 impl FungibleTokenState {
-    /// Initializes the application state with accounts and initial balances
-    pub(crate) async fn initialize_accounts(&mut self, state: InitialState) {
-        for (owner, amount) in state.accounts {
-            if amount != Amount::ZERO {
-                self.accounts
-                    .insert(&owner, amount)
-                    .expect("Error in insert statement");
-            }
-        }
-    }
 
     /// Gets the balance for an account, returning None if no entry exists
     pub(crate) async fn balance(&self, account: &AccountOwner) -> Option<Amount> {

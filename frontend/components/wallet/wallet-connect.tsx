@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { useWalletConnection, getLineraClientManager } from 'linera-react-client';
 import { WalletSelectionDialog } from '../wallet/wallet-selection-dialog';
+import { WalletMenu } from '../wallet/wallet-menu';
 import { SUPPORTED_WALLETS } from '@/config/app.wallets';
 import { toast } from 'sonner';
 
@@ -105,44 +106,13 @@ export function WalletConnect({ onConnect, onDisconnect }: WalletConnectProps) {
     }
   };
 
-  const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
-
   if (isConnected && address) {
     return (
-      <div className='flex items-center gap-2'>
-        <div className='group relative px-4 py-2 rounded-lg bg-gradient-to-r from-success/10 to-success/5 border border-success/30 text-success text-sm font-medium shadow-lg shadow-success/10 hover:shadow-success/20 transition-all'>
-          <div className='flex items-center gap-2'>
-            <div className='relative'>
-              <span className='w-2 h-2 bg-success rounded-full inline-block animate-pulse' />
-              <span className='absolute inset-0 w-2 h-2 bg-success rounded-full animate-ping opacity-75' />
-            </div>
-            <span className='font-mono'>{formatAddress(address)}</span>
-            <svg className='w-4 h-4 opacity-50' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' />
-            </svg>
-          </div>
-
-          {/* Tooltip */}
-          <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-card border border-white/10 rounded-lg text-xs text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl'>
-            Connected Wallet
-            <div className='absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-card' />
-          </div>
-        </div>
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={handleDisconnect}
-          disabled={isDisconnecting}
-          className='hover:text-error hover:border-error/30'
-        >
-          {isDisconnecting && (
-            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1" />
-          )}
-          {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-        </Button>
-      </div>
+      <WalletMenu
+        address={address}
+        onDisconnect={handleDisconnect}
+        isDisconnecting={isDisconnecting}
+      />
     );
   }
 

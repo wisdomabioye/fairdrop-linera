@@ -25,7 +25,7 @@ const SyncContext = createContext<SyncStatus | undefined>(undefined);
 export function SyncProvider({
     children,
     enabled = true,
-    debounceTimeout = 1500,
+    debounceTimeout = 3000,
 }: {
     children: React.ReactNode;
 } & SyncProviderOptions) {

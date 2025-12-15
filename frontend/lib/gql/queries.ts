@@ -481,3 +481,95 @@ export const UIC_MUTATION = {
         }
     }
 }
+
+export const FUNGIBLE_MUTATION = {
+    Mint (owner: string, amount: number) {
+        return {
+            query: `mutation { mint(owner: "${owner}", amount: "${amount}") }`
+        }
+    },
+
+    Approve (owner: string, spender: string, allowance: number) {
+        return {
+            query: `mutation { approve(owner: "${owner}", spender: "${spender}", allowance: "${allowance}") }`
+        }
+    },
+
+    Transfer (owner: string, amount: number, target_account: string) {
+        return {
+            query: `mutation { transfer(owner: "${owner}", amount: "${amount}", targetAccount: "${target_account}") }`
+        }
+    },
+
+    TransferFrom (owner: string, spender: string, amount: number, target_account: string) {
+        return {
+            query: `mutation { transferFrom(owner: "${owner}", spender: "${spender}", amount: "${amount}", targetAccount: "${target_account}") }`
+        }
+    },
+
+    Claim (source_account: string, amount: number, target_account: string) {
+        return {
+            query: `mutation { transferFrom(sourceAccount: "${source_account}", amount: "${amount}", targetAccount: "${target_account}") }`
+        }
+    },
+
+    Balance (owner: string) {
+        return {
+            query: `mutation { balance(owner: "${owner}") }`
+        }
+    },
+
+    TickerSymbol () {
+        return {
+            query: `mutation { tickerSymbol }`
+        }
+    },
+
+    TokenName () {
+        return {
+            query: `mutation { tokenName }`
+        }
+    },
+    
+}
+
+export const FUNGIBLE_QUERY = {
+    Accounts () {
+        return {
+            query: `query {
+                accounts {
+                    entries {
+                        key
+                        value
+                    }
+                }
+            }`
+        }
+    },
+
+    Allowances () {
+        return {
+            query: `query {
+                allowances {
+                    entries {
+                        key
+                        value
+                    }
+                }
+            }`
+        }
+    },
+
+    TickerSymbol () {
+        return {
+            query: `query { tickerSymbol }`
+        }
+    },
+
+    TokenName () {
+        return {
+            query: `query { tokenName }`
+        }
+    },
+
+}
