@@ -4,6 +4,8 @@
  * Centralized exports for all auction-related React hooks.
  */
 
+export { usePolling } from './usePolling';
+
 // Indexer initialization
 export { useIndexerInitialization } from './useIndexerInitialization';
 export type {

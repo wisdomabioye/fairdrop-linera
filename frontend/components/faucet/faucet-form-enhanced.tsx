@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Droplet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { WalletConnectionPrompt } from '@/components/wallet';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
-import { useFungibleMutations, useFungibleQuery } from '@/hooks';
+import { useFungibleMutations, usePolling } from '@/hooks';
 import { useSyncStatus } from '@/providers';
 import { getTokenList, type TokenInfo } from '@/config/app.token-store';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ import { BalanceCard } from './balance-card';
 import { MintHistory, type MintRecord } from './mint-history';
 import { SuccessOverlay } from './success-overlay';
 import { TokenSelector } from './token-selector';
+import { useTokenStore } from '@/store/token-store';
 
 export interface FaucetFormProps {
   defaultToken?: string;
@@ -44,19 +45,37 @@ export function FaucetFormEnhanced({ defaultToken, onSuccess }: FaucetFormProps)
   const selectedToken = tokens.find(t => t.appId === selectedTokenId);
   const fungibleApp = useLineraApplication(selectedTokenId);
 
-  // Query hook for balance with smart polling
+  // Token store for centralized state management
   const {
-    accountsLoading,
-    accountsError,
-    fetchAccounts,
-    getAccountBalance,
-  } = useFungibleQuery({
-    fungibleApp: fungibleApp.app,
-    autoFetch: isConnected && !!fungibleApp.app,
-    pollingInterval: POLLING_INTERVAL,
-    appId: selectedTokenId,
-    isWalletSyncing: isWalletClientSyncing,
-  });
+    getBalance,
+    getBalanceStatus,
+    fetchBalance,
+    fetchTokenInfo,
+    invalidateBalance,
+    isBalanceStale,
+  } = useTokenStore();
+
+  // Polling callback for balance and token info
+  const pollTokenData = useCallback(async () => {
+    if (!address || !selectedTokenId || !fungibleApp.app || isWalletClientSyncing) {
+      return;
+    }
+
+    try {
+      // Only refetch balance if stale
+      if (isBalanceStale(selectedTokenId, address)) {
+        await fetchBalance(selectedTokenId, address, fungibleApp.app);
+      }
+
+      // Fetch token info on first load (it has 60s TTL so won't refetch often)
+      await fetchTokenInfo(selectedTokenId, fungibleApp.app);
+    } catch (error) {
+      console.error('[FaucetForm] Failed to fetch token data:', error);
+    }
+  }, [address, selectedTokenId, fungibleApp.app, isWalletClientSyncing, fetchBalance, fetchTokenInfo, isBalanceStale]);
+
+  // Set up polling with usePolling hook (immediate: true for initial fetch)
+  usePolling(pollTokenData, POLLING_INTERVAL, { immediate: true });
 
   // Mutation hook for minting
   const {
@@ -82,9 +101,14 @@ export function FaucetFormEnhanced({ defaultToken, onSuccess }: FaucetFormProps)
       // Clear optimistic state
       setOptimisticBalance(null);
 
+      // Invalidate balance to force immediate refresh
+      invalidateBalance(selectedTokenId, address);
+
       // Trigger immediate refresh (bypass polling)
       setTimeout(() => {
-        fetchAccounts();
+        if (address && fungibleApp.app) {
+          fetchBalance(selectedTokenId, address, fungibleApp.app);
+        }
       }, 500);
 
       toast.success('Tokens minted successfully!', {
@@ -105,10 +129,18 @@ export function FaucetFormEnhanced({ defaultToken, onSuccess }: FaucetFormProps)
     }
   });
 
-  // Get user balance
-  const actualBalance = address && selectedToken
-    ? getAccountBalance(address)
+  // Get user balance from token store
+  const actualBalance = address && selectedTokenId
+    ? getBalance(selectedTokenId, address)
     : null;
+
+  // Get loading status from token store
+  const balanceStatus = address && selectedTokenId
+    ? getBalanceStatus(selectedTokenId, address)
+    : 'idle';
+
+  const accountsLoading = balanceStatus === 'loading';
+  const accountsError = balanceStatus === 'error' ? new Error('Failed to fetch balance') : null;
 
   // Use optimistic balance if available, otherwise actual balance
   const displayBalance = optimisticBalance || actualBalance;
