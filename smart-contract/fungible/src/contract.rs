@@ -1,6 +1,3 @@
-// Copyright (c) Zefchain Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
 mod state;
@@ -41,21 +38,20 @@ impl Contract for FungibleTokenContract {
     }
 
     async fn instantiate(&mut self, state: Self::InstantiationArgument) {
-        // Validate that the application parameters were configured correctly.
+        // Validate that the application parameters were configured correctly
         let _ = self.runtime.application_parameters();
 
-        let mut total_supply = Amount::ZERO;
-        for value in state.accounts.values() {
-            total_supply.saturating_add_assign(*value);
-        }
-        if total_supply == Amount::ZERO {
-            panic!("The total supply is zero, therefore we cannot instantiate the contract");
-        }
         self.state.initialize_accounts(state).await;
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
         match operation {
+            FungibleOperation::Mint { owner, amount } => {
+                // Faucet: No permission check - anyone can mint!
+                self.state.credit(owner, amount).await;
+                FungibleResponse::Ok
+            }
+
             FungibleOperation::Balance { owner } => {
                 let balance = self.state.balance_or_default(&owner).await;
                 FungibleResponse::Balance(balance)
@@ -63,7 +59,12 @@ impl Contract for FungibleTokenContract {
 
             FungibleOperation::TickerSymbol => {
                 let params = self.runtime.application_parameters();
-                FungibleResponse::TickerSymbol(params.ticker_symbol)
+                FungibleResponse::TickerSymbol(params.symbol)
+            }
+
+            FungibleOperation::TokenName => {
+                let params = self.runtime.application_parameters();
+                FungibleResponse::TokenName(params.name)
             }
 
             FungibleOperation::Approve {
@@ -73,7 +74,7 @@ impl Contract for FungibleTokenContract {
             } => {
                 self.runtime
                     .check_account_permission(owner)
-                    .expect("Permission for Transfer operation");
+                    .expect("Permission for Approve operation");
                 self.state.approve(owner, spender, allowance).await;
                 FungibleResponse::Ok
             }
@@ -100,7 +101,7 @@ impl Contract for FungibleTokenContract {
             } => {
                 self.runtime
                     .check_account_permission(spender)
-                    .expect("Permission for Transfer operation");
+                    .expect("Permission for TransferFrom operation");
                 self.state
                     .debit_for_transfer_from(owner, spender, amount)
                     .await;
@@ -158,6 +159,7 @@ impl Contract for FungibleTokenContract {
 }
 
 impl FungibleTokenContract {
+    /// Claims tokens from a source account and transfers to target account
     async fn claim(&mut self, source_account: Account, amount: Amount, target_account: Account) {
         if source_account.chain_id == self.runtime.chain_id() {
             self.state.debit(source_account.owner, amount).await;
@@ -176,7 +178,7 @@ impl FungibleTokenContract {
         }
     }
 
-    /// Executes the final step of a transfer where the tokens are sent to the destination.
+    /// Executes the final step of a transfer where tokens are sent to the destination
     async fn finish_transfer_to_account(
         &mut self,
         amount: Amount,

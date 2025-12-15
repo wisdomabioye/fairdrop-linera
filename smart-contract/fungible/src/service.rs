@@ -1,6 +1,3 @@
-// Copyright (c) Zefchain Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
 mod state;
@@ -8,10 +5,9 @@ mod state;
 use std::sync::Arc;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
-use fungible::{OwnerSpender, Parameters};
+use fungible::{FungibleOperation, OwnerSpender, Parameters};
 use linera_sdk::{
-    abis::fungible::FungibleOperation,
-    graphql::GraphQLMutationRoot as _,
+    graphql::GraphQLMutationRoot,
     linera_base_types::{AccountOwner, Amount, WithServiceAbi},
     views::{MapView, View},
     Service, ServiceRuntime,
@@ -57,15 +53,23 @@ impl Service for FungibleTokenService {
 
 #[Object]
 impl FungibleTokenService {
+    /// Get all account balances
     async fn accounts(&self) -> &MapView<AccountOwner, Amount> {
         &self.state.accounts
     }
 
+    /// Get all allowances
     async fn allowances(&self) -> &MapView<OwnerSpender, Amount> {
         &self.state.allowances
     }
 
+    /// Get the ticker symbol
     async fn ticker_symbol(&self) -> Result<String, async_graphql::Error> {
-        Ok(self.runtime.application_parameters().ticker_symbol)
+        Ok(self.runtime.application_parameters().symbol)
+    }
+
+    /// Get the token name
+    async fn token_name(&self) -> Result<String, async_graphql::Error> {
+        Ok(self.runtime.application_parameters().name)
     }
 }

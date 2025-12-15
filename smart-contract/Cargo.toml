@@ -4,13 +4,14 @@ members = [
     "shared",
     "auction",
     "indexer",
+    "fungible",
 ]
 
 [workspace.package]
 version = "0.1.0"
 authors = ["Fairdrop Team"]
 edition = "2021"
-repository = "https://github.com/your-repo/fairdrop"
+repository = "https://github.com/wisdomabioye/fairdrop-linera"
 license = "Apache-2.0"
 
 [workspace.dependencies]
