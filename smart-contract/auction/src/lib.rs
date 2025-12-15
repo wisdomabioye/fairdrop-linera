@@ -46,6 +46,8 @@ pub enum AuctionOperation {
         auction_id: u64,
     },
 
+    Trigger,
+
     // ─────────────────────────────────────────────────────────
     // UIC Chain Operations (executed by users on their chains)
     // ─────────────────────────────────────────────────────────

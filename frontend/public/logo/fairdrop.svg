@@ -1,14 +1,7 @@
 <svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" fill="none">
-  <!-- Clean background -->
-  <rect width="180" height="180" rx="24" fill="#FFFFFF"></rect>
 
-  <!-- F Shape -->
-  <path d="M55 42 H125 M55 90 H105 M55 42 V138" stroke="#111111" stroke-width="14" stroke-linecap="round"></path>
-
-  <!-- Improved geometric drop -->
-  <path d="M135 108
-           C135 88 115 76 115 60
-           C115 76 95 88 95 108
-           C95 128 110 143 115 143
-           C120 143 135 128 135 108Z" fill="#111111"></path>
+  <!-- Outer outline for visibility -->
+  <rect x="45" y="60" width="90" height="14" rx="7" fill="#FFFFFF" stroke="#111111" stroke-width="3"></rect>
+  <rect x="55" y="90" width="70" height="14" rx="7" fill="#FFFFFF" stroke="#111111" stroke-width="3"></rect>
+  <rect x="65" y="120" width="50" height="14" rx="7" fill="#FFFFFF" stroke="#111111" stroke-width="3"></rect>
 </svg>

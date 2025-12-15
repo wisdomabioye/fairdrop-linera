@@ -10,7 +10,7 @@ export function AppLogo() {
             href={APP_ROUTES.home}
             className="flex items-center gap-3 group transition-transform hover:scale-105"
         >
-        <div className="relative w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-all">
+        <div className="relative w-10 h-10 md:w-12 md:h-12 rounded-xl transition-all">
             <Image
                 src={APP_INFO.logo.fairdropMono}
                 alt=''

@@ -25,7 +25,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
-import { UIC_MUTATION } from '@/lib/gql/queries';
+import { UIC_MUTATION, AAC_MUTATION } from '@/lib/gql/queries';
 import type { ApplicationClient } from 'linera-react-client';
 import type { AuctionParam } from '@/lib/gql/types';
 
@@ -54,7 +54,8 @@ export interface UseAuctionMutationsResult {
     unsubscribeFromAuction: (aacChain: string) => Promise<boolean>;
     /** Claim settlement */
     claimSettlement: (auctionId: number) => Promise<boolean>;
-
+    /** Trigger changes on Public Client */
+    trigger: () => Promise<void>;
     // Loading states
     /** Is auction creation in progress? */
     isCreating: boolean;
@@ -96,6 +97,22 @@ export function useAuctionMutations(
     const [isClaiming, setIsClaiming] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
+    const trigger = useCallback(
+        async (): Promise<void> => {
+            try {
+                const result = await uicApp?.publicClient.systemMutate<string>(
+                    JSON.stringify(AAC_MUTATION.Trigger())
+                );
+
+                console.log('[useAuctionMutations] Trigger:', result);
+
+            } catch (err) {
+                console.error('[useAuctionMutations] Trigger failed:', err);
+            }
+        },
+        [uicApp]
+    )
+
     /**
      * Create a new auction
      */
@@ -128,6 +145,8 @@ export function useAuctionMutations(
                 if (parsed.data === null) {
                     throw new Error('Auction creation returned null');
                 }
+                // Trigger publicClient
+                await trigger();
 
                 // Invalidate active auctions list to trigger refetch
                 invalidateActiveAuctions();
@@ -178,6 +197,9 @@ export function useAuctionMutations(
                 );
 
                 console.log('[useAuctionMutations] Buy result:', result);
+                
+                // Trigger publicClient
+                await trigger();
 
                 // Invalidate affected caches
                 invalidateAuction(auctionId.toString());
@@ -291,6 +313,9 @@ export function useAuctionMutations(
 
                 console.log('[useAuctionMutations] Claim settlement result:', result);
 
+                // Trigger publicClient
+                await trigger();
+
                 // Invalidate user commitment cache
                 invalidateUserCommitment(auctionId.toString());
 
@@ -315,6 +340,7 @@ export function useAuctionMutations(
         subscribeToAuction,
         unsubscribeFromAuction,
         claimSettlement,
+        trigger,
         isCreating,
         isBuying,
         isSubscribing,

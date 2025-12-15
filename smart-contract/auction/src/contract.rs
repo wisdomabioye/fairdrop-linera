@@ -86,6 +86,10 @@ impl Contract for AuctionContract {
                 self.handle_prune_settled_auction(auction_id).await
             }
 
+            AuctionOperation::Trigger {} => {
+                AuctionResponse::Ok
+            }
+
             // ═══════════════════════════════════════════════════════════
             // UIC CHAIN OPERATIONS
             // ═══════════════════════════════════════════════════════════

@@ -356,6 +356,12 @@ export const AAC_MUTATION = {
         }
     },
 
+    Trigger () {
+        return {
+            query: `mutation { trigger }`
+        }
+    },
+
     PruneSettledAuction (auction_id: number) {
         return {
             query: `mutation { pruneSettledAuction(auctionId: ${auction_id}) }`
