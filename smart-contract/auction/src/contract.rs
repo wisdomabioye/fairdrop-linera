@@ -561,38 +561,22 @@ impl AuctionContract {
     }
 
     /// Handle bid placement from user chains
-    /// This helper function encapsulates all bid processing logic
+    /// Main bid processing orchestrator - delegates to helper methods for testability
     async fn handle_place_bid(&mut self, auction_id: u64, user_chain: ChainId, quantity: u64) {
-        // Calculate current price on-demand
         let current_price = self.calculate_current_price(auction_id).await;
         let now = self.runtime.system_time();
 
-        // Get mutable reference to auction for bid processing
+        // Get auction and extract needed data
         let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+        let current_status = auction.status;
+        let start_time = auction.params.start_time;
+        let end_time = auction.params.end_time;
+        let total_supply = auction.total_supply;
+        let sold = auction.sold;
+        let payment_token_app = auction.params.payment_token_app;
 
-        // Handle Scheduled → Active transition
-        if auction.status == shared::types::AuctionStatus::Scheduled {
-            if now >= auction.params.start_time {
-                // Auction has started, transition to Active
-                auction.status = shared::types::AuctionStatus::Active;
-            } else {
-                // Auction not started yet, reject bid
-                let event = AuctionEvent::BidRejected {
-                    auction_id,
-                    user_chain,
-                    reason: format!(
-                        "Auction not started yet. Starts at: {:?}",
-                        auction.params.start_time
-                    ),
-                };
-                self.runtime.emit(AUCTION_STREAM.into(), &event);
-                return;
-            }
-        }
-
-        // Check if auction has expired (time-based expiration)
-        if now > auction.params.end_time && auction.status == shared::types::AuctionStatus::Active {
-            // Auction expired - trigger settlement
+        // Handle time expiration (special case requiring async settlement)
+        if now > end_time && current_status == shared::types::AuctionStatus::Active {
             auction.clearing_price = Some(current_price);
             auction.status = shared::types::AuctionStatus::Ended;
             let total_bids = auction.total_bids;
@@ -605,175 +589,85 @@ impl AuctionContract {
             };
             self.runtime.emit(AUCTION_STREAM.into(), &event);
 
-            // Drop auction reference before calling settle_auction
             let _ = auction;
-
-            // Auto-settle expired auction
             self.settle_auction(auction_id).await;
 
-            // Reject this bid (auction already expired)
+            let event = AuctionEvent::BidRejected {
+                auction_id,
+                user_chain,
+                reason: format!("Auction expired at: {:?}", end_time),
+            };
+            self.runtime.emit(AUCTION_STREAM.into(), &event);
+            return;
+        }
+
+        // Drop auction reference before calling helper methods
+        let _ = auction;
+
+        // Validate auction state (Scheduled→Active transition, active check)
+        let new_status = match self.validate_auction_state(
+            current_status,
+            start_time,
+            end_time,
+            now,
+            auction_id,
+            user_chain,
+        ) {
+            Ok(status) => status,
+            Err(()) => return,
+        };
+
+        // Apply status change if needed
+        if let Some(status) = new_status {
+            let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+            auction.status = status;
+        }
+
+        // Validate supply availability
+        let accepted_quantity = match self.validate_supply(
+            total_supply,
+            sold,
+            quantity,
+            auction_id,
+            user_chain,
+        ) {
+            Ok(qty) => qty,
+            Err(()) => return,
+        };
+
+        // Calculate payment and get authenticated bidder
+        let amount_paid = current_price.saturating_mul(accepted_quantity as u128);
+        let bidder = self
+            .runtime
+            .authenticated_signer()
+            .expect("PlaceBid must be authenticated");
+
+        // Collect payment (fail-fast before state changes)
+        if let Err(reason) = self.collect_payment(bidder, amount_paid, payment_token_app) {
             let event = AuctionEvent::BidRejected {
                 auction_id,
                 user_chain,
                 reason: format!(
-                    "Auction expired at: {:?}",
-                    self.state.auctions.get(&auction_id).await.unwrap().unwrap().params.end_time
+                    "Payment failed: {}. Ensure you have sufficient fungible token balance on AAC",
+                    reason
                 ),
             };
             self.runtime.emit(AUCTION_STREAM.into(), &event);
             return;
         }
 
-        // Check if auction still active
-        if auction.status != shared::types::AuctionStatus::Active {
-            let event = AuctionEvent::BidRejected {
-                auction_id,
-                user_chain,
-                reason: "Auction not active".to_string(),
-            };
-            self.runtime.emit(AUCTION_STREAM.into(), &event);
-            return;
-        }
+        // Create and record bid
+        let (bid, is_first_bid) = self
+            .create_and_record_bid(auction_id, user_chain, accepted_quantity, amount_paid)
+            .await;
 
-        // Calculate available quantity
-        let remaining = auction.total_supply.saturating_sub(auction.sold);
-        if remaining == 0 {
-            let event = AuctionEvent::BidRejected {
-                auction_id,
-                user_chain,
-                reason: "Supply exhausted".to_string(),
-            };
-            self.runtime.emit(AUCTION_STREAM.into(), &event);
-            return;
-        }
+        // Update auction state
+        self.update_auction_state(auction_id, accepted_quantity, is_first_bid, user_chain)
+            .await;
 
-        let accepted_quantity = quantity.min(remaining);
-
-        // Calculate amount to pay
-        let amount_paid = current_price.saturating_mul(accepted_quantity as u128);
-
-        // Get authenticated bidder (works cross-chain)
-        let bidder = self
-            .runtime
-            .authenticated_signer()
-            .expect("PlaceBid must be authenticated");
-
-        // Get payment token app for this auction
-        // Note: payment_token_app is stored as ApplicationId (untyped) for serialization
-        // We'll convert it when calling the fungible application
-        let payment_token_app = auction.params.payment_token_app;
-
-        // Drop auction reference before function call
-        let _ = auction;
-
-        // Collect payment from user (synchronous - on AAC)
-        // If user has insufficient balance on AAC, this will fail
-        if let Err(reason) = self.collect_payment(bidder, amount_paid, payment_token_app) {
-            // Payment failed - reject bid
-            let event = AuctionEvent::BidRejected {
-                auction_id,
-                user_chain,
-                reason: format!("Payment failed: {}. Ensure you have sufficient fungible token balance on AAC", reason),
-            };
-            self.runtime.emit(AUCTION_STREAM.into(), &event);
-            return;
-        }
-
-        // Create bid record
-        let bid_id = *self.state.next_bid_id.get();
-        self.state.next_bid_id.set(bid_id + 1);
-
-        let bid = BidRecord {
-            bid_id,
-            auction_id,
-            user_chain,
-            quantity: accepted_quantity,
-            amount_paid,
-            timestamp: self.runtime.system_time(),
-            claimed: false,
-        };
-
-        // Insert bid using composite key for O(1) lookups
-        let mut user_bids = self
-            .state
-            .user_auction_bids
-            .get(&(user_chain, auction_id))
-            .await
-            .unwrap()
-            .unwrap_or_default();
-
-        let is_first_bid_from_user = user_bids.is_empty();
-        user_bids.push(bid);
-        self.state
-            .user_auction_bids
-            .insert(&(user_chain, auction_id), user_bids)
-            .unwrap();
-
-        // Re-acquire auction reference to update counters
-        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
-
-        // Update sold quantity and cached counters
-        auction.sold += accepted_quantity;
-        auction.total_bids += 1;
-        if is_first_bid_from_user {
-            auction.total_bidders += 1;
-        }
-
-        // Update user total
-        let user_total = self
-            .state
-            .user_totals
-            .get(&(auction_id, user_chain))
-            .await
-            .unwrap()
-            .unwrap_or(0);
-        self.state
-            .user_totals
-            .insert(&(auction_id, user_chain), user_total + accepted_quantity)
-            .unwrap();
-
-        // Emit payment received event
-        let payment_event = AuctionEvent::PaymentReceived {
-            auction_id,
-            user_chain,
-            amount: amount_paid,
-            bid_id,
-        };
-        self.runtime.emit(AUCTION_STREAM.into(), &payment_event);
-
-        // Emit bid accepted event
-        let event = AuctionEvent::BidAccepted {
-            auction_id,
-            bid_id,
-            user_chain,
-            quantity: accepted_quantity,
-            amount_paid,
-            total_sold: auction.sold,
-            remaining: auction.total_supply - auction.sold,
-        };
-        self.runtime.emit(AUCTION_STREAM.into(), &event);
-
-        // Check if supply exhausted
-        let supply_exhausted = auction.sold >= auction.total_supply;
-        if supply_exhausted {
-            auction.clearing_price = Some(current_price);
-            auction.status = shared::types::AuctionStatus::Ended;
-            let total_bids = auction.total_bids;
-
-            let event = AuctionEvent::AuctionCleared {
-                auction_id,
-                clearing_price: current_price,
-                total_bids,
-                reason: ClearReason::SupplyExhausted,
-            };
-            self.runtime.emit(AUCTION_STREAM.into(), &event);
-
-            // Drop auction reference before calling settle_auction
-            let _ = auction;
-
-            // Auto-settle
-            self.settle_auction(auction_id).await;
-        }
+        // Finalize bid processing (emit events, check settlement)
+        self.finalize_bid_processing(auction_id, &bid, current_price)
+            .await;
     }
 
     /// Settle auction (manual claim-based settlement - no auto-messaging)
@@ -805,6 +699,223 @@ impl AuctionContract {
         };
         self.runtime.emit(AUCTION_STREAM.into(), &event);
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // Bid Processing Helper Methods (for testability)
+    // ═══════════════════════════════════════════════════════════
+
+    /// Validate auction state and handle transitions
+    /// Returns Ok(Some(new_status)) if transition needed, Ok(None) if ready, Err if rejected
+    fn validate_auction_state(
+        &mut self,
+        current_status: shared::types::AuctionStatus,
+        start_time: linera_sdk::linera_base_types::Timestamp,
+        end_time: linera_sdk::linera_base_types::Timestamp,
+        now: linera_sdk::linera_base_types::Timestamp,
+        auction_id: u64,
+        user_chain: ChainId,
+    ) -> Result<Option<shared::types::AuctionStatus>, ()> {
+        // Handle Scheduled → Active transition
+        if current_status == shared::types::AuctionStatus::Scheduled {
+            if now >= start_time {
+                return Ok(Some(shared::types::AuctionStatus::Active));
+            } else {
+                let event = AuctionEvent::BidRejected {
+                    auction_id,
+                    user_chain,
+                    reason: format!("Auction not started yet. Starts at: {:?}", start_time),
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+                return Err(());
+            }
+        }
+
+        // Check if auction has expired (time-based expiration)
+        if now > end_time && current_status == shared::types::AuctionStatus::Active {
+            let event = AuctionEvent::BidRejected {
+                auction_id,
+                user_chain,
+                reason: format!("Auction expired at: {:?}", end_time),
+            };
+            self.runtime.emit(AUCTION_STREAM.into(), &event);
+            return Err(());
+        }
+
+        // Check if auction is active
+        if current_status != shared::types::AuctionStatus::Active {
+            let event = AuctionEvent::BidRejected {
+                auction_id,
+                user_chain,
+                reason: "Auction not active".to_string(),
+            };
+            self.runtime.emit(AUCTION_STREAM.into(), &event);
+            return Err(());
+        }
+
+        Ok(None)
+    }
+
+    /// Validate supply availability and return accepted quantity
+    /// Returns Ok(accepted_quantity) if supply available, Err if supply exhausted
+    fn validate_supply(
+        &mut self,
+        total_supply: u64,
+        sold: u64,
+        requested_quantity: u64,
+        auction_id: u64,
+        user_chain: ChainId,
+    ) -> Result<u64, ()> {
+        let remaining = total_supply.saturating_sub(sold);
+
+        if remaining == 0 {
+            let event = AuctionEvent::BidRejected {
+                auction_id,
+                user_chain,
+                reason: "Supply exhausted".to_string(),
+            };
+            self.runtime.emit(AUCTION_STREAM.into(), &event);
+            return Err(());
+        }
+
+        Ok(requested_quantity.min(remaining))
+    }
+
+    /// Create bid record and insert into storage
+    /// Returns (bid_record, is_first_bid_from_user)
+    async fn create_and_record_bid(
+        &mut self,
+        auction_id: u64,
+        user_chain: ChainId,
+        quantity: u64,
+        amount_paid: Amount,
+    ) -> (BidRecord, bool) {
+        // Create bid record
+        let bid_id = *self.state.next_bid_id.get();
+        self.state.next_bid_id.set(bid_id + 1);
+
+        let bid = BidRecord {
+            bid_id,
+            auction_id,
+            user_chain,
+            quantity,
+            amount_paid,
+            timestamp: self.runtime.system_time(),
+            claimed: false,
+        };
+
+        // Insert bid using composite key for O(1) lookups
+        let mut user_bids = self
+            .state
+            .user_auction_bids
+            .get(&(user_chain, auction_id))
+            .await
+            .unwrap()
+            .unwrap_or_default();
+
+        let is_first_bid_from_user = user_bids.is_empty();
+        user_bids.push(bid.clone());
+
+        self.state
+            .user_auction_bids
+            .insert(&(user_chain, auction_id), user_bids)
+            .unwrap();
+
+        (bid, is_first_bid_from_user)
+    }
+
+    /// Update auction state with new bid
+    async fn update_auction_state(
+        &mut self,
+        auction_id: u64,
+        quantity: u64,
+        is_first_bid: bool,
+        user_chain: ChainId,
+    ) {
+        // Re-acquire auction reference to update counters
+        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+
+        // Update sold quantity and cached counters
+        auction.sold += quantity;
+        auction.total_bids += 1;
+        if is_first_bid {
+            auction.total_bidders += 1;
+        }
+
+        // Drop auction reference before next async call
+        let _ = auction;
+
+        // Update user total
+        let user_total = self
+            .state
+            .user_totals
+            .get(&(auction_id, user_chain))
+            .await
+            .unwrap()
+            .unwrap_or(0);
+
+        self.state
+            .user_totals
+            .insert(&(auction_id, user_chain), user_total + quantity)
+            .unwrap();
+    }
+
+    /// Finalize bid processing: emit events and check settlement
+    async fn finalize_bid_processing(
+        &mut self,
+        auction_id: u64,
+        bid: &BidRecord,
+        current_price: Amount,
+    ) {
+        // Emit payment received event
+        let payment_event = AuctionEvent::PaymentReceived {
+            auction_id,
+            user_chain: bid.user_chain,
+            amount: bid.amount_paid,
+            bid_id: bid.bid_id,
+        };
+        self.runtime.emit(AUCTION_STREAM.into(), &payment_event);
+
+        // Get auction for event data
+        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+
+        // Emit bid accepted event
+        let event = AuctionEvent::BidAccepted {
+            auction_id,
+            bid_id: bid.bid_id,
+            user_chain: bid.user_chain,
+            quantity: bid.quantity,
+            amount_paid: bid.amount_paid,
+            total_sold: auction.sold,
+            remaining: auction.total_supply - auction.sold,
+        };
+        self.runtime.emit(AUCTION_STREAM.into(), &event);
+
+        // Check if supply exhausted and trigger settlement
+        let supply_exhausted = auction.sold >= auction.total_supply;
+        if supply_exhausted {
+            auction.clearing_price = Some(current_price);
+            auction.status = shared::types::AuctionStatus::Ended;
+            let total_bids = auction.total_bids;
+
+            let event = AuctionEvent::AuctionCleared {
+                auction_id,
+                clearing_price: current_price,
+                total_bids,
+                reason: ClearReason::SupplyExhausted,
+            };
+            self.runtime.emit(AUCTION_STREAM.into(), &event);
+
+            // Drop auction reference before calling settle_auction
+            let _ = auction;
+
+            // Auto-settle
+            self.settle_auction(auction_id).await;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Payment Helper Methods
+    // ═══════════════════════════════════════════════════════════
 
     /// Helper: Collect payment from user to escrow (synchronous on AAC)
     /// Returns Ok if successful, Err with reason if payment fails
