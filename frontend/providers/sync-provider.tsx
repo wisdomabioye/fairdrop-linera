@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useLineraClient } from 'linera-react-client';
 import { useAuctionStore } from '@/store/auction-store';
 
@@ -16,7 +16,7 @@ export interface SyncStatus {
 export interface SyncProviderOptions {
     /** Whether to enable sync tracking (default: true) */
     enabled?: boolean;
-    /** Debounce timeout in milliseconds (default: 1500) */
+    /** Debounce timeout in milliseconds (default: 3000) */
     debounceTimeout?: number;
 }
 

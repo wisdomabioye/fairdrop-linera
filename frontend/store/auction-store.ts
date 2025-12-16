@@ -42,10 +42,10 @@ import {
 
 
 // TTL constants (in milliseconds)
-const AUCTION_DATA_TTL = 5000; // 5 seconds - active auction data changes frequently
-const AUCTION_LIST_TTL = 10000; // 10 seconds - auction lists
-const BID_HISTORY_TTL = 30000; // 30 seconds - bid history changes less frequently
-const USER_COMMITMENT_TTL = 10000; // 10 seconds - user commitments
+const AUCTION_DATA_TTL = 30000; // active auction data changes frequently
+const AUCTION_LIST_TTL = 60000; // auction lists
+const BID_HISTORY_TTL = 30000; // bid history changes less frequently
+const USER_COMMITMENT_TTL = 10000; // user commitments
 
 // Store types
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';

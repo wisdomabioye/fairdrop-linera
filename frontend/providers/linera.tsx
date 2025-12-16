@@ -2,6 +2,7 @@
 import { LineraProvider, LogLevel } from 'linera-react-client';
 import { PageLoading } from '@/components/loading';
 import { SyncProvider } from './sync-provider';
+import { EagerLoader } from './eager-loader';
 
 export function AppLineraProvider({ children }: {children: React.ReactNode}) {
 
@@ -17,7 +18,9 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
       }}
     >
       <SyncProvider>
-        {children}
+        <EagerLoader>
+          {children}
+        </EagerLoader>
       </SyncProvider>
     </LineraProvider>
   )

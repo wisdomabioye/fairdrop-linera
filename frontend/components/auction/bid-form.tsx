@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useSyncStatus } from '@/providers';
 import { useAuctionMutations, useCachedMyCommitment } from '@/hooks';
 import { UIC_APP_ID } from '@/config/app.config';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
@@ -36,6 +37,7 @@ export function BidForm({
 }: BidFormProps) {
   const uicApp = useLineraApplication(UIC_APP_ID);
   const { isConnected, isConnecting, connect } = useWalletConnection();
+  const { isWalletClientSyncing } = useSyncStatus();
   const [quantity, setQuantity] = useState(1);
   const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
 
@@ -265,7 +267,7 @@ export function BidForm({
                 variant="outline"
                 size="icon"
                 onClick={handleIncrement}
-                disabled={quantity >= availableSupply || isBuying}
+                disabled={quantity >= availableSupply || isBuying || isWalletClientSyncing}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -326,10 +328,19 @@ export function BidForm({
             )}
             <Button
               type="submit"
-              disabled={!canSubmit}
+              disabled={!canSubmit || isWalletClientSyncing}
               className={cn('gap-2', onCancel ? 'flex-1' : 'w-full')}
             >
-              {isBuying ? (
+              {
+              isWalletClientSyncing ?
+              (
+                <>
+                  <Spinner className="h-4 w-4" />
+                  Wallet is Syncing...
+                </>
+              )
+              :
+              isBuying ? (
                 <>
                   <Spinner className="h-4 w-4" />
                   Placing Bid...

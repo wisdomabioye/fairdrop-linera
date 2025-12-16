@@ -19,7 +19,7 @@ import type { ApplicationClient } from 'linera-react-client';
 
 // TTL constants (in milliseconds)
 const BALANCE_TTL = 10000; // 10 seconds - balances can change frequently
-const TOKEN_INFO_TTL = 60000; // 60 seconds - token info rarely changes
+const TOKEN_INFO_TTL = 6000000; // token info should not change
 
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
 

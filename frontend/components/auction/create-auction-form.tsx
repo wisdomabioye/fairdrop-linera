@@ -13,6 +13,7 @@ import { useAuctionMutations } from '@/hooks';
 import { UIC_APP_ID } from '@/config/app.config';
 import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useSyncStatus } from '@/providers';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -29,7 +30,8 @@ export function CreateAuctionForm({
 }: CreateAuctionFormProps) {
   const router = useRouter();
   const uicApp = useLineraApplication(UIC_APP_ID);
-  const { isConnected, isConnecting, connect, address } = useWalletConnection()
+  const { isConnected, isConnecting, connect, address } = useWalletConnection();
+  const { isWalletClientSyncing } = useSyncStatus();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -344,7 +346,7 @@ export function CreateAuctionForm({
               isConnected ?
               <Button
                 type="submit"
-                disabled={isCreating || !uicApp.app}
+                disabled={isCreating || !uicApp.app || isWalletClientSyncing}
                 className={cn('gap-2', onCancel ? 'flex-1' : 'w-full')}
               >
                 {isCreating ? (
@@ -352,7 +354,14 @@ export function CreateAuctionForm({
                     <Spinner className="h-4 w-4" />
                     Creating Auction...
                   </>
-                ) : (
+                ) :
+                isWalletClientSyncing ?
+                  <>
+                    <Spinner className="h-4 w-4" />
+                    Wallet is Syncing...
+                  </>
+                :
+                (
                   'Create Auction'
                 )}
               </Button>
