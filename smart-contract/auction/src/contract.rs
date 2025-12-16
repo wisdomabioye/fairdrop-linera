@@ -4,7 +4,8 @@ mod state;
 
 use self::state::{AuctionData, AuctionState};
 use auction::{AuctionAbi, AuctionOperation, AuctionParameters, AuctionResponse};
-use linera_sdk::linera_base_types::{Amount, ChainId, StreamUpdate, WithContractAbi};
+use fungible::{FungibleOperation, FungibleResponse, FungibleTokenAbi};
+use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, StreamUpdate, WithContractAbi};
 use linera_sdk::views::{RootView, View};
 use linera_sdk::{Contract, ContractRuntime};
 use shared::events::{AuctionEvent, ClearReason, AUCTION_STREAM};
@@ -150,18 +151,25 @@ impl Contract for AuctionContract {
             }
 
             AuctionOperation::ClaimSettlement { auction_id } => {
-                // Send ClaimSettlement message to AAC
-                let params = self.runtime.application_parameters();
-                let user_chain = self.runtime.chain_id();
+                let app_params = self.runtime.application_parameters();
+                let current_chain = self.runtime.chain_id();
 
-                self.runtime
-                    .prepare_message(AuctionMessage::ClaimSettlement {
-                        auction_id,
-                        user_chain,
-                    })
-                    .send_to(params.aac_chain);
+                if current_chain == app_params.aac_chain {
+                    // Called on AAC - handle directly
+                    // AAC_chain should not bid on auctions
+                    // self.handle_claim_settlement(auction_id, current_chain).await;
+                    AuctionResponse::Ok
+                } else {
+                    // Called on UIC - send message to AAC
+                    self.runtime
+                        .prepare_message(AuctionMessage::ClaimSettlement {
+                            auction_id,
+                            user_chain: current_chain,
+                        })
+                        .send_to(app_params.aac_chain);
 
-                AuctionResponse::Ok
+                    AuctionResponse::Ok
+                }
             }
         }
     }
@@ -265,7 +273,7 @@ impl AuctionContract {
         // Emit creation event with full params
         let event = AuctionEvent::AuctionCreated {
             auction_id,
-            item_name: params.item_name,
+            item_name: params.item_name.clone(),
             total_supply: params.total_supply,
             start_price: params.start_price,
             floor_price: params.floor_price,
@@ -274,6 +282,7 @@ impl AuctionContract {
             start_time: params.start_time,
             end_time: params.end_time,
             creator: params.creator,
+            payment_token_app: params.payment_token_app,
         };
         self.runtime.emit(AUCTION_STREAM.into(), &event);
 
@@ -470,6 +479,18 @@ impl AuctionContract {
         let total_cost = clearing_price.saturating_mul(total_quantity as u128);
         let refund = total_paid.saturating_sub(total_cost);
 
+        // Get authenticated bidder (for refund recipient)
+        let bidder = self
+            .runtime
+            .authenticated_signer()
+            .expect("ClaimSettlement must be authenticated");
+
+        // Get payment token app for refund transfer
+        let payment_token_app = auction.params.payment_token_app;
+
+        // Drop auction reference before function call
+        drop(auction);
+
         // Mark all bids as claimed
         for bid in &mut user_bids {
             if !bid.claimed {
@@ -482,6 +503,9 @@ impl AuctionContract {
             .user_auction_bids
             .insert(&(user_chain, auction_id), user_bids)
             .unwrap();
+
+        // Execute refund transfer (synchronous - on AAC)
+        self.refund_payment(auction_id, bidder, refund, payment_token_app);
 
         // Send settlement result to user
         self.runtime
@@ -625,8 +649,35 @@ impl AuctionContract {
 
         let accepted_quantity = quantity.min(remaining);
 
-        // Calculate amount paid
+        // Calculate amount to pay
         let amount_paid = current_price.saturating_mul(accepted_quantity as u128);
+
+        // Get authenticated bidder (works cross-chain)
+        let bidder = self
+            .runtime
+            .authenticated_signer()
+            .expect("PlaceBid must be authenticated");
+
+        // Get payment token app for this auction
+        // Note: payment_token_app is stored as ApplicationId (untyped) for serialization
+        // We'll convert it when calling the fungible application
+        let payment_token_app = auction.params.payment_token_app;
+
+        // Drop auction reference before function call
+        let _ = auction;
+
+        // Collect payment from user (synchronous - on AAC)
+        // If user has insufficient balance on AAC, this will fail
+        if let Err(reason) = self.collect_payment(bidder, amount_paid, payment_token_app) {
+            // Payment failed - reject bid
+            let event = AuctionEvent::BidRejected {
+                auction_id,
+                user_chain,
+                reason: format!("Payment failed: {}. Ensure you have sufficient fungible token balance on AAC", reason),
+            };
+            self.runtime.emit(AUCTION_STREAM.into(), &event);
+            return;
+        }
 
         // Create bid record
         let bid_id = *self.state.next_bid_id.get();
@@ -658,6 +709,9 @@ impl AuctionContract {
             .insert(&(user_chain, auction_id), user_bids)
             .unwrap();
 
+        // Re-acquire auction reference to update counters
+        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+
         // Update sold quantity and cached counters
         auction.sold += accepted_quantity;
         auction.total_bids += 1;
@@ -677,6 +731,15 @@ impl AuctionContract {
             .user_totals
             .insert(&(auction_id, user_chain), user_total + accepted_quantity)
             .unwrap();
+
+        // Emit payment received event
+        let payment_event = AuctionEvent::PaymentReceived {
+            auction_id,
+            user_chain,
+            amount: amount_paid,
+            bid_id,
+        };
+        self.runtime.emit(AUCTION_STREAM.into(), &payment_event);
 
         // Emit bid accepted event
         let event = AuctionEvent::BidAccepted {
@@ -714,7 +777,6 @@ impl AuctionContract {
     }
 
     /// Settle auction (manual claim-based settlement - no auto-messaging)
-    /// Uses cached counters - O(1) instead of O(all_bids)
     async fn settle_auction(&mut self, auction_id: u64) {
         // Get mutable reference for updating status
         let auction = self
@@ -742,6 +804,90 @@ impl AuctionContract {
             total_sold,
         };
         self.runtime.emit(AUCTION_STREAM.into(), &event);
+    }
+
+    /// Helper: Collect payment from user to escrow (synchronous on AAC)
+    /// Returns Ok if successful, Err with reason if payment fails
+    fn collect_payment(
+        &mut self,
+        bidder: AccountOwner,
+        amount: Amount,
+        payment_token_app: ApplicationId,
+    ) -> Result<(), String> {
+        // Define escrow account owned by the application
+        let escrow_account = Account {
+            chain_id: self.runtime.chain_id(), // AAC chain
+            owner: self.runtime.application_id().into(), // App-owned escrow
+        };
+
+        // Transfer from bidder (on AAC) to escrow (on AAC) - synchronous
+        let transfer_operation = FungibleOperation::Transfer {
+            owner: bidder,
+            amount,
+            target_account: escrow_account,
+        };
+
+        // Convert untyped ApplicationId to typed for the call
+        let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
+            std::mem::transmute(payment_token_app)
+        };
+
+        // Call fungible token application (synchronous - same chain)
+        // This will fail immediately if user has insufficient balance
+        match self.runtime.call_application(true, typed_app, &transfer_operation) {
+            FungibleResponse::Ok => Ok(()),
+            FungibleResponse::Balance(_) | FungibleResponse::TickerSymbol(_) | FungibleResponse::TokenName(_) => {
+                Err("Unexpected response from fungible token".to_string())
+            }
+        }
+    }
+
+    /// Helper: Refund excess payment to user after settlement (synchronous on AAC)
+    fn refund_payment(
+        &mut self,
+        auction_id: u64,
+        bidder: AccountOwner,
+        refund_amount: Amount,
+        payment_token_app: ApplicationId,
+    ) {
+        if refund_amount == Amount::ZERO {
+            return; // No refund needed
+        }
+
+        // User account on AAC (refund stays on AAC for fast settlement)
+        let user_account = Account {
+            chain_id: self.runtime.chain_id(), // AAC
+            owner: bidder,
+        };
+
+        // Transfer from escrow (app-owned) back to user
+        let transfer_operation = FungibleOperation::Transfer {
+            owner: self.runtime.application_id().into(), // From app escrow
+            amount: refund_amount,
+            target_account: user_account,
+        };
+
+        // Convert untyped ApplicationId to typed for the call
+        let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
+            std::mem::transmute(payment_token_app)
+        };
+
+        // Call fungible token application (synchronous - same chain)
+        match self.runtime.call_application(true, typed_app, &transfer_operation) {
+            FungibleResponse::Ok => {
+                // Emit refund event
+                let event = AuctionEvent::RefundIssued {
+                    auction_id,
+                    user_chain: self.runtime.chain_id(), // AAC
+                    refund_amount,
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+            }
+            _ => {
+                // This should not fail since escrow has the funds
+                panic!("Failed to refund payment to user");
+            }
+        }
     }
 
 }

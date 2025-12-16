@@ -1,5 +1,5 @@
 use async_graphql::{scalar, InputObject, SimpleObject};
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, Timestamp};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 pub type AuctionId = u64;
@@ -17,6 +17,7 @@ pub struct AuctionParamsInput {
     pub start_time: Timestamp,
     pub end_time: Timestamp,
     pub creator: AccountOwner, // Creator's account (for fund transfers)
+    pub payment_token_app: ApplicationId, // Fungible token application for payments
 }
 
 /// Auction configuration parameters (for output and internal use)
@@ -31,6 +32,7 @@ pub struct AuctionParams {
     pub start_time: Timestamp,
     pub end_time: Timestamp,
     pub creator: AccountOwner,
+    pub payment_token_app: ApplicationId,
 }
 
 // Conversion from input to internal type
@@ -46,6 +48,7 @@ impl From<AuctionParamsInput> for AuctionParams {
             start_time: input.start_time,
             end_time: input.end_time,
             creator: input.creator,
+            payment_token_app: input.payment_token_app,
         }
     }
 }
@@ -105,6 +108,7 @@ pub struct AuctionSummary {
     pub start_time: Timestamp,
     pub end_time: Timestamp,
     pub creator: AccountOwner,
+    pub payment_token_app: ApplicationId,
 
     // ──────────────────────────────────────────────────────────
     // Derived State (computed/updated during auction lifecycle)

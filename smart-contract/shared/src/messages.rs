@@ -1,4 +1,4 @@
-use linera_sdk::linera_base_types::ChainId;
+use linera_sdk::linera_base_types::{ChainId};
 use serde::{Deserialize, Serialize};
 
 use crate::types::{AuctionId, AuctionParams, SettlementResult};

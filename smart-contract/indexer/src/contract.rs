@@ -113,6 +113,7 @@ impl IndexerContract {
                 start_time,
                 end_time,
                 creator,
+                payment_token_app,
             } => {
                 // Determine initial status: Scheduled if start_time is in the future, otherwise Active
                 let now = self.runtime.system_time();
@@ -134,6 +135,7 @@ impl IndexerContract {
                     start_time,
                     end_time,
                     creator,
+                    payment_token_app,
                     // Derived state
                     current_price: start_price,
                     sold: 0,
@@ -286,6 +288,14 @@ impl IndexerContract {
                         .insert(&auction_id, summary)
                         .unwrap();
                 }
+            }
+
+            AuctionEvent::PaymentReceived { .. } => {
+                // Payment received event - informational only, no state update needed
+            }
+
+            AuctionEvent::RefundIssued { .. } => {
+                // Refund issued event - informational only, no state update needed
             }
         }
     }

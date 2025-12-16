@@ -16,6 +16,7 @@ thiserror.workspace = true
 
 # Local dependencies
 shared = { path = "../shared" }
+fungible = { path = "../fungible" }
 
 [lib]
 crate-type = ["cdylib", "rlib"]

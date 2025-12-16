@@ -26,6 +26,7 @@ pub enum AuctionEvent {
         start_time: Timestamp,
         end_time: Timestamp,
         creator: AccountOwner, // Creator's account (for fund transfers)
+        payment_token_app: linera_sdk::linera_base_types::ApplicationId, // Payment token app
     },
 
     /// Bid accepted
@@ -76,6 +77,21 @@ pub enum AuctionEvent {
     AuctionCancelled {
         auction_id: AuctionId,
         reason: String,
+    },
+
+    /// Payment received for bid (escrow)
+    PaymentReceived {
+        auction_id: AuctionId,
+        user_chain: ChainId,
+        amount: Amount,
+        bid_id: u64,
+    },
+
+    /// Refund issued to user after settlement
+    RefundIssued {
+        auction_id: AuctionId,
+        user_chain: ChainId,
+        refund_amount: Amount,
     },
 }
 
