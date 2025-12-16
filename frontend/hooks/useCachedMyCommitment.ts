@@ -20,6 +20,7 @@
 
 import { useEffect, useCallback, useMemo } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
+import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
 import type { UserCommitment, SettlementResult } from '@/lib/gql/types';
 
@@ -68,6 +69,9 @@ export function useCachedMyCommitment(
         [uicApp]
     );
 
+    // Get sync status
+    const { isWalletClientSyncing } = useSyncStatus();
+
     // Subscribe to store
     const {
         userCommitments,
@@ -92,32 +96,32 @@ export function useCachedMyCommitment(
      * Fetch user commitment
      */
     const refetch = useCallback(async () => {
-        if (!uicApp || skip || !userChain) return;
+        if (!uicApp || skip || !userChain || isWalletClientSyncing) return;
 
         try {
             await fetchMyCommitment(auctionId, userChain, uicApp);
         } catch (err) {
             console.error('[useCachedMyCommitment] Refetch failed:', err);
         }
-    }, [uicApp, skip, userChain, auctionId, fetchMyCommitment]);
+    }, [uicApp, skip, userChain, isWalletClientSyncing, auctionId, fetchMyCommitment]);
 
     /**
-     * Initial fetch
+     * Initial fetch and refetch on stale
      */
     useEffect(() => {
-        if (skip || !uicApp || !userChain) return;
+        if (skip || !uicApp || !userChain || isWalletClientSyncing) return;
 
         // Check if entry exists by reading from store directly
         const auctionMap = userCommitments.get(auctionId);
         const currentEntry = auctionMap?.get(userChain);
 
-        // Only fetch if no entry exists OR entry has no data
-        // This handles both initial load and failed previous fetches
-        if (!currentEntry || !currentEntry.data) {
+        // Fetch if no entry exists OR entry has no data OR data is stale
+        // This handles initial load, failed fetches, and invalidated cache
+        if (!currentEntry || !currentEntry.data || isStale) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, uicApp, userChain, auctionId]);
+    }, [skip, uicApp, userChain, auctionId, isWalletClientSyncing, isStale]);
 
     return {
         totalQuantity,

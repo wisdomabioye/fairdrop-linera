@@ -25,6 +25,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
+import { useSyncStatus } from '@/providers';
 import { UIC_MUTATION, AAC_MUTATION } from '@/lib/gql/queries';
 import type { ApplicationClient } from 'linera-react-client';
 import type { AuctionParam } from '@/lib/gql/types';
@@ -82,11 +83,15 @@ export function useAuctionMutations(
         onError
     } = options;
 
+    // Get sync status
+    const { isWalletClientSyncing } = useSyncStatus();
+
     // Get store actions for cache invalidation
     const {
         invalidateActiveAuctions,
         invalidateAuction,
         invalidateUserCommitment,
+        invalidateAllMyCommitments,
         invalidateBidHistory
     } = useAuctionStore();
 
@@ -120,6 +125,13 @@ export function useAuctionMutations(
         async (params: AuctionParam): Promise<boolean> => {
             if (!uicApp?.walletClient) {
                 const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            if (isWalletClientSyncing) {
+                const err = new Error('Wallet is syncing, please wait');
                 setError(err);
                 onError?.(err);
                 return false;
@@ -166,7 +178,7 @@ export function useAuctionMutations(
                 setIsCreating(false);
             }
         },
-        [uicApp, onCreateSuccess, onError, invalidateActiveAuctions]
+        [uicApp, onCreateSuccess, onError, invalidateActiveAuctions, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -188,6 +200,13 @@ export function useAuctionMutations(
                 return false;
             }
 
+            if (isWalletClientSyncing) {
+                const err = new Error('Wallet is syncing, please wait');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
             setIsBuying(true);
             setError(null);
 
@@ -204,6 +223,7 @@ export function useAuctionMutations(
                 // Invalidate affected caches
                 invalidateAuction(auctionId.toString());
                 invalidateUserCommitment(auctionId.toString());
+                invalidateAllMyCommitments(); // Invalidate all commitments view
                 invalidateBidHistory(auctionId.toString());
 
                 onBuySuccess?.(auctionId, quantity);
@@ -218,7 +238,7 @@ export function useAuctionMutations(
                 setIsBuying(false);
             }
         },
-        [uicApp, onBuySuccess, onError, invalidateAuction, invalidateUserCommitment, invalidateBidHistory]
+        [uicApp, onBuySuccess, onError, invalidateAuction, invalidateUserCommitment, invalidateAllMyCommitments, invalidateBidHistory, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -228,6 +248,13 @@ export function useAuctionMutations(
         async (aacChain: string): Promise<boolean> => {
             if (!uicApp?.walletClient) {
                 const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            if (isWalletClientSyncing) {
+                const err = new Error('Wallet is syncing, please wait');
                 setError(err);
                 onError?.(err);
                 return false;
@@ -253,7 +280,7 @@ export function useAuctionMutations(
                 setIsSubscribing(false);
             }
         },
-        [uicApp, onError]
+        [uicApp, onError, isWalletClientSyncing]
     );
 
     /**
@@ -263,6 +290,13 @@ export function useAuctionMutations(
         async (aacChain: string): Promise<boolean> => {
             if (!uicApp?.walletClient) {
                 const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            if (isWalletClientSyncing) {
+                const err = new Error('Wallet is syncing, please wait');
                 setError(err);
                 onError?.(err);
                 return false;
@@ -288,7 +322,7 @@ export function useAuctionMutations(
                 setIsSubscribing(false);
             }
         },
-        [uicApp, onError]
+        [uicApp, onError, isWalletClientSyncing]
     );
 
     /**
@@ -298,6 +332,13 @@ export function useAuctionMutations(
         async (auctionId: number): Promise<boolean> => {
             if (!uicApp?.walletClient) {
                 const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            if (isWalletClientSyncing) {
+                const err = new Error('Wallet is syncing, please wait');
                 setError(err);
                 onError?.(err);
                 return false;
@@ -331,7 +372,7 @@ export function useAuctionMutations(
                 setIsClaiming(false);
             }
         },
-        [uicApp, onClaimSuccess, onError, invalidateUserCommitment]
+        [uicApp, onClaimSuccess, onError, invalidateUserCommitment, trigger, isWalletClientSyncing]
     );
 
     return {

@@ -115,7 +115,7 @@ export default function ActiveAuctions() {
 
             {/* Auctions Grid */}
             {auctions && auctions.length > 0 && (
-                <div className="flex flex-wrap gap-6">
+                <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(350px,1fr))]">
                     {auctions.map((auction) => (
                         <AuctionCard
                             key={auction.auctionId}

@@ -22,6 +22,7 @@
 
 import { useEffect, useCallback, useState } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
+import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
 import type { AuctionSummary } from '@/lib/gql/types';
 
@@ -72,6 +73,9 @@ export function useCachedAuctionsByCreator(
         skip = false
     } = options;
 
+    // Get sync status
+    const { isPublicClientSyncing } = useSyncStatus();
+
     // Subscribe to store
     const {
         auctionsByCreator,
@@ -97,7 +101,7 @@ export function useCachedAuctionsByCreator(
      * Fetch auctions by creator
      */
     const refetch = useCallback(async () => {
-        if (!aacApp || skip || !creator) return;
+        if (!aacApp || skip || !creator || isPublicClientSyncing) return;
 
         try {
             // TEMPORARY: offset and limit not passed - AAC returns all creator's auctions
@@ -106,20 +110,20 @@ export function useCachedAuctionsByCreator(
             console.error('[useCachedAuctionsByCreator] Refetch failed:', err);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [aacApp, skip, creator]);
+    }, [aacApp, skip, creator, isPublicClientSyncing]);
 
     /**
-     * Initial fetch - only run once when conditions are met
+     * Initial fetch and refetch on stale
      */
     useEffect(() => {
-        if (skip || !aacApp || !creator) return;
+        if (skip || !aacApp || !creator || isPublicClientSyncing) return;
 
-        // Only fetch if we have no data at all, or if data is stale AND not currently loading
+        // Fetch if no data exists OR data is stale AND not currently loading
         if ((!creatorAuctions || isStale) && !isFetching) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, aacApp, creator]);
+    }, [skip, aacApp, creator, isPublicClientSyncing, isStale]);
 
     /**
      * Setup polling if enabled

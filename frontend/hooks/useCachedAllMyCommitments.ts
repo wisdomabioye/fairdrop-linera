@@ -19,6 +19,7 @@
 
 import { useEffect, useCallback, useMemo } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
+import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
 import type { AuctionCommitment } from '@/lib/gql/types';
 
@@ -60,6 +61,9 @@ export function useCachedAllMyCommitments(
         [uicApp]
     );
 
+    // Get sync status
+    const { isWalletClientSyncing } = useSyncStatus();
+
     // Subscribe to store
     const {
         allMyCommitments,
@@ -82,31 +86,31 @@ export function useCachedAllMyCommitments(
      * Fetch all user commitments
      */
     const refetch = useCallback(async () => {
-        if (!uicApp || skip || !userChain) return;
+        if (!uicApp || skip || !userChain || isWalletClientSyncing) return;
 
         try {
             await fetchAllMyCommitments(userChain, uicApp);
         } catch (err) {
             console.error('[useCachedAllMyCommitments] Refetch failed:', err);
         }
-    }, [uicApp, skip, userChain, fetchAllMyCommitments]);
+    }, [uicApp, skip, userChain, isWalletClientSyncing, fetchAllMyCommitments]);
 
     /**
-     * Initial fetch
+     * Initial fetch and refetch on stale
      */
     useEffect(() => {
-        if (skip || !uicApp || !userChain) return;
+        if (skip || !uicApp || !userChain || isWalletClientSyncing) return;
 
         // Check if entry exists by reading from store directly
         const currentEntry = allMyCommitments.get(userChain);
 
-        // Only fetch if no entry exists OR entry has no data
-        // This handles both initial load and failed previous fetches
-        if (!currentEntry || !currentEntry.data) {
+        // Fetch if no entry exists OR entry has no data OR data is stale
+        // This handles initial load, failed fetches, and invalidated cache
+        if (!currentEntry || !currentEntry.data || isStale) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, uicApp, userChain]);
+    }, [skip, uicApp, userChain, isWalletClientSyncing, isStale]);
 
     return {
         commitments,
