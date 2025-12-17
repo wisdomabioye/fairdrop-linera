@@ -274,6 +274,8 @@ impl AuctionContract {
         let event = AuctionEvent::AuctionCreated {
             auction_id,
             item_name: params.item_name.clone(),
+            image: params.image.clone(),
+            max_bid_amount: params.max_bid_amount,
             total_supply: params.total_supply,
             start_price: params.start_price,
             floor_price: params.floor_price,
@@ -283,6 +285,7 @@ impl AuctionContract {
             end_time: params.end_time,
             creator: params.creator,
             payment_token_app: params.payment_token_app,
+            auction_token_app: params.auction_token_app,
         };
         self.runtime.emit(AUCTION_STREAM.into(), &event);
 

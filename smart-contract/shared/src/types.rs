@@ -9,6 +9,8 @@ pub type AuctionId = u64;
 #[graphql(name = "AuctionParamsInput")]
 pub struct AuctionParamsInput {
     pub item_name: String,
+    pub image: String,
+    pub max_bid_amount: u64,
     pub total_supply: u64, // Total quantity for sale
     pub start_price: Amount, // Starting price per unit
     pub floor_price: Amount, // Minimum price (reserve)
@@ -18,13 +20,16 @@ pub struct AuctionParamsInput {
     pub end_time: Timestamp,
     pub creator: AccountOwner, // Creator's account (for fund transfers)
     pub payment_token_app: ApplicationId, // Fungible token application for payments
+    pub auction_token_app: ApplicationId,
 }
 
 /// Auction configuration parameters (for output and internal use)
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, SimpleObject)]
 pub struct AuctionParams {
     pub item_name: String,
+    pub image: String,
     pub total_supply: u64,
+    pub max_bid_amount: u64,
     pub start_price: Amount,
     pub floor_price: Amount,
     pub price_decay_interval: u64,
@@ -33,6 +38,7 @@ pub struct AuctionParams {
     pub end_time: Timestamp,
     pub creator: AccountOwner,
     pub payment_token_app: ApplicationId,
+    pub auction_token_app: ApplicationId,
 }
 
 // Conversion from input to internal type
@@ -40,6 +46,8 @@ impl From<AuctionParamsInput> for AuctionParams {
     fn from(input: AuctionParamsInput) -> Self {
         Self {
             item_name: input.item_name,
+            image: input.image,
+            max_bid_amount: input.max_bid_amount,
             total_supply: input.total_supply,
             start_price: input.start_price,
             floor_price: input.floor_price,
@@ -49,6 +57,7 @@ impl From<AuctionParamsInput> for AuctionParams {
             end_time: input.end_time,
             creator: input.creator,
             payment_token_app: input.payment_token_app,
+            auction_token_app: input.auction_token_app,
         }
     }
 }
@@ -100,6 +109,8 @@ pub struct AuctionSummary {
     // ──────────────────────────────────────────────────────────
     pub auction_id: AuctionId,
     pub item_name: String,
+    pub image: String,
+    pub max_bid_amount: u64,
     pub total_supply: u64,
     pub start_price: Amount,
     pub floor_price: Amount,
@@ -109,6 +120,7 @@ pub struct AuctionSummary {
     pub end_time: Timestamp,
     pub creator: AccountOwner,
     pub payment_token_app: ApplicationId,
+    pub auction_token_app: ApplicationId,
 
     // ──────────────────────────────────────────────────────────
     // Derived State (computed/updated during auction lifecycle)

@@ -18,7 +18,9 @@ pub enum AuctionEvent {
     AuctionCreated {
         auction_id: AuctionId,
         item_name: String,
+        image: String,
         total_supply: u64,
+        max_bid_amount: u64,
         start_price: Amount,
         floor_price: Amount,
         price_decay_interval: u64, // Microseconds between price drops
@@ -27,6 +29,7 @@ pub enum AuctionEvent {
         end_time: Timestamp,
         creator: AccountOwner, // Creator's account (for fund transfers)
         payment_token_app: linera_sdk::linera_base_types::ApplicationId, // Payment token app
+        auction_token_app: linera_sdk::linera_base_types::ApplicationId, // Auction token app
     },
 
     /// Bid accepted

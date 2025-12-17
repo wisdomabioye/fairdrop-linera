@@ -12,7 +12,11 @@ export type AuctionStatus = typeof AuctionStatus[keyof typeof AuctionStatus];
 
 export interface AuctionParam {
     itemName: string;
+    image: string;
     totalSupply: number;
+    maxBidAmount: number;
+    paymentTokenApp: string;
+    auctionTokenApp: string;
     startPrice: string;
     floorPrice: string;
     priceDecayInterval: number;
@@ -82,7 +86,11 @@ export interface AuctionWithId {
     totalBidders: number;
     params: {
         itemName: string;
+        image: string;
         totalSupply: number;
+        maxBidAmount: number;
+        paymentTokenApp: string;
+        auctionTokenApp: string;
         startPrice: string;
         floorPrice: string;
         priceDecayInterval: number;
@@ -121,6 +129,10 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
     return {
         auctionId: auction.auctionId,
         itemName: auction.params.itemName,
+        image: auction.params.image,
+        maxBidAmount: auction.params.maxBidAmount,
+        paymentTokenApp: auction.params.paymentTokenApp,
+        auctionTokenApp: auction.params.auctionTokenApp,
         totalSupply: auction.params.totalSupply,
         startPrice: auction.params.startPrice,
         floorPrice: auction.params.floorPrice,

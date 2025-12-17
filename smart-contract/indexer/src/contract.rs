@@ -105,6 +105,8 @@ impl IndexerContract {
             AuctionEvent::AuctionCreated {
                 auction_id,
                 item_name,
+                image,
+                max_bid_amount,
                 total_supply,
                 start_price,
                 floor_price,
@@ -114,6 +116,7 @@ impl IndexerContract {
                 end_time,
                 creator,
                 payment_token_app,
+                auction_token_app,
             } => {
                 // Determine initial status: Scheduled if start_time is in the future, otherwise Active
                 let now = self.runtime.system_time();
@@ -127,6 +130,8 @@ impl IndexerContract {
                     // Original auction parameters
                     auction_id,
                     item_name,
+                    image,
+                    max_bid_amount,
                     total_supply,
                     start_price,
                     floor_price,
@@ -136,6 +141,7 @@ impl IndexerContract {
                     end_time,
                     creator,
                     payment_token_app,
+                    auction_token_app,
                     // Derived state
                     current_price: start_price,
                     sold: 0,

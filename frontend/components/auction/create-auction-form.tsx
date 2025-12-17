@@ -34,13 +34,18 @@ export function CreateAuctionForm({
   const { isWalletClientSyncing } = useSyncStatus();
 
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<AuctionParam, 'startTime' | 'endTime'>>({
     itemName: '',
-    totalSupply: '',
+    image: '',
+    maxBidAmount: 0,
+    auctionTokenApp: '',
+    paymentTokenApp: '',
+    totalSupply: 0,
     startPrice: '',
     floorPrice: '',
     priceDecayAmount: '',
-    priceDecayInterval: '',
+    priceDecayInterval: 0,
+    creator: ''
   });
 
   const [startDate, setStartDate] = useState<Date>();
@@ -88,8 +93,24 @@ export function CreateAuctionForm({
       newErrors.itemName = 'Item name is required';
     }
 
-    if (!formData.totalSupply || parseInt(formData.totalSupply) < 1) {
+    if (!formData.image.trim()) {
+      newErrors.image = 'Image url is required';
+    }
+
+    if (!formData.paymentTokenApp.trim()) {
+      newErrors.paymentTokenApp = 'Payment Token is required';
+    }
+
+    if (!formData.auctionTokenApp.trim()) {
+      newErrors.auctionTokenApp = 'Auction Token is required';
+    }
+
+    if (!formData.totalSupply || Number(formData.totalSupply) < 1) {
       newErrors.totalSupply = 'Total supply must be at least 1';
+    }
+
+    if (!formData.maxBidAmount || Number(formData.maxBidAmount) < 0) {
+      newErrors.maxBidAmount = 'Max bid amount must be at least 1 or 0 for unlimited amount';
     }
 
     if (!formData.startPrice || BigInt(formData.startPrice) <= BigInt(0)) {
@@ -104,7 +125,7 @@ export function CreateAuctionForm({
       newErrors.priceDecayAmount = 'Price decay amount must be greater than 0';
     }
 
-    if (!formData.priceDecayInterval || parseInt(formData.priceDecayInterval) < 1) {
+    if (!formData.priceDecayInterval || Number(formData.priceDecayInterval) < 1) {
       newErrors.priceDecayInterval = 'Price decay interval must be at least 1 second';
     }
 
@@ -147,14 +168,18 @@ export function CreateAuctionForm({
 
     const params: AuctionParam = {
       itemName: formData.itemName.trim(),
-      totalSupply: parseInt(formData.totalSupply),
+      image: formData.image.trim(),
+      maxBidAmount: Number(formData.maxBidAmount),
+      totalSupply: Number(formData.totalSupply),
       startPrice: formData.startPrice,
       floorPrice: formData.floorPrice,
       priceDecayAmount: formData.priceDecayAmount,
-      priceDecayInterval: parseInt(formData.priceDecayInterval),
+      priceDecayInterval: Number(formData.priceDecayInterval),
       startTime,
       endTime,
-      creator: address!
+      creator: address!,
+      paymentTokenApp: formData.paymentTokenApp.trim(),
+      auctionTokenApp: formData.auctionTokenApp.trim(),
     };
 
     await createAuction(params);
