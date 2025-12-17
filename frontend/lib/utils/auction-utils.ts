@@ -168,8 +168,9 @@ export function formatAbsoluteTime(timestamp: number): string {
  *
  * NOTE: Expects auction.endTime in milliseconds (already normalized)
  */
+export type AuctionStatusBadgeVariant = 'default' | 'outline' | 'secondary' | 'success' | 'warning' | 'info' | 'active' | 'ending' | 'winning' | 'outbid' | 'destructive'; 
 export function getAuctionStatusBadge(auction: AuctionSummary): {
-  variant: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'destructive';
+  variant: AuctionStatusBadgeVariant;
   text: string;
   className: string;
 } {
@@ -187,7 +188,7 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
       };
     }
     return {
-      variant: 'primary',
+      variant: 'default',
       text: 'Active',
       className: 'gradient-auction-active'
     };
@@ -211,7 +212,7 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
 
   if (status === AuctionStatus.Scheduled) {
     return {
-      variant: 'default',
+      variant: 'info',
       text: 'Scheduled',
       className: ''
     };

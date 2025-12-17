@@ -146,7 +146,7 @@ export function useAuctionMutations(
                 );
                 // console.log('📥 CreateAuction raw result:', result);
 
-                const parsed = JSON.parse(result) as { data: unknown | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
                 // console.log('📊 Parsed result:', parsed);
 
                 if (parsed.errors && parsed.errors.length > 0) {

@@ -77,7 +77,7 @@ export function AuctionCard({
     <Card
       className={cn(
         'hover-lift cursor-pointer relative overflow-hidden animate-fade-in',
-        'group'
+        'group w-full'
       )}
       onClick={handleViewDetails}
     >
@@ -99,7 +99,7 @@ export function AuctionCard({
               'absolute top-2 left-2',
               statusBadge.className
             )}
-            variant={statusBadge.variant as any}
+            variant={statusBadge.variant}
           >
             {statusBadge.text}
           </Badge>

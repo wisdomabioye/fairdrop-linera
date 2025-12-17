@@ -93,7 +93,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
                     JSON.stringify(FUNGIBLE_QUERY.Accounts())
                 );
                 // console.log('Accounts', result)
-                const parsed = JSON.parse(result) as { data: FungibleAccounts | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: FungibleAccounts | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -138,7 +138,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
                     JSON.stringify(FUNGIBLE_QUERY.Allowances())
                 );
 
-                const parsed = JSON.parse(result) as { data: FungibleAllowances | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: FungibleAllowances | null, errors?: unknown[] };
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
                 }
@@ -182,7 +182,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
                 const tickerResult = await fungibleApp.walletClient!.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.TickerSymbol())
                 );
-                const tickerParsed = JSON.parse(tickerResult) as { data: { tickerSymbol: string } | null, errors?: any[] };
+                const tickerParsed = JSON.parse(tickerResult) as { data: { tickerSymbol: string } | null, errors?: unknown[] };
 
                 if (tickerParsed.errors && tickerParsed.errors.length > 0) {
                     throw new Error(`GraphQL error fetching ticker: ${JSON.stringify(tickerParsed.errors)}`);
@@ -192,7 +192,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
                 const nameResult = await fungibleApp.walletClient!.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.TokenName())
                 );
-                const nameParsed = JSON.parse(nameResult) as { data: { tokenName: string } | null, errors?: any[] };
+                const nameParsed = JSON.parse(nameResult) as { data: { tokenName: string } | null, errors?: unknown[] };
 
                 if (nameParsed.errors && nameParsed.errors.length > 0) {
                     throw new Error(`GraphQL error fetching token name: ${JSON.stringify(nameParsed.errors)}`);

@@ -22,7 +22,7 @@ import {
   getAuctionStatusBadge,
   calculateSupplyPercentage,
   formatTokenAmount,
-  formatAbsoluteTime
+  formatAbsoluteTime,
 } from '@/lib/utils/auction-utils';
 
 export default function AuctionDetailPage() {
@@ -153,7 +153,7 @@ export default function AuctionDetailPage() {
                     <CardTitle className="text-3xl">{auction.itemName}</CardTitle>
                     <Badge
                       className={cn(statusBadge.className)}
-                      variant={statusBadge.variant as any}
+                      variant={statusBadge.variant}
                     >
                       {statusBadge.text}
                     </Badge>

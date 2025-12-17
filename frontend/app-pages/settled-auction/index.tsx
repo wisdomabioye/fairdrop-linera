@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { type AuctionSummary } from '@/lib/gql/types';
 import { toast } from 'sonner';
 
 export default function SettledAuctions() {
@@ -114,14 +115,14 @@ export default function SettledAuctions() {
                         </CardHeader>
                         <CardContent>
                             <p className="text-sm text-muted-foreground">
-                                These auctions have ended and been settled. The clearing price is the final price all winners pay.
+                                These auctions have ended and been settled. The clearing price is the final price all bidders pay.
                                 If you participated, you can claim your settlement below.
                             </p>
                         </CardContent>
                     </Card>
 
                     {/* Auctions Grid */}
-                    <div className="flex flex-wrap gap-6">
+                    <div className="grid gap-6 justify-start [grid-template-columns:repeat(auto-fill,minmax(345px,350px))]">
                         {auctions.map((auction) => (
                             <SettledAuctionCard
                                 key={auction.auctionId}
@@ -143,7 +144,7 @@ function SettledAuctionCard({
     onClaimClick,
     isClaiming
 }: {
-    auction: any;
+    auction: AuctionSummary;
     onClaimClick: (id: number) => void;
     isClaiming: boolean;
 }) {

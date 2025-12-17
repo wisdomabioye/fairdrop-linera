@@ -15,7 +15,7 @@
  */
 
 export class QueryDeduplicator {
-  private inflight: Map<string, Promise<any>> = new Map();
+  private inflight: Map<string, Promise<unknown>> = new Map();
 
   /**
    * Deduplicate a query by key

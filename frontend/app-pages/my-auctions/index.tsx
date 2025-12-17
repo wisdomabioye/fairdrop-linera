@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Hammer, TrendingDown, Plus } from 'lucide-react';
-import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useLineraApplication, useWalletConnection, type ApplicationClient } from 'linera-react-client';
 import { useCachedAuctionsByCreator, useCachedAllMyCommitments, useCachedAuctionSummary } from '@/hooks';
 import { AAC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
@@ -15,7 +15,7 @@ import { WalletConnectionPrompt } from '@/components/wallet/wallet-connection-pr
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { APP_ROUTES } from '@/config/app.route';
-import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
+import { AuctionStatus, type AuctionSummary, type UserCommitment } from '@/lib/gql/types';
 
 export default function MyAuctionsPage() {
     const router = useRouter();
@@ -289,7 +289,7 @@ function AuctionGroup({
     }
 
     return (
-        <div className="flex flex-wrap gap-6">
+        <div className="grid gap-6 justify-start [grid-template-columns:repeat(auto-fill,minmax(345px,350px))]">
             {auctions.map((auction) => (
                 <AuctionCard
                     key={auction.auctionId}
@@ -308,8 +308,8 @@ function MyBidsGrid({
     aacApp,
     onBidClick
 }: {
-    commitments: { auctionId: string; commitment: any }[];
-    aacApp: any;
+    commitments: { auctionId: string; commitment: UserCommitment }[];
+    aacApp: ApplicationClient | null;
     onBidClick: (id: number) => void;
 }) {
     return (
@@ -335,8 +335,8 @@ function BidCommitmentCard({
     onBidClick
 }: {
     auctionId: string;
-    commitment: any;
-    aacApp: any;
+    commitment: UserCommitment;
+    aacApp: ApplicationClient | null;
     onBidClick: (id: number) => void;
 }) {
     // Fetch auction details

@@ -281,7 +281,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     });
                 }
 
-            } catch (err: any) {
+            } catch (err: unknown) {
                 const error = new Error('Indexer initialization failed');
                 console.error('❌ Indexer initialization error:', error);
                 set({
@@ -416,8 +416,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
     // ============ Fetch Actions ============
     fetchAuctionSummary: async (auctionId, aacApp) => {
+        // CRITICAL: Convert to string for consistent Map key lookups
+        const stringKey = String(auctionId);
+
         // Check normalized cache first
-        const cached = get().allAuctionsCache.get(auctionId);
+        const cached = get().allAuctionsCache.get(stringKey);
 
         if (cached && cached.status === 'success' && cached.data) {
             const age = Date.now() - cached.timestamp;
@@ -425,7 +428,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 // Cache hit! Update auctions map and return
                 set((state) => {
                     const newAuctions = new Map(state.auctions);
-                    newAuctions.set(auctionId, cached);
+                    newAuctions.set(stringKey, cached);
                     return { auctions: newAuctions };
                 });
                 return; // No API call needed
@@ -433,14 +436,14 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         }
 
         // Cache miss or stale - fetch from API
-        const key = `auction-summary-${auctionId}`;
+        const key = `auction-summary-${stringKey}`;
 
         await queryDeduplicator.deduplicate(key, async () => {
             // Set loading state
             set((state) => {
                 const newAuctions = new Map(state.auctions);
-                const existing = newAuctions.get(auctionId);
-                newAuctions.set(auctionId, {
+                const existing = newAuctions.get(stringKey);
+                newAuctions.set(stringKey, {
                     data: existing?.data ?? null,
                     timestamp: existing?.timestamp ?? Date.now(),
                     status: 'loading',
@@ -472,12 +475,14 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 };
 
                 // Update BOTH caches (auctions and allAuctionsCache)
+                // CRITICAL: Always use String() to ensure consistent Map keys (prevent duplicates)
                 set((state) => {
                     const newAuctions = new Map(state.auctions);
                     const newAllAuctions = new Map(state.allAuctionsCache);
 
-                    newAuctions.set(auctionId, cacheEntry);
-                    newAllAuctions.set(auctionId, cacheEntry);
+                    const stringKey = String(auctionId);
+                    newAuctions.set(stringKey, cacheEntry);
+                    newAllAuctions.set(stringKey, cacheEntry);
 
                     return {
                         auctions: newAuctions,
@@ -490,8 +495,9 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 // Update cache with error
                 set((state) => {
                     const newAuctions = new Map(state.auctions);
-                    const existing = newAuctions.get(auctionId);
-                    newAuctions.set(auctionId, {
+                    const stringKey = String(auctionId);
+                    const existing = newAuctions.get(stringKey);
+                    newAuctions.set(stringKey, {
                         data: existing?.data ?? null,
                         timestamp: existing?.timestamp ?? Date.now(),
                         status: 'error',

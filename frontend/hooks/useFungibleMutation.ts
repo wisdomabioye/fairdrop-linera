@@ -100,7 +100,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.Mint(owner, Number(amount)))
                 );
 
-                const parsed = JSON.parse(result) as { data: unknown | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -143,7 +143,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.Transfer(owner, Number(amount), targetAccount))
                 );
 
-                const parsed = JSON.parse(result) as { data: unknown | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -186,7 +186,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.Approve(owner, spender, Number(allowance)))
                 );
 
-                const parsed = JSON.parse(result) as { data: unknown | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -229,7 +229,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.TransferFrom(owner, spender, Number(amount), targetAccount))
                 );
 
-                const parsed = JSON.parse(result) as { data: unknown | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -271,7 +271,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.Claim(sourceAccount, Number(amount), targetAccount))
                 );
 
-                const parsed = JSON.parse(result) as { data: unknown | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -313,7 +313,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.Balance(owner))
                 );
 
-                const parsed = JSON.parse(result) as { data: { balance: string } | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: { balance: string } | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -351,7 +351,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.TickerSymbol())
                 );
 
-                const parsed = JSON.parse(result) as { data: { tickerSymbol: string } | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: { tickerSymbol: string } | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
@@ -389,7 +389,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     JSON.stringify(FUNGIBLE_MUTATION.TokenName())
                 );
 
-                const parsed = JSON.parse(result) as { data: { tokenName: string } | null, errors?: any[] };
+                const parsed = JSON.parse(result) as { data: { tokenName: string } | null, errors?: unknown[] };
 
                 if (parsed.errors && parsed.errors.length > 0) {
                     throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
