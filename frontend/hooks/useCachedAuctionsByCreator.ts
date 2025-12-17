@@ -79,6 +79,7 @@ export function useCachedAuctionsByCreator(
     // Subscribe to store
     const {
         auctionsByCreator,
+        allAuctionsCache,
         fetchAuctionsByCreator,
         isStale: checkIsStale
     } = useAuctionStore();
@@ -89,8 +90,12 @@ export function useCachedAuctionsByCreator(
     // Get auctions for this specific creator
     const creatorAuctions = creator ? auctionsByCreator.get(creator) ?? null : null;
 
-    // Derived state
-    const auctions = creatorAuctions?.data ?? null;
+    // Derived state - map IDs to full auction data from normalized cache
+    const auctions = creatorAuctions?.auctionIds
+        ? creatorAuctions.auctionIds
+            .map(id => allAuctionsCache.get(id)?.data)
+            .filter(Boolean) as AuctionSummary[]
+        : null;
     const loading = creatorAuctions?.status === 'loading' && !auctions;
     const isFetching = creatorAuctions?.status === 'loading';
     const error = creatorAuctions?.error ?? null;

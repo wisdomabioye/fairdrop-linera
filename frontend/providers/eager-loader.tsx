@@ -93,9 +93,10 @@ export function EagerLoader({
 
     // ============ TIER 1: CRITICAL (T=0) - Homepage Must-Haves ============
     // Load active auctions immediately - critical for homepage
+    // IMPORTANT: limit must match active-auction page (20) to avoid conflicts
     useCachedActiveAuctions({
         aacApp: aacApp.app,
-        limit: 10,
+        limit: 20,
         offset: 0,
         skip: false,
         enablePolling: true,

@@ -76,6 +76,7 @@ export function useCachedActiveAuctions(
     // Subscribe to store
     const {
         activeAuctions,
+        allAuctionsCache,
         fetchActiveAuctions,
         isStale: checkIsStale,
         startPollingActiveAuctions
@@ -85,8 +86,12 @@ export function useCachedActiveAuctions(
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
     const [isRefetching, setIsRefetching] = useState(false);
 
-    // Derived state
-    const auctions = activeAuctions?.data ?? null;
+    // Derived state - map IDs to full auction data from normalized cache
+    const auctions = activeAuctions?.auctionIds
+        ? activeAuctions.auctionIds
+            .map(id => allAuctionsCache.get(id)?.data)
+            .filter(Boolean) as AuctionSummary[]
+        : null;
     const isFetching = activeAuctions?.status === 'loading';
     const error = activeAuctions?.error ?? null;
     const hasLoadedOnce = activeAuctions?.status === 'success' || auctions !== null;

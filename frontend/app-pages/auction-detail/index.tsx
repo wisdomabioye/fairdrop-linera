@@ -176,7 +176,7 @@ export default function AuctionDetailPage() {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Current Price</p>
                   <p className="text-2xl font-bold text-primary">
-                    {formatTokenAmount(currentPrice, 18, 4)}
+                    {formatTokenAmount(currentPrice, 18, 4)} fUSD
                   </p>
                 </div>
                 <div className="space-y-1">

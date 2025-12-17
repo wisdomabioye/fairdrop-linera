@@ -71,6 +71,7 @@ export function useCachedSettledAuctions(
     // Subscribe to store
     const {
         settledAuctions,
+        allAuctionsCache,
         fetchSettledAuctions,
         isStale: checkIsStale
     } = useAuctionStore();
@@ -78,8 +79,12 @@ export function useCachedSettledAuctions(
     // Local state for polling interval
     const [_pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
-    // Derived state
-    const auctions = settledAuctions?.data ?? null;
+    // Derived state - map IDs to full auction data from normalized cache
+    const auctions = settledAuctions?.auctionIds
+        ? settledAuctions.auctionIds
+            .map(id => allAuctionsCache.get(id)?.data)
+            .filter(Boolean) as AuctionSummary[]
+        : null;
     const loading = settledAuctions?.status === 'loading' && !auctions;
     const isFetching = settledAuctions?.status === 'loading';
     const error = settledAuctions?.error ?? null;

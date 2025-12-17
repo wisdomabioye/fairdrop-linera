@@ -43,23 +43,38 @@ export function SyncProvider({
     const prevWalletSyncingRef = useRef(false);
     const prevPublicSyncingRef = useRef(false);
 
+    // Track if this is the first sync completion (skip invalidation on initial load)
+    const hasCompletedFirstPublicSyncRef = useRef(false);
+    const hasCompletedFirstWalletSyncRef = useRef(false);
+
     const isClientSyncing = isWalletClientSyncing || isPublicClientSyncing;
 
     /**
      * Handle sync completion - call invalidateAll when syncing stops
+     * Skip invalidation on first sync to prevent double-fetch on initial page load
      */
     useEffect(() => {
         // Detect wallet client sync completion
         if (prevWalletSyncingRef.current && !isWalletClientSyncing) {
-            console.log('[SyncProvider] Wallet client sync completed, invalidating caches');
-            invalidateAll();
+            if (!hasCompletedFirstWalletSyncRef.current) {
+                console.log('[SyncProvider] Wallet client first sync completed - skipping cache invalidation');
+                hasCompletedFirstWalletSyncRef.current = true;
+            } else {
+                console.log('[SyncProvider] Wallet client sync completed, invalidating caches');
+                invalidateAll();
+            }
         }
         prevWalletSyncingRef.current = isWalletClientSyncing;
 
         // Detect public client sync completion
         if (prevPublicSyncingRef.current && !isPublicClientSyncing) {
-            console.log('[SyncProvider] Public client sync completed, invalidating caches');
-            invalidateAll();
+            if (!hasCompletedFirstPublicSyncRef.current) {
+                console.log('[SyncProvider] Public client first sync completed - skipping cache invalidation');
+                hasCompletedFirstPublicSyncRef.current = true;
+            } else {
+                console.log('[SyncProvider] Public client sync completed, invalidating caches');
+                invalidateAll();
+            }
         }
         prevPublicSyncingRef.current = isPublicClientSyncing;
     }, [isWalletClientSyncing, isPublicClientSyncing, invalidateAll]);

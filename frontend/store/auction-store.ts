@@ -42,9 +42,9 @@ import {
 
 
 // TTL constants (in milliseconds)
-const AUCTION_DATA_TTL = 30000; // active auction data changes frequently
-const AUCTION_LIST_TTL = 60000; // auction lists
-const BID_HISTORY_TTL = 30000; // bid history changes less frequently
+const AUCTION_DATA_TTL = 10000; // active auction data changes frequently
+const AUCTION_LIST_TTL = 30000; // auction lists
+const BID_HISTORY_TTL = 5000; // bid history changes less frequently
 const USER_COMMITMENT_TTL = 10000; // user commitments
 
 // Store types
@@ -62,9 +62,11 @@ export interface AuctionCacheEntry {
 
 /**
  * Cache entry for auction lists (active, settled, by creator)
+ * Stores only auction IDs from the specific query, not full data.
+ * Full auction data is looked up from the normalized allAuctionsCache.
  */
 export interface AuctionListCacheEntry {
-    data: AuctionSummary[] | null;
+    auctionIds: string[];  // IDs of auctions from this specific query
     timestamp: number;
     status: FetchStatus;
     error: Error | null;
@@ -111,6 +113,7 @@ export interface AllAuctionsMetadata {
     error: Error | null;
     offset: number;
     limit: number;
+    fetchedIds: string[]; // IDs that were fetched in the last query
 }
 
 /**
@@ -156,7 +159,7 @@ export interface AuctionStore {
     fetchAllMyCommitments: (userChain: string, uicApp: ApplicationClient) => Promise<void>;
 
     // ============ Internal Fetch Methods ============
-    _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
+    _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<string[]>;
 
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId: string) => void;
@@ -331,12 +334,16 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
      * Internal method to fetch all auctions and populate normalized cache.
      * This is the ONLY method that calls AAC_QUERY.AllAuctions.
      *
+     * Returns the list of auction IDs that were fetched, allowing callers
+     * to track which auctions belong to their specific query.
+     *
      * @param offset - Pagination offset
      * @param limit - Number of auctions to fetch
      * @param aacApp - AAC application client
      * @param force - Force fetch even if cache is fresh
+     * @returns Array of auction IDs that were fetched
      */
-    _fetchAllAuctionsInternal: async (offset, limit, aacApp, force = false) => {
+    _fetchAllAuctionsInternal: async (offset, limit, aacApp, force = false): Promise<string[]> => {
         const key = `all-auctions-${offset}-${limit}`;
 
         // Check if we can skip fetch (unless forced)
@@ -344,12 +351,13 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         if (!force && meta) {
             const age = Date.now() - meta.lastFetchTime;
             if (age < AUCTION_LIST_TTL && meta.status === 'success') {
-                // Cache is fresh, skip fetch
-                return;
+                // Cache is fresh, return the IDs from the previous fetch
+                // NOT all cache keys - this prevents list shuffling!
+                return meta.fetchedIds;
             }
         }
 
-        await queryDeduplicator.deduplicate(key, async () => {
+        return await queryDeduplicator.deduplicate(key, async () => {
             // Set loading state
             set((state) => ({
                 allAuctionsMeta: {
@@ -357,7 +365,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     status: 'loading',
                     error: null,
                     offset,
-                    limit
+                    limit,
+                    fetchedIds: state.allAuctionsMeta?.fetchedIds ?? []
                 }
             }));
 
@@ -371,6 +380,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 };
 
                 const allAuctions = (data.allAuctions || []).map(transformAuctionWithId);
+                const fetchedIds = allAuctions.map(a => String(a.auctionId));
 
                 // Populate normalized cache with ALL auctions
                 set((state) => {
@@ -392,10 +402,13 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                             status: 'success',
                             error: null,
                             offset,
-                            limit
+                            limit,
+                            fetchedIds // Store the IDs we just fetched
                         }
                     };
                 });
+
+                return fetchedIds;
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to fetch all auctions');
 
@@ -405,7 +418,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                         status: 'error',
                         error,
                         offset,
-                        limit
+                        limit,
+                        fetchedIds: state.allAuctionsMeta?.fetchedIds ?? []
                     }
                 }));
 
@@ -515,7 +529,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         // Set loading state
         set((state) => ({
             activeAuctions: {
-                data: state.activeAuctions?.data ?? null,
+                auctionIds: state.activeAuctions?.auctionIds ?? [],
                 timestamp: state.activeAuctions?.timestamp ?? Date.now(),
                 status: 'loading',
                 error: null,
@@ -525,22 +539,22 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         }));
 
         try {
-            // Fetch all auctions (will use cache if fresh)
-            await get()._fetchAllAuctionsInternal(offset, limit, aacApp);
+            // Fetch auctions and get the IDs that were fetched
+            const fetchedIds = await get()._fetchAllAuctionsInternal(offset, limit, aacApp);
 
-            // Filter from normalized cache
-            const allAuctions = Array.from(get().allAuctionsCache.values())
-                .map(entry => entry.data)
-                .filter(Boolean) as AuctionSummary[];
-
-            const activeAuctions = allAuctions.filter(
-                auction => auction.status === AuctionStatus.Active ||
-                           auction.status === AuctionStatus.Scheduled
-            );
+            // Filter ONLY the fetched IDs by status (not the entire cache)
+            const activeAuctionIds = fetchedIds.filter(id => {
+                const entry = get().allAuctionsCache.get(id);
+                const auction = entry?.data;
+                return auction && (
+                    auction.status === AuctionStatus.Active ||
+                    auction.status === AuctionStatus.Scheduled
+                );
+            });
 
             set({
                 activeAuctions: {
-                    data: activeAuctions,
+                    auctionIds: activeAuctionIds,
                     timestamp: Date.now(),
                     status: 'success',
                     error: null,
@@ -553,7 +567,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             set((state) => ({
                 activeAuctions: {
-                    data: state.activeAuctions?.data ?? null,
+                    auctionIds: state.activeAuctions?.auctionIds ?? [],
                     timestamp: state.activeAuctions?.timestamp ?? Date.now(),
                     status: 'error',
                     error,
@@ -570,7 +584,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         // Set loading state
         set((state) => ({
             settledAuctions: {
-                data: state.settledAuctions?.data ?? null,
+                auctionIds: state.settledAuctions?.auctionIds ?? [],
                 timestamp: state.settledAuctions?.timestamp ?? Date.now(),
                 status: 'loading',
                 error: null,
@@ -580,21 +594,19 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         }));
 
         try {
-            // Fetch all auctions (will use cache if fresh)
-            await get()._fetchAllAuctionsInternal(offset, limit, aacApp);
+            // Fetch auctions and get the IDs that were fetched
+            const fetchedIds = await get()._fetchAllAuctionsInternal(offset, limit, aacApp);
 
-            // Filter from normalized cache
-            const allAuctions = Array.from(get().allAuctionsCache.values())
-                .map(entry => entry.data)
-                .filter(Boolean) as AuctionSummary[];
-
-            const settledAuctions = allAuctions.filter(
-                auction => auction.status === AuctionStatus.Settled
-            );
+            // Filter ONLY the fetched IDs by status (not the entire cache)
+            const settledAuctionIds = fetchedIds.filter(id => {
+                const entry = get().allAuctionsCache.get(id);
+                const auction = entry?.data;
+                return auction && auction.status === AuctionStatus.Settled;
+            });
 
             set({
                 settledAuctions: {
-                    data: settledAuctions,
+                    auctionIds: settledAuctionIds,
                     timestamp: Date.now(),
                     status: 'success',
                     error: null,
@@ -607,7 +619,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             set((state) => ({
                 settledAuctions: {
-                    data: state.settledAuctions?.data ?? null,
+                    auctionIds: state.settledAuctions?.auctionIds ?? [],
                     timestamp: state.settledAuctions?.timestamp ?? Date.now(),
                     status: 'error',
                     error,
@@ -634,7 +646,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const newMap = new Map(state.auctionsByCreator);
                 const existing = newMap.get(creator);
                 newMap.set(creator, {
-                    data: existing?.data ?? null,
+                    auctionIds: existing?.auctionIds ?? [],
                     timestamp: existing?.timestamp ?? Date.now(),
                     status: 'loading',
                     error: null,
@@ -655,13 +667,29 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     data: { auctionsByCreator: AuctionWithId[] | null }
                 };
 
-                // Transform AuctionWithId[] to AuctionSummary[]
+                // Transform AuctionWithId[] to AuctionSummary[] and populate normalized cache
                 const auctions = (data.auctionsByCreator || []).map(transformAuctionWithId);
 
+                // Populate normalized cache
+                set((state) => {
+                    const newCache = new Map(state.allAuctionsCache);
+                    auctions.forEach(auction => {
+                        newCache.set(String(auction.auctionId), {
+                            data: auction,
+                            timestamp: Date.now(),
+                            status: 'success',
+                            error: null
+                        });
+                    });
+                    return { allAuctionsCache: newCache };
+                });
+
+                // Store only IDs in creator cache
+                const auctionIds = auctions.map(a => String(a.auctionId));
                 set((state) => {
                     const newMap = new Map(state.auctionsByCreator);
                     newMap.set(creator, {
-                        data: auctions,
+                        auctionIds,
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
@@ -677,7 +705,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     const newMap = new Map(state.auctionsByCreator);
                     const existing = newMap.get(creator);
                     newMap.set(creator, {
-                        data: existing?.data ?? null,
+                        auctionIds: existing?.auctionIds ?? [],
                         timestamp: existing?.timestamp ?? Date.now(),
                         status: 'error',
                         error,

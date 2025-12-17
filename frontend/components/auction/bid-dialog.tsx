@@ -40,7 +40,7 @@ export function BidDialog({
         <DialogHeader>
           <DialogTitle>{auction.itemName}</DialogTitle>
           <DialogDescription>
-            Current Price: {formatTokenAmount(auction.currentPrice, 18, 4)} •{' '}
+            Current Price: {formatTokenAmount(auction.currentPrice, 18, 4)} fUSD •{' '}
             {auction.totalSupply - auction.sold} / {auction.totalSupply} remaining
           </DialogDescription>
         </DialogHeader>

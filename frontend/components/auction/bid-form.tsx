@@ -221,7 +221,7 @@ export function BidForm({
                 <span>Current Price</span>
               </div>
               <div className="text-2xl font-bold text-primary">
-                {formatTokenAmount(currentPrice, 18, 4)}
+                {formatTokenAmount(currentPrice, 18, 4)} fUSD
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -283,7 +283,7 @@ export function BidForm({
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {quantity} × {formatTokenAmount(currentPrice, 18, 4)} = {formatTokenAmount(totalCost, 18, 4)}
+              {quantity} × {formatTokenAmount(currentPrice, 18, 4)} fUSD = {formatTokenAmount(totalCost, 18, 4)} fUSD
             </p>
           </div>
 

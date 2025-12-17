@@ -117,7 +117,7 @@ export function AuctionCard({
         )}>
           <div className="flex items-center gap-2">
             <TrendingDown className="h-5 w-5" />
-            <span>{formatTokenAmount(currentPrice, 18, 4)}</span>
+            <span>{formatTokenAmount(currentPrice, 18, 4)} fUSD</span>
           </div>
           <CardDescription className="text-xs mt-1">
             Current Price
