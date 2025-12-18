@@ -8,7 +8,6 @@ import { ArrowLeft, Package, Share2 } from 'lucide-react';
 import { useLineraApplication } from 'linera-react-client';
 import { useCachedAuctionSummary, useCachedMyCommitment } from '@/hooks';
 import { AAC_APP_ID } from '@/config/app.config';
-import { BidForm } from '@/components/auction/bid-form';
 import { BidHistory } from '@/components/auction/bid-history';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,13 +15,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ErrorState } from '@/components/loading/error-state';
+import { DetailPriceDisplay } from './components/detail-price-display';
+import { DetailCountdown } from './components/detail-countdown';
+import { DetailSidebarActions } from './components/detail-sidebar-actions';
+import { AuctionStatus } from '@/lib/gql/types';
 import {
   calculateCurrentPrice,
-  formatTimeRemaining,
   getAuctionStatusBadge,
   calculateSupplyPercentage,
   formatTokenAmount,
   formatAbsoluteTime,
+  isEndingVerySoon
 } from '@/lib/utils/auction-utils';
 
 export default function AuctionDetailPage() {
@@ -33,7 +36,6 @@ export default function AuctionDetailPage() {
   const aacApp = useLineraApplication(AAC_APP_ID);
 
   const [currentPrice, setCurrentPrice] = useState('0');
-  const [timeRemaining, setTimeRemaining] = useState('');
 
   // Fetch auction details
   const {
@@ -49,24 +51,23 @@ export default function AuctionDetailPage() {
     skip: !auctionId || !aacApp.app
   });
 
-  // Fetch user's commitment
+  // Fetch user's commitment (for active auctions display)
   const { commitment } = useCachedMyCommitment({
     auctionId,
     uicApp: aacApp.app,
     skip: !auctionId || !aacApp.app?.walletClient
   });
 
-  // Update price and countdown
+  // Update price only for active auctions
   useEffect(() => {
-    if (!auction) return;
+    if (!auction || auction.status !== AuctionStatus.Active) return;
 
-    const updateValues = () => {
+    const updatePrice = () => {
       setCurrentPrice(calculateCurrentPrice(auction));
-      setTimeRemaining(formatTimeRemaining(auction.endTime));
     };
 
-    updateValues();
-    const interval = setInterval(updateValues, 1000);
+    updatePrice();
+    const interval = setInterval(updatePrice, 1000);
 
     return () => clearInterval(interval);
   }, [auction]);
@@ -174,16 +175,16 @@ export default function AuctionDetailPage() {
 
               {/* Price and Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Current Price</p>
-                  <p className="text-2xl font-bold text-primary">
-                    {formatTokenAmount(currentPrice, 18, 4)} fUSD
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Time Remaining</p>
-                  <p className="text-2xl font-bold">{timeRemaining}</p>
-                </div>
+                {/* Status-aware price display */}
+                <DetailPriceDisplay
+                  auction={auction}
+                  currentPrice={currentPrice}
+                  isEndingNow={isEndingVerySoon(auction.endTime)}
+                />
+
+                {/* Status-aware countdown */}
+                <DetailCountdown auction={auction} />
+
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Supply</p>
                   <p className="text-2xl font-bold">
@@ -254,57 +255,29 @@ export default function AuctionDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Bid Form */}
-          <BidForm
+          {/* Status-aware Actions (Bid/Claim) */}
+          <DetailSidebarActions
             auction={auction}
-            onSuccess={() => {
+            uicApp={aacApp.app}
+            onBidSuccess={() => {
+              refetch();
+            }}
+            onClaimSuccess={() => {
               refetch();
             }}
           />
 
-          {/* User's Commitment */}
-          {commitment && commitment.totalQuantity > 0 && (
+          {/* User's Commitment (for active auctions) */}
+          {auction.status === AuctionStatus.Active && commitment && commitment.totalQuantity > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Your Commitment</CardTitle>
+                <CardTitle>Your Bids</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Total Quantity</span>
                   <span className="font-semibold">{commitment.totalQuantity}</span>
                 </div>
-                {commitment.settlement && (
-                  <>
-                    <Separator />
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold">Settlement</h4>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Allocated</span>
-                          <span>{commitment.settlement.allocatedQuantity}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Clearing Price</span>
-                          <span className="font-mono">
-                            {formatTokenAmount(commitment.settlement.clearingPrice, 18, 4)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total Cost</span>
-                          <span className="font-mono">
-                            {formatTokenAmount(commitment.settlement.totalCost, 18, 4)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-success">
-                          <span>Refund</span>
-                          <span className="font-mono">
-                            {formatTokenAmount(commitment.settlement.refund, 18, 4)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
               </CardContent>
             </Card>
           )}

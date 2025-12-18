@@ -78,12 +78,12 @@ export default function SettledAuctions() {
             </header>
 
             {/* Loading State */}
-            {loading && !hasLoadedOnce && (
-                <AuctionSkeletonGrid count={8} />
+            {((loading && !hasLoadedOnce) || (isFetching && !auctions?.length)) && (
+                <AuctionSkeletonGrid count={4} />
             )}
 
             {/* Error State */}
-            {error && (
+            {error && !auctions?.length && (
                 <ErrorState
                     error={error}
                     onRetry={refetch}
