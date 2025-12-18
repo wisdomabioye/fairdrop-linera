@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import { useLineraClient } from 'linera-react-client';
+import { useLineraClient, useWalletConnection } from 'linera-react-client';
 import { useAuctionStore } from '@/store/auction-store';
 
 export interface SyncStatus {
@@ -30,6 +30,7 @@ export function SyncProvider({
     children: React.ReactNode;
 } & SyncProviderOptions) {
     const { publicClient, walletClient } = useLineraClient();
+    const { isConnected } = useWalletConnection();
     const { invalidateAll } = useAuctionStore();
 
     const [isWalletClientSyncing, setIsWalletClientSyncing] = useState(false);
@@ -48,6 +49,26 @@ export function SyncProvider({
     const hasCompletedFirstWalletSyncRef = useRef(false);
 
     const isClientSyncing = isWalletClientSyncing || isPublicClientSyncing;
+
+    /**
+     * Set initial syncing state when wallet client becomes available
+     */
+    useEffect(() => {
+        if (walletClient && enabled && isConnected) {
+            console.log('[SyncProvider] Wallet client available, assuming initial sync');
+            setIsWalletClientSyncing(true);
+        }
+    }, [walletClient, enabled, isConnected]);
+
+    /**
+     * Set initial syncing state when public client becomes available
+     */
+    useEffect(() => {
+        if (publicClient && enabled) {
+            console.log('[SyncProvider] Public client available, assuming initial sync');
+            setIsPublicClientSyncing(true);
+        }
+    }, [publicClient, enabled]);
 
     /**
      * Handle sync completion - call invalidateAll when syncing stops
