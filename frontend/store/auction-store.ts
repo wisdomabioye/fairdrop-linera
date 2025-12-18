@@ -824,6 +824,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     JSON.stringify(UIC_QUERY.MyCommitmentForAuction(Number(auctionId)))
                 );
 
+                // console.log('MyCommitmentForAuction:', JSON.parse(result));
+
                 const { data } = JSON.parse(result) as {
                     data: { myCommitmentForAuction: UserCommitment | null }
                 };
@@ -895,6 +897,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await uicApp.walletClient.query<string>(
                     JSON.stringify(UIC_QUERY.MyAuctionCommitments())
                 );
+                // console.log('MyAuctionCommitments:', JSON.parse(result));
+
                 // console.log('MyAuctionCommitments', JSON.parse(result))
                 const { data } = JSON.parse(result) as {
                     data: { myAuctionCommitment: AuctionCommitment[] | null }

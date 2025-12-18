@@ -32,7 +32,6 @@ export function ClaimForm({
   uicApp,
   onSuccess
 }: ClaimFormProps) {
-  const [claimed, setClaimed] = useState(false);
   const { isConnected, isConnecting } = useWalletConnection();
   const { isWalletClientSyncing } = useSyncStatus();
 
@@ -51,7 +50,6 @@ export function ClaimForm({
   const { claimSettlement, isClaiming, error: claimError } = useAuctionMutations({
     uicApp,
     onClaimSuccess: () => {
-      setClaimed(true);
       toast.success('Successfully claimed your settlement!');
       onSuccess?.();
     },
@@ -166,8 +164,9 @@ export function ClaimForm({
 
   // At this point, commitment is guaranteed to exist
   // Check if user has items to claim
-  const hasAllocation = (commitment.settlement?.allocatedQuantity || 0) > 0;
-  const hasRefund = commitment.settlement?.refund && BigInt(commitment.settlement.refund) > BigInt(0);
+  const claimed = !!commitment.settlement; // settlement is available only after claim
+  const hasAllocation = (commitment.totalQuantity || 0) > 0;
+  const hasRefund = commitment.settlement?.refund ? BigInt(parseFloat(commitment.settlement?.refund)) : BigInt(0);
 
   // State 6: No claimable items
   if (!hasAllocation && !hasRefund) {
@@ -201,13 +200,13 @@ export function ClaimForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {hasAllocation && (
+          {!!hasAllocation && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Items Claimed</span>
               <span className="font-semibold">{commitment.settlement?.allocatedQuantity || 0}</span>
             </div>
           )}
-          {hasRefund && (
+          {!!hasRefund && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Refund Claimed</span>
               <span className="font-semibold font-mono">

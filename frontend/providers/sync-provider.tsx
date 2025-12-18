@@ -104,7 +104,7 @@ export function SyncProvider({
      * Handle wallet client notifications
      */
     const handleWalletNotification = useCallback(() => {
-        console.log('[SyncProvider] Wallet client notification received');
+        // console.log('[SyncProvider] Wallet client notification received');
 
         // Set syncing state
         setIsWalletClientSyncing(true);
@@ -125,7 +125,7 @@ export function SyncProvider({
      * Handle public client notifications
      */
     const handlePublicNotification = useCallback(() => {
-        console.log('[SyncProvider] Public client notification received');
+        // console.log('[SyncProvider] Public client notification received');
 
         // Set syncing state
         setIsPublicClientSyncing(true);

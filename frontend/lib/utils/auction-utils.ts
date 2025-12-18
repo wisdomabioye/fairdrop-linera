@@ -182,13 +182,13 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
     // Less than 1 hour remaining
     if (timeRemaining < 60 * 60 * 1000) {
       return {
-        variant: 'warning',
+        variant: 'ending',
         text: 'Ending Soon',
         className: 'gradient-auction-ending'
       };
     }
     return {
-      variant: 'default',
+      variant: 'active',
       text: 'Active',
       className: 'gradient-auction-active'
     };
@@ -212,7 +212,7 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
 
   if (status === AuctionStatus.Scheduled) {
     return {
-      variant: 'info',
+      variant: 'default',
       text: 'Scheduled',
       className: ''
     };
