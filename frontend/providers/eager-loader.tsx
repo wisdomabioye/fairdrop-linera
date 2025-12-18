@@ -27,8 +27,8 @@ export function EagerLoader({
 }: {
     children: React.ReactNode;
 }) {
-    const aacApp = useLineraApplication(AAC_APP_ID);
-    const uicApp = useLineraApplication(UIC_APP_ID);
+    const aacApp = useLineraApplication(AAC_APP_ID); // Same as uicApp
+    // const uicApp = useLineraApplication(UIC_APP_ID);
     const { isConnected, walletAddress } = useLineraClient();
     const { isWalletClientSyncing } = useSyncStatus();
 
@@ -106,7 +106,7 @@ export function EagerLoader({
     // Load settled auctions after initial render
     useCachedSettledAuctions({
         aacApp: aacApp.app,
-        limit: 10,
+        limit: 20,
         offset: 0,
         skip: !loadTier2,
         enablePolling: loadTier2,
@@ -125,7 +125,7 @@ export function EagerLoader({
 
     // Load user's commitments for all auctions (for "My Bids" page)
     useCachedAllMyCommitments({
-        uicApp: uicApp.app,
+        uicApp: aacApp.app, // uicApp is the same with aacApp
         skip: !isConnected || !loadTier3,
     });
 
