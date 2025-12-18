@@ -163,7 +163,6 @@ function SettledAuctionCard({
         <div className="relative">
             <AuctionCard
                 auction={auction}
-                showQuickBid={false}
             />
             {hasCommitment && !hasClaimed && (
                 <div className="absolute bottom-4 left-4 right-4">

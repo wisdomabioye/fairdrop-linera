@@ -120,7 +120,6 @@ export default function ActiveAuctions() {
                         <AuctionCard
                             key={auction.auctionId}
                             auction={auction}
-                            showQuickBid
                             isRefreshing={isFetching && hasLoadedOnce}
                             onBidClick={handleBidClick}
                         />

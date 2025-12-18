@@ -294,7 +294,6 @@ function AuctionGroup({
                 <AuctionCard
                     key={auction.auctionId}
                     auction={auction}
-                    showQuickBid={auction.status === AuctionStatus.Active}
                     onBidClick={onBidClick}
                 />
             ))}
@@ -369,7 +368,6 @@ function BidCommitmentCard({
             )}
             <AuctionCard
                 auction={auction}
-                showQuickBid={auction.status === AuctionStatus.Active}
                 onBidClick={onBidClick}
             />
         </div>
