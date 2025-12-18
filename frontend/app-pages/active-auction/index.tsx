@@ -85,7 +85,7 @@ export default function ActiveAuctions() {
             </header>
 
             {/* Loading State */}
-            {((loading)) && (
+            {((loading || (isFetching && !auctions?.length))) && (
                 <AuctionSkeletonGrid count={4} />
             )}
 
