@@ -99,7 +99,7 @@ export default function ActiveAuctions() {
             )}
 
             {/* Empty State */}
-            {!loading && !error && auctions && auctions.length === 0 && (
+            {!loading && !isFetching && !error && auctions && auctions.length === 0 && (
                 <EmptyState
                     title="No active auctions"
                     description="Be the first to create an auction!"

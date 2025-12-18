@@ -38,6 +38,7 @@ export default function AuctionDetailPage() {
   // Fetch auction details
   const {
     auction,
+    isFetching,
     loading,
     error,
     refetch
@@ -87,7 +88,7 @@ export default function AuctionDetailPage() {
   };
 
   // Loading state
-  if (loading) {
+  if (loading || (isFetching && !auction)) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <Skeleton className="h-10 w-32 mb-8" />

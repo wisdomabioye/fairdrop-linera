@@ -175,6 +175,7 @@ export interface AuctionStore {
     // TEMPORARY: Using AAC app while indexer event streaming is fixed
     startPollingAuction: (auctionId: string, aacApp: ApplicationClient, interval?: number) => () => void;
     startPollingActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient, interval?: number) => () => void;
+    startPollingBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, interval?: number) => () => void;
 
     // ============ Utility Actions ============
     isStale: (
@@ -1143,6 +1144,17 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         return pollingManager.subscribe(
             key,
             () => get().fetchActiveAuctions(offset, limit, aacApp),
+            interval
+        );
+    },
+
+    // ============ Polling Actions ============
+    startPollingBidHistory: (auctionId, offset, limit, aacApp, interval = 5000) => {
+        const key = `bid-history-${auctionId}-${offset}-${limit}`;
+
+        return pollingManager.subscribe(
+            key,
+            () => get().fetchBidHistory(auctionId, offset, limit, aacApp),
             interval
         );
     },
