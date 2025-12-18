@@ -67,7 +67,7 @@ export function useCachedActiveAuctions(
         limit,
         aacApp,
         enablePolling = true,
-        pollInterval = 10000,
+        pollInterval = 5000,
         skip = false
     } = options;
 

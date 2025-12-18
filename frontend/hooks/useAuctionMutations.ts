@@ -222,9 +222,9 @@ export function useAuctionMutations(
 
                 // Invalidate affected caches
                 invalidateAuction(auctionId.toString());
+                invalidateBidHistory(auctionId.toString());
                 invalidateUserCommitment(auctionId.toString());
                 invalidateAllMyCommitments(); // Invalidate all commitments view
-                invalidateBidHistory(auctionId.toString());
 
                 onBuySuccess?.(auctionId, quantity);
                 return true;

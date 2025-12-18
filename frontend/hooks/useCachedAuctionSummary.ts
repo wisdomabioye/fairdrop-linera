@@ -82,14 +82,22 @@ export function useCachedAuctionSummary(
 
     // Local state for managing polling subscription
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
+    const [isRefetching, setIsRefetching] = useState(false);
 
     // Derived state
     const auction = entry?.data ?? null;
-    const loading = entry?.status === 'loading' && !auction;
     const isFetching = entry?.status === 'loading';
     const error = entry?.error ?? null;
     const hasLoadedOnce = entry?.status === 'success' || auction !== null;
     const isStale = checkIsStale('auction', auctionId);
+
+    // Loading state: show loading if no data exists AND (currently fetching OR syncing OR will fetch soon)
+    const loading = !auction && (
+        entry?.status === 'loading' ||
+        isRefetching ||
+        isPublicClientSyncing ||
+        (!hasLoadedOnce && !skip && !!aacApp) // Initial load state
+    );
 
     /**
      * Fetch auction summary
@@ -98,28 +106,28 @@ export function useCachedAuctionSummary(
         if (!aacApp || skip || isPublicClientSyncing) return;
 
         try {
+            setIsRefetching(true);
             await fetchAuctionSummary(auctionId, aacApp);
         } catch (err) {
             console.error('[useCachedAuctionSummary] Refetch failed:', err);
+        } finally {
+            setIsRefetching(false);
         }
     }, [aacApp, skip, isPublicClientSyncing, auctionId, fetchAuctionSummary]);
 
     /**
-     * Initial fetch and refetch on stale
+     * Initial fetch and refetch on stale data
+     * Wait for sync to complete before fetching
      */
     useEffect(() => {
         if (skip || !aacApp || isPublicClientSyncing) return;
 
-        // Check if entry exists by reading from store directly
-        const currentEntry = auctions.get(auctionId);
-
-        // Fetch if no entry exists OR entry has no data OR data is stale
-        // This handles initial load, failed fetches, and invalidated cache
-        if (!currentEntry || !currentEntry.data || isStale) {
+        // Fetch if we have no data at all, or if data is stale AND not currently loading
+        if ((!entry || isStale) && !isFetching) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, aacApp, auctionId, isPublicClientSyncing, isStale]);
+    }, [skip, aacApp, isStale, isPublicClientSyncing]);
 
     /**
      * Setup polling if enabled

@@ -42,10 +42,12 @@ import {
 
 
 // TTL constants (in milliseconds)
-const AUCTION_DATA_TTL = 10000; // active auction data changes frequently
-const AUCTION_LIST_TTL = 30000; // auction lists
-const BID_HISTORY_TTL = 5000; // bid history changes less frequently
-const USER_COMMITMENT_TTL = 10000; // user commitments
+// Note: TTLs are set ~20% longer than default polling intervals to prevent
+// cache expiration right when polling checks, reducing unnecessary API calls
+const AUCTION_DATA_TTL = 6000; // 6s (polling: 5s) - auction data changes frequently
+const AUCTION_LIST_TTL = 12000; // 12s (polling: 10s) - auction lists
+const BID_HISTORY_TTL = 6000; // 6s (polling: 5s) - bid history
+const USER_COMMITMENT_TTL = 10000; // 10s - user commitments (no default polling)
 
 // Store types
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -150,7 +152,7 @@ export interface AuctionStore {
 
     // ============ Fetch Actions ============
     // TEMPORARY: Using AAC queries while indexer event streaming is fixed
-    fetchAuctionSummary: (auctionId: string, aacApp: ApplicationClient) => Promise<void>;
+    fetchAuctionSummary: (auctionId: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchSettledAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
@@ -430,23 +432,25 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     // ============ Fetch Actions ============
-    fetchAuctionSummary: async (auctionId, aacApp) => {
+    fetchAuctionSummary: async (auctionId, aacApp, force = false) => {
         // CRITICAL: Convert to string for consistent Map key lookups
         const stringKey = String(auctionId);
 
-        // Check normalized cache first
-        const cached = get().allAuctionsCache.get(stringKey);
+        // Check normalized cache first (skip if forced)
+        if (!force) {
+            const cached = get().allAuctionsCache.get(stringKey);
 
-        if (cached && cached.status === 'success' && cached.data) {
-            const age = Date.now() - cached.timestamp;
-            if (age < AUCTION_DATA_TTL) {
-                // Cache hit! Update auctions map and return
-                set((state) => {
-                    const newAuctions = new Map(state.auctions);
-                    newAuctions.set(stringKey, cached);
-                    return { auctions: newAuctions };
-                });
-                return; // No API call needed
+            if (cached && cached.status === 'success' && cached.data) {
+                const age = Date.now() - cached.timestamp;
+                if (age < AUCTION_DATA_TTL) {
+                    // Cache hit! Update auctions map and return
+                    set((state) => {
+                        const newAuctions = new Map(state.auctions);
+                        newAuctions.set(stringKey, cached);
+                        return { auctions: newAuctions };
+                    });
+                    return; // No API call needed
+                }
             }
         }
 

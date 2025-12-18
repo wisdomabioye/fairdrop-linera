@@ -69,7 +69,7 @@ export function useCachedAuctionsByCreator(
         // limit,   // TEMPORARY: not used, AAC returns all creator's auctions
         aacApp,
         enablePolling = false,
-        pollInterval = 300000,
+        pollInterval = 10000,
         skip = false
     } = options;
 
