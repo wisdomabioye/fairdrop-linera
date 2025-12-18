@@ -5,7 +5,19 @@
  * Used as fallback while Linera client initializes.
  */
 
+'use client';
+
+import { useEffect, useState } from 'react';
+
 export function PageLoading() {
+    const [progress, setProgress] = useState(0);
+
+    useEffect(() => {
+        setTimeout(() => setProgress(30), 100);
+        setTimeout(() => setProgress(50), 600);
+        setTimeout(() => setProgress(75), 1200);
+        setTimeout(() => setProgress(95), 1800);
+    }, []);
     return (
         <div className="dark fixed inset-0 bg-background flex items-center justify-center">
             <div className="relative flex flex-col items-center justify-center gap-8">
@@ -61,7 +73,10 @@ export function PageLoading() {
 
                     {/* Shimmer bar */}
                     <div className="w-64 h-1 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full w-1/3 gradient-primary-r animate-shimmer" />
+                        <div
+                            className="h-full gradient-primary-r transition-all duration-700 ease-out"
+                            style={{ width: `${progress}%` }}
+                        />
                     </div>
 
                     {/* Status text */}

@@ -11,7 +11,7 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
       faucetUrl={process.env.NEXT_PUBLIC_FAUCET_URL!}
       readOnlyWallet={{ constantAddress: '0x3000000000000000000000000000000000000004' }}
       fallback={<PageLoading />}
-      skipProcessInbox={true}
+      skipProcessInbox={false}
       logging={{
         enabled: true,
         level: LogLevel.DEBUG
