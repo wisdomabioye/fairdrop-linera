@@ -85,7 +85,7 @@ export default function ActiveAuctions() {
             </header>
 
             {/* Loading State */}
-            {((loading)) && (
+            {((loading || (isFetching && !auctions?.length))) && (
                 <AuctionSkeletonGrid count={4} />
             )}
 
@@ -99,7 +99,7 @@ export default function ActiveAuctions() {
             )}
 
             {/* Empty State */}
-            {!loading && !error && auctions && auctions.length === 0 && (
+            {!loading && !isFetching && !error && auctions && auctions.length === 0 && (
                 <EmptyState
                     title="No active auctions"
                     description="Be the first to create an auction!"
@@ -120,7 +120,6 @@ export default function ActiveAuctions() {
                         <AuctionCard
                             key={auction.auctionId}
                             auction={auction}
-                            showQuickBid
                             isRefreshing={isFetching && hasLoadedOnce}
                             onBidClick={handleBidClick}
                         />

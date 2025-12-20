@@ -5,8 +5,8 @@
  *
  * Features:
  * - Reads from centralized store (instant)
- * - Longer TTL (30s) since bid history changes less frequently
  * - Auto-fetches if data is missing or stale
+ * - Optional polling with reference counting
  * - Stale-while-revalidate strategy
  *
  * Usage:
@@ -15,12 +15,13 @@
  *   auctionId: '1',
  *   offset: 0,
  *   limit: 50,
- *   indexerApp
+ *   aacApp,
+ *   enablePolling: true
  * });
  * ```
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
@@ -35,6 +36,10 @@ export interface UseCachedBidHistoryOptions {
     limit: number;
     /** The AAC (Auction Authority Chain) application client */
     aacApp: ApplicationClient | null;
+    /** Enable automatic polling (default: false) */
+    enablePolling?: boolean;
+    /** Polling interval in milliseconds (default: 5000ms) */
+    pollInterval?: number;
     /** Skip fetching (useful when conditionally loading) */
     skip?: boolean;
 }
@@ -64,6 +69,8 @@ export function useCachedBidHistory(
         offset,
         limit,
         aacApp,
+        enablePolling = false,
+        pollInterval = 5000,
         skip = false
     } = options;
 
@@ -74,19 +81,31 @@ export function useCachedBidHistory(
     const {
         bidHistory,
         fetchBidHistory,
-        isStale: checkIsStale
+        isStale: checkIsStale,
+        startPollingBidHistory
     } = useAuctionStore();
+
+    // Local state for managing polling subscription
+    const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
+    const [isRefetching, setIsRefetching] = useState(false);
 
     // Get cached entry
     const entry = bidHistory.get(auctionId);
 
     // Derived state
     const bids = entry?.data ?? null;
-    const loading = entry?.status === 'loading' && !bids;
     const isFetching = entry?.status === 'loading';
     const error = entry?.error ?? null;
     const hasLoadedOnce = entry?.status === 'success' || bids !== null;
     const isStale = checkIsStale('bidHistory', auctionId);
+
+    // Loading state: show loading if no data exists AND (currently fetching OR syncing OR will fetch soon)
+    const loading = !bids && (
+        entry?.status === 'loading' ||
+        isRefetching ||
+        isPublicClientSyncing ||
+        (!hasLoadedOnce && !skip && !!aacApp) // Initial load state
+    );
 
     /**
      * Fetch bid history
@@ -95,28 +114,48 @@ export function useCachedBidHistory(
         if (!aacApp || skip || isPublicClientSyncing) return;
 
         try {
+            setIsRefetching(true);
             await fetchBidHistory(auctionId, offset, limit, aacApp);
         } catch (err) {
             console.error('[useCachedBidHistory] Refetch failed:', err);
+        } finally {
+            setIsRefetching(false);
         }
     }, [aacApp, skip, isPublicClientSyncing, auctionId, offset, limit, fetchBidHistory]);
 
     /**
-     * Initial fetch and refetch on stale
+     * Initial fetch and refetch on stale data
+     * Wait for sync to complete before fetching
      */
     useEffect(() => {
         if (skip || !aacApp || isPublicClientSyncing) return;
 
-        // Check if entry exists by reading from store directly
-        const currentEntry = bidHistory.get(auctionId);
-
-        // Fetch if no entry exists OR entry has no data OR data is stale
-        // This handles initial load, failed fetches, and invalidated cache
-        if (!currentEntry || !currentEntry.data || isStale) {
+        // Fetch if we have no data at all, or if data is stale AND not currently loading
+        if ((!entry || isStale) && !isFetching) {
             refetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, aacApp, auctionId, isPublicClientSyncing, isStale]);
+    }, [skip, aacApp, isStale, isPublicClientSyncing]);
+
+    /**
+     * Setup polling if enabled
+     */
+    useEffect(() => {
+        if (!enablePolling || skip || !aacApp) {
+            return;
+        }
+
+        // Start polling
+        const unsubscribe = startPollingBidHistory(auctionId, (bids?.length || 0), limit, aacApp, pollInterval);
+        setPollingUnsubscribe(() => unsubscribe);
+
+        // Cleanup
+        return () => {
+            unsubscribe();
+            setPollingUnsubscribe(null);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enablePolling, skip, aacApp, auctionId, offset, limit, pollInterval]);
 
     return {
         bids,

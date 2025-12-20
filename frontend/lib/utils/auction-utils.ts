@@ -182,13 +182,13 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
     // Less than 1 hour remaining
     if (timeRemaining < 60 * 60 * 1000) {
       return {
-        variant: 'warning',
+        variant: 'ending',
         text: 'Ending Soon',
         className: 'gradient-auction-ending'
       };
     }
     return {
-      variant: 'default',
+      variant: 'active',
       text: 'Active',
       className: 'gradient-auction-active'
     };
@@ -212,7 +212,7 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
 
   if (status === AuctionStatus.Scheduled) {
     return {
-      variant: 'info',
+      variant: 'default',
       text: 'Scheduled',
       className: ''
     };
@@ -345,6 +345,23 @@ export function isEndingVerySoon(endTime: number): boolean {
   const remaining = endTime - Date.now();
   return remaining > 0 && remaining < 5 * 60 * 1000;
 }
+
+/**
+ * Check if auction is starting very soon (less than 1 hour until start)
+ *
+ * NOTE: Expects startTime in milliseconds (already normalized)
+ */
+export function isStartingVerySoon(startTime: number): boolean {
+  const timeToStart = startTime - Date.now();
+  return timeToStart > 0 && timeToStart < 60 * 60 * 1000;
+}
+
+/**
+ * Alias for formatRelativeTime - for semantic clarity when showing "ended" time
+ *
+ * NOTE: Expects timestamp in milliseconds (already normalized)
+ */
+export const formatTimeSince = formatRelativeTime;
 
 // ============ BID CALCULATIONS ============
 /**

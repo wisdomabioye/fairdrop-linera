@@ -113,7 +113,7 @@ export default function MyAuctionsPage() {
                 {/* Created Auctions Tab */}
                 <TabsContent value="created" className="space-y-6">
                     {loadingCreated && (
-                        <AuctionSkeletonGrid count={6} />
+                        <AuctionSkeletonGrid count={4} />
                     )}
 
                     {errorCreated && (
@@ -149,7 +149,7 @@ export default function MyAuctionsPage() {
                 {/* My Bids Tab */}
                 <TabsContent value="bids" className="space-y-6">
                     {loadingCommitments && (
-                        <AuctionSkeletonGrid count={6} />
+                        <AuctionSkeletonGrid count={4} />
                     )}
 
                     {errorCommitments && (
@@ -294,7 +294,6 @@ function AuctionGroup({
                 <AuctionCard
                     key={auction.auctionId}
                     auction={auction}
-                    showQuickBid={auction.status === AuctionStatus.Active}
                     onBidClick={onBidClick}
                 />
             ))}
@@ -341,7 +340,7 @@ function BidCommitmentCard({
 }) {
     // Fetch auction details
     const { auction, loading } = useCachedAuctionSummary({
-        auctionId,
+        auctionId: auctionId.toString(),
         aacApp,
         skip: !aacApp
     });
@@ -369,7 +368,6 @@ function BidCommitmentCard({
             )}
             <AuctionCard
                 auction={auction}
-                showQuickBid={auction.status === AuctionStatus.Active}
                 onBidClick={onBidClick}
             />
         </div>

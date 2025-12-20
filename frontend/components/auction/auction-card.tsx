@@ -2,82 +2,73 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, Users, Package, TrendingDown } from 'lucide-react';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
-import {
-  calculateCurrentPrice,
-  formatTimeRemaining,
-  getAuctionStatusBadge,
-  calculateSupplyPercentage,
-  getSupplyColor,
-  formatTokenAmount,
-  isEndingVerySoon
-} from '@/lib/utils/auction-utils';
+import { calculateCurrentPrice, isEndingVerySoon } from '@/lib/utils/auction-utils';
 import { cn } from '@/lib/utils';
 import { APP_ROUTES } from '@/config/app.route';
+import { AuctionCardImage } from './auction-card-image';
+import { AuctionCardPrice } from './auction-card-price';
+import { AuctionCardCountdown } from './auction-card-countdown';
+import { AuctionCardSupply } from './auction-card-supply';
+import { AuctionCardStats } from './auction-card-stats';
+import { AuctionCardActions } from './auction-card-actions';
 
 export interface AuctionCardProps {
   auction: AuctionSummary;
-  showQuickBid?: boolean;
   onBidClick?: (auctionId: number) => void;
+  onClaimClick?: (auctionId: number) => void;
+  onNotifyClick?: (auctionId: number) => void;
   onViewDetails?: (auctionId: number) => void;
   isRefreshing?: boolean;
 }
 
 export function AuctionCard({
   auction,
-  showQuickBid = true,
   onBidClick,
+  onClaimClick,
+  onNotifyClick,
   onViewDetails,
   isRefreshing = false
 }: AuctionCardProps) {
   const router = useRouter();
-  const [currentPrice, setCurrentPrice] = useState(
-    calculateCurrentPrice(auction)
-  );
-  const [timeRemaining, setTimeRemaining] = useState(
-    formatTimeRemaining(auction.endTime)
-  );
+  const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
 
-  // Update price and countdown every second
+  // Only update price for active auctions
   useEffect(() => {
+    if (auction.status !== AuctionStatus.Active) return;
+
     const interval = setInterval(() => {
       setCurrentPrice(calculateCurrentPrice(auction));
-      setTimeRemaining(formatTimeRemaining(auction.endTime));
     }, 1000);
 
     return () => clearInterval(interval);
   }, [auction]);
 
-  const statusBadge = getAuctionStatusBadge(auction);
-  const supplyPercentage = calculateSupplyPercentage(auction.sold, auction.totalSupply);
-  const supplyColor = getSupplyColor(supplyPercentage);
-  const isEndingNow = isEndingVerySoon(auction.endTime);
-
   const handleViewDetails = () => {
     if (onViewDetails) {
       onViewDetails(auction.auctionId);
     } else {
-      router.push(`${APP_ROUTES.auctionDetail(auction.auctionId)}`);
+      router.push(APP_ROUTES.auctionDetail(auction.auctionId));
     }
   };
 
-  const handleQuickBid = (e: React.MouseEvent) => {
+  const handleAction = (e: React.MouseEvent, callback?: (id: number) => void) => {
     e.stopPropagation(); // Prevent card click
-    if (onBidClick) {
-      onBidClick(auction.auctionId);
+    if (callback) {
+      callback(auction.auctionId);
     }
   };
 
   return (
     <Card
       className={cn(
-        'hover-lift cursor-pointer relative overflow-hidden animate-fade-in',
-        'group w-full'
+        'hover-lift cursor-pointer relative overflow-hidden animate-fade-in group w-full',
+        // Status-specific border colors
+        auction.status === AuctionStatus.Active && 'border-primary/20',
+        auction.status === AuctionStatus.Settled && 'border-green-500/20',
+        auction.status === AuctionStatus.Scheduled && 'border-blue-500/20'
       )}
       onClick={handleViewDetails}
     >
@@ -90,109 +81,41 @@ export function AuctionCard({
 
       <CardHeader className="space-y-2">
         {/* Image Placeholder & Status Badge */}
-        <div className="relative">
-          <div className="w-full h-40 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mb-3">
-            <Package className="h-16 w-16 text-muted-foreground/30" />
-          </div>
-          <Badge
-            className={cn(
-              'absolute top-2 left-2',
-              statusBadge.className
-            )}
-            variant={statusBadge.variant}
-          >
-            {statusBadge.text}
-          </Badge>
-        </div>
+        <AuctionCardImage auction={auction} />
 
         {/* Item Name */}
         <CardTitle className="text-xl line-clamp-1">
           {auction.itemName}
         </CardTitle>
 
-        {/* Current Price */}
-        <div className={cn(
-          'text-2xl font-bold text-primary',
-          isEndingNow && 'animate-countdown-pulse'
-        )}>
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5" />
-            <span>{formatTokenAmount(currentPrice, 18, 4)} fUSD</span>
-          </div>
-          <CardDescription className="text-xs mt-1">
-            Current Price
-          </CardDescription>
-        </div>
+        {/* Status-aware Price Display */}
+        <AuctionCardPrice
+          auction={auction}
+          currentPrice={currentPrice}
+          isEndingNow={isEndingVerySoon(auction.endTime)}
+        />
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Countdown */}
-        <div className="flex items-center gap-2 text-sm">
-          <Clock className={cn(
-            'h-4 w-4',
-            isEndingNow && 'text-warning animate-pulse'
-          )} />
-          <span className={cn(
-            'font-medium',
-            isEndingNow && 'text-warning'
-          )}>
-            {timeRemaining}
-          </span>
-        </div>
+        {/* Status-aware Countdown */}
+        <AuctionCardCountdown auction={auction} />
 
-        {/* Supply Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Supply</span>
-            <span className="font-medium">
-              {auction.sold} / {auction.totalSupply}
-            </span>
-          </div>
-          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-            <div
-              className={cn(
-                'h-full transition-all duration-500',
-                supplyColor
-              )}
-              style={{ width: `${supplyPercentage}%` }}
-            />
-          </div>
-          <div className="text-xs text-muted-foreground text-right">
-            {supplyPercentage}% sold
-          </div>
-        </div>
+        {/* Supply Progress - show only for active/settled */}
+        {(auction.status === AuctionStatus.Active || auction.status === AuctionStatus.Settled) && (
+          <AuctionCardSupply auction={auction} />
+        )}
 
         {/* Stats */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground pt-2 border-t">
-          <div className="flex items-center gap-1.5">
-            <TrendingDown className="h-4 w-4" />
-            <span>{auction.totalBids} bids</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Users className="h-4 w-4" />
-            <span>{auction.totalBidders} bidders</span>
-          </div>
-        </div>
+        <AuctionCardStats auction={auction} />
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={handleViewDetails}
-          >
-            View Details
-          </Button>
-          {showQuickBid && auction.status === AuctionStatus.Active && ( // AuctionStatus.Active
-            <Button
-              variant="default"
-              className="flex-1"
-              onClick={handleQuickBid}
-            >
-              Quick Bid
-            </Button>
-          )}
-        </div>
+        {/* Status-aware Action Buttons */}
+        <AuctionCardActions
+          auction={auction}
+          onViewDetails={handleViewDetails}
+          onBidClick={onBidClick ? (e) => handleAction(e, onBidClick) : undefined}
+          onClaimClick={onClaimClick ? (e) => handleAction(e, onClaimClick) : undefined}
+          onNotifyClick={onNotifyClick ? (e) => handleAction(e, onNotifyClick) : undefined}
+        />
       </CardContent>
     </Card>
   );

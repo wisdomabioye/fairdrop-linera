@@ -13,11 +13,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type AuctionSummary } from '@/lib/gql/types';
 import { toast } from 'sonner';
+import { APP_ROUTES } from '@/config/app.route';
 
 export default function SettledAuctions() {
     const router = useRouter();
-    const aacApp = useLineraApplication(AAC_APP_ID);
-    const uicApp = useLineraApplication(UIC_APP_ID);
+    const aacApp = useLineraApplication(AAC_APP_ID); // same as uicApp
+    // const uicApp = useLineraApplication(UIC_APP_ID);
 
     const {
         auctions,
@@ -33,7 +34,7 @@ export default function SettledAuctions() {
     });
 
     const { claimSettlement, isClaiming } = useAuctionMutations({
-        uicApp: uicApp.app,
+        uicApp: aacApp.app,
         onClaimSuccess: (auctionId) => {
             toast.success('Settlement claimed successfully!', {
                 description: `Auction ID: ${auctionId}`
@@ -48,7 +49,7 @@ export default function SettledAuctions() {
     });
 
     const handleCreateAuction = () => {
-        router.push('/create-auction');
+        router.push(APP_ROUTES.createAuction);
     };
 
     const handleClaimClick = async (auctionId: number) => {
@@ -78,12 +79,12 @@ export default function SettledAuctions() {
             </header>
 
             {/* Loading State */}
-            {loading && !hasLoadedOnce && (
-                <AuctionSkeletonGrid count={8} />
+            {((loading && !hasLoadedOnce)) && (
+                <AuctionSkeletonGrid count={4} />
             )}
 
             {/* Error State */}
-            {error && (
+            {error && !auctions?.length && (
                 <ErrorState
                     error={error}
                     onRetry={refetch}
@@ -142,7 +143,6 @@ export default function SettledAuctions() {
 function SettledAuctionCard({
     auction,
     onClaimClick,
-    isClaiming
 }: {
     auction: AuctionSummary;
     onClaimClick: (id: number) => void;
@@ -150,7 +150,7 @@ function SettledAuctionCard({
 }) {
     const uicApp = useLineraApplication(UIC_APP_ID);
 
-    const { commitment, loading } = useCachedMyCommitment({
+    const { commitment } = useCachedMyCommitment({
         auctionId: auction.auctionId.toString(),
         uicApp: uicApp.app,
         skip: !uicApp.app
@@ -160,23 +160,9 @@ function SettledAuctionCard({
     const hasClaimed = commitment?.settlement && commitment.totalQuantity > 0;
 
     return (
-        <div className="relative">
-            <AuctionCard
-                auction={auction}
-                showQuickBid={false}
-            />
-            {hasCommitment && !hasClaimed && (
-                <div className="absolute bottom-4 left-4 right-4">
-                    <Button
-                        onClick={() => onClaimClick(auction.auctionId)}
-                        disabled={isClaiming || loading}
-                        className="w-full gap-2"
-                        variant="success"
-                    >
-                        {isClaiming ? 'Claiming...' : 'Claim Settlement'}
-                    </Button>
-                </div>
-            )}
-        </div>
+        <AuctionCard
+            auction={auction}
+            onClaimClick={hasCommitment && !hasClaimed ? () => onClaimClick(auction.auctionId) : undefined}
+        />
     );
 }
