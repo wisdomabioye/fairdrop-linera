@@ -4,7 +4,7 @@ mod state;
 
 use self::state::IndexerState;
 use indexer::{IndexerAbi, IndexerOperation, IndexerParameters, IndexerResponse};
-use linera_sdk::linera_base_types::{StreamUpdate, WithContractAbi};
+use linera_sdk::linera_base_types::{StreamUpdate, Amount, WithContractAbi};
 use linera_sdk::views::{RootView, View};
 use linera_sdk::{Contract, ContractRuntime};
 use shared::events::{AuctionEvent, AUCTION_STREAM};
@@ -144,7 +144,7 @@ impl IndexerContract {
                     auction_token_app,
                     // Derived state
                     current_price: start_price,
-                    sold: 0,
+                    sold: Amount::ZERO,
                     clearing_price: None,
                     status: initial_status,
                     total_bids: 0,
@@ -176,7 +176,7 @@ impl IndexerContract {
             AuctionEvent::BidAccepted {
                 auction_id,
                 bid_id,
-                user_chain,
+                user_account,
                 quantity,
                 amount_paid,
                 total_sold,
@@ -203,7 +203,7 @@ impl IndexerContract {
                     history.push(BidRecord {
                         bid_id,
                         auction_id,
-                        user_chain,
+                        user_account,
                         quantity,
                         amount_paid,
                         timestamp: self.runtime.system_time(),
@@ -215,37 +215,15 @@ impl IndexerContract {
 
             AuctionEvent::BidRejected {
                 auction_id: _,
-                user_chain: _,
+                user_account: _,
                 reason: _,
             } => {
                 // Log only, no state changes
             }
 
-            AuctionEvent::AuctionCleared {
-                auction_id,
-                clearing_price,
-                total_bids: _,
-                reason: _,
-            } => {
-                if let Some(mut summary) = self
-                    .state
-                    .auction_summaries
-                    .get(&auction_id)
-                    .await
-                    .unwrap()
-                {
-                    summary.clearing_price = Some(clearing_price);
-                    summary.status = AuctionStatus::Ended;
-                    self.state
-                        .auction_summaries
-                        .insert(&auction_id, summary)
-                        .unwrap();
-                }
-            }
-
             AuctionEvent::AuctionSettled {
                 auction_id,
-                clearing_price: _,
+                clearing_price,
                 total_bidders,
                 total_sold: _,
             } => {
@@ -258,6 +236,8 @@ impl IndexerContract {
                 {
                     summary.status = AuctionStatus::Settled;
                     summary.total_bidders = total_bidders;
+                    summary.clearing_price = Some(clearing_price);
+
                     self.state
                         .auction_summaries
                         .insert(&auction_id, summary)
@@ -267,7 +247,7 @@ impl IndexerContract {
 
             AuctionEvent::SettlementClaimed {
                 auction_id: _,
-                user_chain: _,
+                user_account: _,
                 allocated_quantity: _,
                 clearing_price: _,
                 total_cost: _,

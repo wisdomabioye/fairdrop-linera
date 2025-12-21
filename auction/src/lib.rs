@@ -1,8 +1,8 @@
 use async_graphql::{Request, Response};
-use linera_sdk::linera_base_types::{ChainId, ContractAbi, ServiceAbi};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, Timestamp, ContractAbi, ServiceAbi};
 use linera_sdk::graphql::GraphQLMutationRoot;
 use serde::{Deserialize, Serialize};
-use shared::types::AuctionParamsInput;
+use shared::types::{ AuctionParamsInput, AuctionId };
 
 pub use shared;
 
@@ -21,10 +21,6 @@ impl ServiceAbi for AuctionAbi {
     type QueryResponse = Response;
 }
 
-/// Operations that can be executed on the Auction Application
-/// Different operations are relevant for different chain types:
-/// - AAC Chain: CreateAuction, PruneSettledAuction, CancelAuction
-/// - UIC Chains: Buy, SubscribeToAuction, UnsubscribeFromAuction, ClaimSettlement
 #[derive(Debug, Deserialize, Serialize, GraphQLMutationRoot)]
 pub enum AuctionOperation {
     // ─────────────────────────────────────────────────────────
@@ -46,16 +42,13 @@ pub enum AuctionOperation {
         auction_id: u64,
     },
 
+    /// Trigger block execution on AAC
     Trigger,
 
-    // ─────────────────────────────────────────────────────────
-    // UIC Chain Operations (executed by users on their chains)
-    // ─────────────────────────────────────────────────────────
-
-    /// Place a bid (UIC operation)
+    /// Place a bid directly on AAC
     Buy {
         auction_id: u64,
-        quantity: u64,
+        quantity: Amount,
     },
 
     /// Subscribe to AAC events for live updates
@@ -68,7 +61,7 @@ pub enum AuctionOperation {
         aac_chain: ChainId,
     },
 
-    /// Claim settlement for a settled auction (UIC operation)
+    /// Claim settlement for a settled auction AAC
     ClaimSettlement {
         auction_id: u64,
     },
@@ -83,15 +76,13 @@ pub enum AuctionResponse {
         auction_id: u64,
     },
 
-    BidSubmitted {
-        auction_id: u64,
-        quantity: u64,
+    BidPlaced {
+        auction_id: AuctionId,
+        bid_id: u64,
+        user_account: AccountOwner,
+        quantity: Amount,
+        amount_paid: Amount,
+        timestamp: Timestamp,
+        claimed: bool,
     },
-}
-
-/// Application parameters
-/// Each chain (AAC or UIC) needs to know the AAC chain ID
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct AuctionParameters {
-    pub aac_chain: ChainId,  // The AAC chain ID (needed by UICs to send messages)
 }

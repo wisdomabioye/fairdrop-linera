@@ -1,5 +1,5 @@
 use async_graphql::{scalar, InputObject, SimpleObject};
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 pub type AuctionId = u64;
@@ -10,8 +10,8 @@ pub type AuctionId = u64;
 pub struct AuctionParamsInput {
     pub item_name: String,
     pub image: String,
-    pub max_bid_amount: u64,
-    pub total_supply: u64, // Total quantity for sale
+    pub max_bid_amount: Amount,
+    pub total_supply: Amount, // Total quantity for sale
     pub start_price: Amount, // Starting price per unit
     pub floor_price: Amount, // Minimum price (reserve)
     pub price_decay_interval: u64, // Microseconds between price drops
@@ -28,8 +28,8 @@ pub struct AuctionParamsInput {
 pub struct AuctionParams {
     pub item_name: String,
     pub image: String,
-    pub total_supply: u64,
-    pub max_bid_amount: u64,
+    pub total_supply: Amount,
+    pub max_bid_amount: Amount,
     pub start_price: Amount,
     pub floor_price: Amount,
     pub price_decay_interval: u64,
@@ -67,8 +67,8 @@ scalar!(AuctionStatus);
 pub enum AuctionStatus {
     Scheduled, // Created but not yet started (current_time < start_time)
     Active, // Accepting bids (started and not ended)
-    Ended, // Supply exhausted or time expired, ready for settlement
     Settled, // Settlement complete
+    Pruned,
     Cancelled, // Cancelled by creator (only Scheduled auctions can be cancelled)
 }
 
@@ -77,27 +77,11 @@ pub enum AuctionStatus {
 pub struct BidRecord {
     pub bid_id: u64,
     pub auction_id: AuctionId,
-    pub user_chain: ChainId,
-    pub quantity: u64,
+    pub user_account: AccountOwner,
+    pub quantity: Amount,
     pub amount_paid: Amount,
     pub timestamp: Timestamp,
     pub claimed: bool,
-}
-
-/// User's local commitment (stored on UIC)
-#[derive(Debug, Clone, Default, Serialize, Deserialize, SimpleObject)]
-pub struct UserCommitment {
-    pub total_quantity: u64, // Total quantity bid for
-    pub settlement: Option<SettlementResult>,
-}
-
-/// Settlement result sent from AAC to UIC
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, SimpleObject)]
-pub struct SettlementResult {
-    pub allocated_quantity: u64, // Quantity received
-    pub clearing_price: Amount, // Final uniform price
-    pub total_cost: Amount, // allocated_quantity × clearing_price
-    pub refund: Amount, // Overpayment refunded
 }
 
 /// Auction summary (materialized by Indexer)
@@ -110,8 +94,8 @@ pub struct AuctionSummary {
     pub auction_id: AuctionId,
     pub item_name: String,
     pub image: String,
-    pub max_bid_amount: u64,
-    pub total_supply: u64,
+    pub max_bid_amount: Amount,
+    pub total_supply: Amount,
     pub start_price: Amount,
     pub floor_price: Amount,
     pub price_decay_interval: u64,
@@ -126,7 +110,7 @@ pub struct AuctionSummary {
     // Derived State (computed/updated during auction lifecycle)
     // ──────────────────────────────────────────────────────────
     pub current_price: Amount,
-    pub sold: u64,
+    pub sold: Amount,
     pub clearing_price: Option<Amount>,
     pub status: AuctionStatus,
     pub total_bids: u64,

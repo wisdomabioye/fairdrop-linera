@@ -4,19 +4,13 @@ mod state;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use linera_sdk::graphql::GraphQLMutationRoot;
-use linera_sdk::linera_base_types::{Amount, ChainId, WithServiceAbi};
+use linera_sdk::linera_base_types::{Amount, AccountOwner, WithServiceAbi};
 use linera_sdk::views::View;
 use linera_sdk::{Service, ServiceRuntime};
 use auction::AuctionAbi;
-use shared::types::{AuctionId, SettlementResult, UserCommitment, BidRecord};
+use shared::types::{AuctionId, BidRecord};
 use std::sync::Arc;
 use self::state::{AuctionState, AuctionData};
-
-#[derive(SimpleObject)]
-struct AuctionCommitment {
-    auction_id: AuctionId,
-    commitment: UserCommitment,
-}
 
 #[derive(SimpleObject)]
 struct AuctionWithId {
@@ -104,112 +98,22 @@ impl QueryRoot {
         })
     }
 
-    /// Get claimable settlement for a user (AAC only)
-    /// Returns None if auction not settled or user has no unclaimed bids
-    async fn claimable_settlement(
+    /// Get user's bids for a specific auction (AAC only)
+    /// O(1) lookup using composite key (user, auction_id)
+    async fn user_bids(
         &self,
+        user: AccountOwner,
         auction_id: AuctionId,
-        user_chain: ChainId,
-    ) -> Result<Option<UserCommitment>, String> {
-        // Get auction
-        let auction = self
-            .state
-            .auctions
-            .get(&auction_id)
-            .await
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Auction not found".to_string())?;
-
-        // Check if auction is settled
-        if auction.status != shared::types::AuctionStatus::Settled {
-            return Ok(None); // Not settled yet
-        }
-
-        let clearing_price = auction
-            .clearing_price
-            .ok_or_else(|| "Clearing price not set".to_string())?;
-
-        // O(1) lookup: Get all unclaimed bids for this user and auction
-        let user_bids = self
+    ) -> Result<Vec<BidRecord>, String> {
+        let bids = self
             .state
             .user_auction_bids
-            .get(&(user_chain, auction_id))
+            .get(&(user, auction_id))
             .await
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
 
-        let mut total_quantity = 0u64;
-        let mut total_paid = Amount::ZERO;
-
-        for bid in user_bids {
-            if !bid.claimed {
-                total_quantity += bid.quantity;
-                total_paid = total_paid.saturating_add(bid.amount_paid);
-            }
-        }
-
-        // No unclaimed bids
-        if total_quantity == 0 {
-            return Ok(None);
-        }
-
-        // Calculate settlement
-        let total_cost = clearing_price.saturating_mul(total_quantity as u128);
-        let refund = total_paid.saturating_sub(total_cost);
-
-        Ok(Some(UserCommitment {
-            total_quantity,
-            settlement: Some(SettlementResult {
-                allocated_quantity: total_quantity,
-                clearing_price,
-                total_cost,
-                refund,
-            }),
-        }))
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // UIC Chain Queries (available on UIC chains)
-    // ─────────────────────────────────────────────────────────
-
-    /// Get user's commitment for an auction (UIC only)
-    async fn my_commitment_for_auction(
-        &self,
-        auction_id: AuctionId,
-    ) -> Result<Option<UserCommitment>, String> {
-        self.state
-            .my_commitments
-            .get(&auction_id)
-            .await
-            .map_err(|e| e.to_string())
-    }
-
-    /// Get all user's commitments (UIC only)
-    async fn my_auction_commitment(&self) -> Result<Vec<AuctionCommitment>, String> {
-        let indices = self
-            .state
-            .my_commitments
-            .indices()
-            .await
-            .map_err(|e| e.to_string())?;
-        let mut result = Vec::new();
-
-        for auction_id in indices {
-            if let Some(commitment) = self
-                .state
-                .my_commitments
-                .get(&auction_id)
-                .await
-                .map_err(|e| e.to_string())?
-            {
-                result.push(AuctionCommitment {
-                    auction_id,
-                    commitment,
-                });
-            }
-        }
-
-        Ok(result)
+        Ok(bids)
     }
 
     // ─────────────────────────────────────────────────────────

@@ -5,10 +5,9 @@ pub mod utils;
 
 // Re-export commonly used types
 pub use events::{AuctionEvent, ClearReason, AUCTION_STREAM};
-pub use messages::{AuctionMessage, IndexerMessage};
+pub use messages::{/* AuctionMessage, */ IndexerMessage};
 pub use types::{
-    AuctionId, AuctionParams, AuctionStatus, AuctionSummary, BidRecord, SettlementResult,
-    UserCommitment,
+    AuctionId, AuctionParams, AuctionStatus, AuctionSummary, BidRecord
 };
 pub use utils::calculate_current_price;
 
