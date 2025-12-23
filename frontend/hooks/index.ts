@@ -32,11 +32,11 @@ export type {
     UseCachedBidHistoryResult
 } from './useCachedBidHistory';
 
-export { useCachedMyCommitment } from './useCachedMyCommitment';
+export { useCachedMyCommitment } from './useCachedMyBids';
 export type {
     UseCachedMyCommitmentOptions,
     UseCachedMyCommitmentResult
-} from './useCachedMyCommitment';
+} from './useCachedMyBids';
 
 export { useCachedAllMyCommitments } from './useCachedAllMyCommitments';
 export type {

@@ -26,13 +26,13 @@
 import { useState, useCallback } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useSyncStatus } from '@/providers';
-import { UIC_MUTATION, AAC_MUTATION } from '@/lib/gql/queries';
+import { AAC_MUTATION } from '@/lib/gql/queries';
 import type { ApplicationClient } from 'linera-react-client';
 import type { AuctionParam } from '@/lib/gql/types';
 
 export interface UseAuctionMutationsOptions {
-    /** The UIC (User Interaction Chain) application client */
-    uicApp: ApplicationClient | null;
+    /** The AAC application client */
+    aacApp: ApplicationClient | null;
     /** Callback after successful auction creation */
     onCreateSuccess?: (auctionId: string) => void;
     /** Callback after successful buy */
@@ -49,10 +49,6 @@ export interface UseAuctionMutationsResult {
     createAuction: (params: AuctionParam) => Promise<boolean>;
     /** Place a bid (buy) */
     buy: (auctionId: number, quantity: number) => Promise<boolean>;
-    /** Subscribe to AAC for auction updates */
-    subscribeToAuction: (aacChain: string) => Promise<boolean>;
-    /** Unsubscribe from AAC */
-    unsubscribeFromAuction: (aacChain: string) => Promise<boolean>;
     /** Claim settlement */
     claimSettlement: (auctionId: number) => Promise<boolean>;
     /** Trigger changes on Public Client */
@@ -62,8 +58,6 @@ export interface UseAuctionMutationsResult {
     isCreating: boolean;
     /** Is buy/bid placement in progress? */
     isBuying: boolean;
-    /** Is subscription operation in progress? */
-    isSubscribing: boolean;
     /** Is claim operation in progress? */
     isClaiming: boolean;
 
@@ -76,7 +70,7 @@ export function useAuctionMutations(
     options: UseAuctionMutationsOptions
 ): UseAuctionMutationsResult {
     const {
-        uicApp,
+        aacApp,
         onCreateSuccess,
         onBuySuccess,
         onClaimSuccess,
@@ -98,14 +92,13 @@ export function useAuctionMutations(
     // Loading states
     const [isCreating, setIsCreating] = useState(false);
     const [isBuying, setIsBuying] = useState(false);
-    const [isSubscribing, setIsSubscribing] = useState(false);
     const [isClaiming, setIsClaiming] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
     const trigger = useCallback(
         async (): Promise<void> => {
             try {
-                const result = await uicApp?.publicClient.systemMutate<string>(
+                const result = await aacApp?.mutate<string>(
                     JSON.stringify(AAC_MUTATION.Trigger())
                 );
 
@@ -115,7 +108,7 @@ export function useAuctionMutations(
                 console.error('[useAuctionMutations] Trigger failed:', err);
             }
         },
-        [uicApp]
+        [aacApp]
     )
 
     /**
@@ -123,7 +116,7 @@ export function useAuctionMutations(
      */
     const createAuction = useCallback(
         async (params: AuctionParam): Promise<boolean> => {
-            if (!uicApp?.walletClient) {
+            if (!aacApp?.canMutate()) {
                 const err = new Error('Wallet not connected');
                 setError(err);
                 onError?.(err);
@@ -141,8 +134,8 @@ export function useAuctionMutations(
             setError(null);
 
             try {
-                const result = await uicApp.walletClient.mutate<string>(
-                    JSON.stringify(UIC_MUTATION.CreateAuction(params))
+                const result = await aacApp.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.CreateAuction(params))
                 );
                 // console.log('📥 CreateAuction raw result:', result);
 
@@ -178,7 +171,7 @@ export function useAuctionMutations(
                 setIsCreating(false);
             }
         },
-        [uicApp, onCreateSuccess, onError, invalidateActiveAuctions, trigger, isWalletClientSyncing]
+        [aacApp, onCreateSuccess, onError, invalidateActiveAuctions, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -193,7 +186,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (!uicApp?.walletClient) {
+            if (!aacApp?.canMutate()) {
                 const err = new Error('Wallet not connected');
                 setError(err);
                 onError?.(err);
@@ -211,8 +204,8 @@ export function useAuctionMutations(
             setError(null);
 
             try {
-                const result = await uicApp.walletClient.mutate<string>(
-                    JSON.stringify(UIC_MUTATION.Buy(auctionId.toString(), quantity.toString()))
+                const result = await aacApp.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.Buy(auctionId.toString(), quantity.toString()))
                 );
 
                 console.log('[useAuctionMutations] Buy result:', result);
@@ -238,91 +231,7 @@ export function useAuctionMutations(
                 setIsBuying(false);
             }
         },
-        [uicApp, onBuySuccess, onError, invalidateAuction, invalidateUserCommitment, invalidateAllMyCommitments, invalidateBidHistory, trigger, isWalletClientSyncing]
-    );
-
-    /**
-     * Subscribe to AAC for auction updates
-     */
-    const subscribeToAuction = useCallback(
-        async (aacChain: string): Promise<boolean> => {
-            if (!uicApp?.walletClient) {
-                const err = new Error('Wallet not connected');
-                setError(err);
-                onError?.(err);
-                return false;
-            }
-
-            if (isWalletClientSyncing) {
-                const err = new Error('Wallet is syncing, please wait');
-                setError(err);
-                onError?.(err);
-                return false;
-            }
-
-            setIsSubscribing(true);
-            setError(null);
-
-            try {
-                const result = await uicApp.walletClient.mutate<string>(
-                    JSON.stringify(UIC_MUTATION.SubscribeToAuction(aacChain))
-                );
-
-                console.log('[useAuctionMutations] Subscribe result:', result);
-                return true;
-            } catch (err) {
-                const error = err instanceof Error ? err : new Error('Failed to subscribe');
-                setError(error);
-                console.error('[useAuctionMutations] Subscribe failed:', error);
-                onError?.(error);
-                return false;
-            } finally {
-                setIsSubscribing(false);
-            }
-        },
-        [uicApp, onError, isWalletClientSyncing]
-    );
-
-    /**
-     * Unsubscribe from AAC
-     */
-    const unsubscribeFromAuction = useCallback(
-        async (aacChain: string): Promise<boolean> => {
-            if (!uicApp?.walletClient) {
-                const err = new Error('Wallet not connected');
-                setError(err);
-                onError?.(err);
-                return false;
-            }
-
-            if (isWalletClientSyncing) {
-                const err = new Error('Wallet is syncing, please wait');
-                setError(err);
-                onError?.(err);
-                return false;
-            }
-
-            setIsSubscribing(true);
-            setError(null);
-
-            try {
-                const result = await uicApp.walletClient.mutate<string>(
-                    JSON.stringify(UIC_MUTATION.UnsubscribeFromAuction(aacChain))
-                );
-
-                console.log('[useAuctionMutations] Unsubscribe result:', result);
-                return true;
-            } catch (err) {
-                const error = err instanceof Error ? err : new Error('Failed to unsubscribe');
-                setError(error);
-                console.error('[useAuctionMutations] Unsubscribe failed:', error);
-                onError?.(error);
-                return false;
-            } finally {
-                setIsSubscribing(false);
-            }
-        },
-        [uicApp, onError, isWalletClientSyncing]
+        [aacApp, onBuySuccess, onError, invalidateAuction, invalidateUserCommitment, invalidateAllMyCommitments, invalidateBidHistory, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -330,7 +239,7 @@ export function useAuctionMutations(
      */
     const claimSettlement = useCallback(
         async (auctionId: number): Promise<boolean> => {
-            if (!uicApp?.walletClient) {
+            if (!aacApp?.canMutate()) {
                 const err = new Error('Wallet not connected');
                 setError(err);
                 onError?.(err);
@@ -348,8 +257,8 @@ export function useAuctionMutations(
             setError(null);
 
             try {
-                const result = await uicApp.walletClient.mutate<string>(
-                    JSON.stringify(UIC_MUTATION.ClaimSettlement(auctionId))
+                const result = await aacApp.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.ClaimSettlement(auctionId))
                 );
 
                 console.log('[useAuctionMutations] Claim settlement result:', result);
@@ -372,19 +281,16 @@ export function useAuctionMutations(
                 setIsClaiming(false);
             }
         },
-        [uicApp, onClaimSuccess, onError, invalidateUserCommitment, trigger, isWalletClientSyncing]
+        [aacApp, onClaimSuccess, onError, invalidateUserCommitment, trigger, isWalletClientSyncing]
     );
 
     return {
         createAuction,
         buy,
-        subscribeToAuction,
-        unsubscribeFromAuction,
         claimSettlement,
         trigger,
         isCreating,
         isBuying,
-        isSubscribing,
         isClaiming,
         error
     };

@@ -1,3 +1,152 @@
+
+
+import { QueryBatchBuilder, formatGraphQLValue } from './query-builder';
+
+/**
+ * AAC Query Batch Builder
+ */
+export class AACQueryBatchBuilder extends QueryBatchBuilder {
+    constructor() {
+        super('query');
+    }
+
+    currentPrice(auction_id: number): this {
+        const queryBody = `currentPrice(auctionId: ${auction_id})`;
+        return this.addFragment(queryBody);
+    }
+
+    auctionInfo(auction_id: number): this {
+        const queryBody = `auctionInfo(auctionId: ${auction_id}) {
+                    auctionId
+                    currentPrice
+                    lastPriceUpdate
+                    totalSupply
+                    sold
+                    clearingPrice
+                    status
+                    settledAt
+                    bidsPruned
+                    totalBids
+                    totalBidders
+
+                    params {
+                        itemName
+                        image
+                        maxBidAmount
+                        totalSupply
+                        startPrice
+                        floorPrice
+                        priceDecayInterval
+                        priceDecayAmount
+                        startTime
+                        endTime
+                        creator
+                        paymentTokenApp
+                        auctionTokenApp
+                    }
+                }`;
+        return this.addFragment(queryBody);
+    }
+
+    claimableSettlement(auction_id: number, user_chain: string): this {
+        const queryBody = `claimableSettlement(auctionId: ${auction_id}, userChain: ${formatGraphQLValue(user_chain)}) {
+                    totalQuantity
+
+                    settlement {
+                        allocatedQuantity
+                        clearingPrice
+                        totalCost
+                        refund
+                    }
+                }`;
+        return this.addFragment(queryBody);
+    }
+
+    allAuctions(offset: number, limit: number): this {
+        const queryBody = `allAuctions(offset: ${offset}, limit: ${limit}) {
+                    auctionId
+                    currentPrice
+                    lastPriceUpdate
+                    totalSupply
+                    sold
+                    clearingPrice
+                    status
+                    settledAt
+                    bidsPruned
+                    totalBids
+                    totalBidders
+
+                    params {
+                        itemName
+                        totalSupply
+                        startPrice
+                        floorPrice
+                        priceDecayInterval
+                        priceDecayAmount
+                        startTime
+                        endTime
+                        creator
+                    }
+                }`;
+        return this.addFragment(queryBody);
+    }
+
+    auctionsByCreator(creator: string): this {
+        const queryBody = `auctionsByCreator(creator: ${formatGraphQLValue(creator)}) {
+                    auctionId
+                    currentPrice
+                    lastPriceUpdate
+                    totalSupply
+                    sold
+                    clearingPrice
+                    status
+                    settledAt
+                    bidsPruned
+                    totalBids
+                    totalBidders
+
+                    params {
+                        itemName
+                        totalSupply
+                        startPrice
+                        floorPrice
+                        priceDecayInterval
+                        priceDecayAmount
+                        startTime
+                        endTime
+                        creator
+                    }
+                }`;
+        return this.addFragment(queryBody);
+    }
+
+    bidHistory(auction_id: number, offset: number, limit: number): this {
+        const queryBody = `bidHistory(auctionId: ${auction_id}, offset: ${offset}, limit: ${limit}) {
+                    bidId
+                    auctionId
+                    userAccount
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }`;
+        return this.addFragment(queryBody);
+    }
+
+    userBids(user: string, auction_id: number): this {
+        const queryBody = `userBids(user: ${formatGraphQLValue(user)}, auction_id: ${auction_id}) {
+                    bidId
+                    auctionId
+                    userAccount
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }`;
+        return this.addFragment(queryBody);
+    }
+}
+
 /**
  * Indexer Chain Query
  */
@@ -63,7 +212,7 @@ export const INDEXER_QUERY = {
         return {
             query: `
             query {
-                auctionsByCreator(creator: "${creator}", offset: ${offset}, limit: ${limit}) {
+                auctionsByCreator(creator: ${formatGraphQLValue(creator)}, offset: ${offset}, limit: ${limit}) {
                     auctionId
                     itemName
                     totalSupply
@@ -123,7 +272,7 @@ export const INDEXER_QUERY = {
                     bidHistory(auctionId: ${auction_id}, offset: ${offset}, limit: ${limit}) {
                         bidId
                         auctionId
-                        userChain
+                        userAccount
                         quantity
                         amountPaid
                         timestamp
@@ -154,7 +303,7 @@ export const INDEXER_QUERY = {
  */
 export const INDEXER_MUTATION = {
     Initialize (aac_chain: string, auction_app: string) {
-        const query = `mutation { initialize(aacChain: "${aac_chain}", auctionApp: "${auction_app}") }`;
+        const query = `mutation { initialize(aacChain: ${formatGraphQLValue(aac_chain)}, auctionApp: ${formatGraphQLValue(auction_app)}) }`;
         return { query };
     }
 }
@@ -163,6 +312,11 @@ export const INDEXER_MUTATION = {
  * Auction Authority Chain Query
  */
 export const AAC_QUERY = {
+    /** Create a batch query builder */
+    batch(): AACQueryBatchBuilder {
+        return new AACQueryBatchBuilder();
+    },
+
     CurrentPrice (auction_id: number) {
         return {
             query: `query { currentPrice(auctionId: ${auction_id}) }`
@@ -187,6 +341,8 @@ export const AAC_QUERY = {
 
                     params {
                         itemName
+                        image
+                        maxBidAmount
                         totalSupply
                         startPrice
                         floorPrice
@@ -195,6 +351,8 @@ export const AAC_QUERY = {
                         startTime
                         endTime
                         creator
+                        paymentTokenApp
+                        auctionTokenApp
                     }
                 }
             }`
@@ -204,7 +362,7 @@ export const AAC_QUERY = {
     ClaimableSettlement (auction_id: number, user_chain: string) {
         return {
             query: `query {
-                claimableSettlement(auctionId: ${auction_id}, userChain: "${user_chain}") {
+                claimableSettlement(auctionId: ${auction_id}, userChain: ${formatGraphQLValue(user_chain)}) {
                     totalQuantity
 
                     settlement {
@@ -260,7 +418,7 @@ export const AAC_QUERY = {
     AuctionsByCreator (creator: string) {
         return {
             query: `query {
-                auctionsByCreator(creator: "${creator}") {
+                auctionsByCreator(creator: ${formatGraphQLValue(creator)}) {
                     auctionId
                     currentPrice
                     lastPriceUpdate
@@ -296,7 +454,7 @@ export const AAC_QUERY = {
                 bidHistory(auctionId: ${auction_id}, offset: ${offset}, limit: ${limit}) {
                     bidId
                     auctionId
-                    userChain
+                    userAccount
                     quantity
                     amountPaid
                     timestamp
@@ -305,6 +463,22 @@ export const AAC_QUERY = {
             }`
         }
     },
+
+    UserBids (user: string, auction_id: number) {
+        return {
+            query: `query {
+                userBids(user: ${formatGraphQLValue(user)}, auction_id: ${auction_id}) {
+                    bidId
+                    auctionId
+                    userAccount
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }
+            }`
+        }
+    }
 }
 
 /**
@@ -335,15 +509,15 @@ export const AAC_MUTATION = {
         const query = `mutation {
             createAuction(
                 params: {
-                    itemName: "${itemName}",
+                    itemName: ${formatGraphQLValue(itemName)},
                     totalSupply: ${totalSupply},
-                    startPrice: "${startPrice}",
-                    floorPrice: "${floorPrice}",
+                    startPrice: ${formatGraphQLValue(startPrice)},
+                    floorPrice: ${formatGraphQLValue(floorPrice)},
                     priceDecayInterval: ${priceDecayInterval},
-                    priceDecayAmount: "${priceDecayAmount}",
+                    priceDecayAmount: ${formatGraphQLValue(priceDecayAmount)},
                     startTime: ${startTime},
                     endTime: ${endTime},
-                    creator: "${creator}"
+                    creator: ${formatGraphQLValue(creator)}
                 }
             )
         }`;
@@ -367,111 +541,10 @@ export const AAC_MUTATION = {
             query: `mutation { pruneSettledAuction(auctionId: ${auction_id}) }`
         }
     },
-}
-
-/**
- * User Interaction Chain Query
- */
-export const UIC_QUERY = {
-    /** Get my commitment for an auction */
-    MyCommitmentForAuction (auction_id: number) {
-        return {
-            query: `query {
-                myCommitmentForAuction(auctionId: ${auction_id}) {
-                   totalQuantity
-                    
-                    settlement {
-                        allocatedQuantity
-                        clearingPrice
-                        totalCost
-                        refund
-                    } 
-                }
-            }`
-        }
-    },
-
-    /** Get my commit for all auctions */
-    MyAuctionCommitments () {
-        return {
-            query: `query {
-                myAuctionCommitment {
-                    auctionId
-                    
-                    commitment {
-                        totalQuantity
-                    
-                        settlement {
-                            allocatedQuantity
-                            clearingPrice
-                            totalCost
-                            refund
-                        } 
-                    } 
-                }
-            }`
-        }
-    }
-}
-
-/**
- * User Interaction Chain Mutation
- */
-export const UIC_MUTATION = {
-    CreateAuction ({
-        itemName,
-        totalSupply,
-        startPrice,
-        floorPrice,
-        priceDecayInterval,
-        priceDecayAmount,
-        startTime,
-        endTime,
-        creator
-    }: {
-        itemName: string;
-        totalSupply: number
-        startPrice: string;
-        floorPrice: string;
-        priceDecayInterval: number;
-        priceDecayAmount: string;
-        startTime: number;
-        endTime: number;
-        creator: string;
-    }) {
-        const query = `mutation {
-            createAuction(
-                params: {
-                    itemName: "${itemName}",
-                    totalSupply: ${totalSupply},
-                    startPrice: "${startPrice}",
-                    floorPrice: "${floorPrice}",
-                    priceDecayInterval: ${priceDecayInterval},
-                    priceDecayAmount: "${priceDecayAmount}",
-                    startTime: ${startTime},
-                    endTime: ${endTime},
-                    creator: "${creator}"
-                }
-            )
-        }`;
-        return { query };
-    },
-
+    
     Buy (auction_id: string, quantity: string) {
         return {
             query: `mutation { buy(auctionId: ${auction_id}, quantity: ${quantity}) }`
-        }
-    },
-
-    SubscribeToAuction (aac_chain: string) {
-        return {
-            query: `mutation { subscribeToAuction(aacChain: "${aac_chain}") }`
-        }
-    },
-
-    UnsubscribeFromAuction (aac_chain: string) {
-        return {
-            query: `mutation { unsubscribeFromAuction(aacChain: "${aac_chain}") }`
         }
     },
 
@@ -485,37 +558,37 @@ export const UIC_MUTATION = {
 export const FUNGIBLE_MUTATION = {
     Mint (owner: string, amount: number) {
         return {
-            query: `mutation { mint(owner: "${owner}", amount: "${amount}") }`
+            query: `mutation { mint(owner: ${formatGraphQLValue(owner)}, amount: ${formatGraphQLValue(String(amount))}) }`
         }
     },
 
     Approve (owner: string, spender: string, allowance: number) {
         return {
-            query: `mutation { approve(owner: "${owner}", spender: "${spender}", allowance: "${allowance}") }`
+            query: `mutation { approve(owner: ${formatGraphQLValue(owner)}, spender: ${formatGraphQLValue(spender)}, allowance: ${formatGraphQLValue(String(allowance))}) }`
         }
     },
 
     Transfer (owner: string, amount: number, target_account: string) {
         return {
-            query: `mutation { transfer(owner: "${owner}", amount: "${amount}", targetAccount: "${target_account}") }`
+            query: `mutation { transfer(owner: ${formatGraphQLValue(owner)}, amount: ${formatGraphQLValue(String(amount))}, targetAccount: ${formatGraphQLValue(target_account)}) }`
         }
     },
 
     TransferFrom (owner: string, spender: string, amount: number, target_account: string) {
         return {
-            query: `mutation { transferFrom(owner: "${owner}", spender: "${spender}", amount: "${amount}", targetAccount: "${target_account}") }`
+            query: `mutation { transferFrom(owner: ${formatGraphQLValue(owner)}, spender: ${formatGraphQLValue(spender)}, amount: ${formatGraphQLValue(String(amount))}, targetAccount: ${formatGraphQLValue(target_account)}) }`
         }
     },
 
     Claim (source_account: string, amount: number, target_account: string) {
         return {
-            query: `mutation { transferFrom(sourceAccount: "${source_account}", amount: "${amount}", targetAccount: "${target_account}") }`
+            query: `mutation { transferFrom(sourceAccount: ${formatGraphQLValue(source_account)}, amount: ${formatGraphQLValue(String(amount))}, targetAccount: ${formatGraphQLValue(target_account)}) }`
         }
     },
 
     Balance (owner: string) {
         return {
-            query: `mutation { balance(owner: "${owner}") }`
+            query: `mutation { balance(owner: ${formatGraphQLValue(owner)}) }`
         }
     },
 

@@ -3,7 +3,6 @@ import { microsecondsToMilliseconds } from '@/lib/utils/auction-utils';
 export const AuctionStatus = {
     Scheduled: 'Scheduled',
     Active: 'Active',
-    Ended: 'Ended',
     Settled: 'Settled',
     Cancelled: 'Cancelled'
 } as const;
@@ -39,7 +38,7 @@ export interface AuctionSummary extends AuctionParam {
 export interface BidRecord {
     bidId: number;
     auctionId: number;
-    userChain: string;
+    userAccount: string;
     quantity: number;
     amountPaid: number;
     timestamp: number;
@@ -84,21 +83,7 @@ export interface AuctionWithId {
     bidsPruned: boolean;
     totalBids: number;
     totalBidders: number;
-    params: {
-        itemName: string;
-        image: string;
-        totalSupply: number;
-        maxBidAmount: number;
-        paymentTokenApp: string;
-        auctionTokenApp: string;
-        startPrice: string;
-        floorPrice: string;
-        priceDecayInterval: number;
-        priceDecayAmount: string;
-        startTime: number;
-        endTime: number;
-        creator: string;
-    };
+    params: AuctionParam;
 }
 
 export function transformAuctionStatus(auction: AuctionWithId): AuctionStatus {
@@ -118,7 +103,7 @@ export function transformAuctionStatus(auction: AuctionWithId): AuctionStatus {
         &&
         Date.now() > microsecondsToMilliseconds(auction.params.endTime)
     ) {
-        return AuctionStatus.Ended;
+        return AuctionStatus.Settled;
     }
 
     return auction.status;

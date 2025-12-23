@@ -20,14 +20,11 @@ import {
     INDEXER_QUERY,
     INDEXER_MUTATION,
     AAC_QUERY,
-    UIC_QUERY
 } from '@/lib/gql/queries';
 import {
     type AuctionSummary,
     type AuctionWithId,
     type BidRecord,
-    type UserCommitment,
-    type AuctionCommitment,
     type SubscriptionInfo,
     transformAuctionWithId,
     transformBidRecord,
@@ -40,14 +37,13 @@ import {
     clearStoredInitState
 } from '@/lib/utils/storage-helpers';
 
-
 // TTL constants (in milliseconds)
 // Note: TTLs are set ~20% longer than default polling intervals to prevent
 // cache expiration right when polling checks, reducing unnecessary API calls
 const AUCTION_DATA_TTL = 6000; // 6s (polling: 5s) - auction data changes frequently
 const AUCTION_LIST_TTL = 12000; // 12s (polling: 10s) - auction lists
 const BID_HISTORY_TTL = 6000; // 6s (polling: 5s) - bid history
-const USER_COMMITMENT_TTL = 10000; // 10s - user commitments (no default polling)
+const USER_BID_TTL = 10000; // 10s - user commitments (no default polling)
 
 // Store types
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -87,20 +83,10 @@ export interface BidHistoryCacheEntry {
 }
 
 /**
- * Cache entry for user commitments
+ * Cache entry for user bids
  */
-export interface UserCommitmentCacheEntry {
-    data: UserCommitment | null;
-    timestamp: number;
-    status: FetchStatus;
-    error: Error | null;
-}
-
-/**
- * Cache entry for all user commitments
- */
-export interface AllCommitmentsCacheEntry {
-    data: AuctionCommitment[] | null;
+export interface UserBidsCacheEntry {
+    data: BidRecord[] | null;
     timestamp: number;
     status: FetchStatus;
     error: Error | null;
@@ -137,8 +123,7 @@ export interface AuctionStore {
     settledAuctions: AuctionListCacheEntry | null;
     auctionsByCreator: Map<string, AuctionListCacheEntry>; // creator -> auctions
     bidHistory: Map<string, BidHistoryCacheEntry>; // auctionId -> bids
-    userCommitments: Map<string, Map<string, UserCommitmentCacheEntry>>; // auctionId -> userChain -> commitment
-    allMyCommitments: Map<string, AllCommitmentsCacheEntry>; // userChain -> all commitments
+    userBids: Map<string, Map<string, UserBidsCacheEntry>>; // auctionId -> address -> userBids
 
     // ============ Indexer Actions ============
     initializeIndexer: (
@@ -157,8 +142,7 @@ export interface AuctionStore {
     fetchSettledAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
-    fetchMyCommitment: (auctionId: string, userChain: string, uicApp: ApplicationClient) => Promise<void>;
-    fetchAllMyCommitments: (userChain: string, uicApp: ApplicationClient) => Promise<void>;
+    fetchUserBids: (auctionId: string, address: string, aacApp: ApplicationClient) => Promise<void>;
 
     // ============ Internal Fetch Methods ============
     _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<string[]>;
@@ -169,8 +153,7 @@ export interface AuctionStore {
     invalidateSettledAuctions: () => void;
     invalidateAuctionsByCreator: (creator: string) => void;
     invalidateBidHistory: (auctionId: string) => void;
-    invalidateUserCommitment: (auctionId: string, userChain?: string) => void;
-    invalidateAllMyCommitments: (userChain?: string) => void;
+    invalidateUserBids: (auctionId: string, address?: string) => void;
     invalidateAll: () => void;
 
     // ============ Polling Actions ============
@@ -181,7 +164,7 @@ export interface AuctionStore {
 
     // ============ Utility Actions ============
     isStale: (
-        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userCommitment' | 'allMyCommitments',
+        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids',
         key?: string
     ) => boolean;
 }
@@ -204,8 +187,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     settledAuctions: null,
     auctionsByCreator: new Map(),
     bidHistory: new Map(),
-    userCommitments: new Map(),
-    allMyCommitments: new Map(),
+    userBids: new Map(),
 
     // ============ Indexer Initialization ============
     initializeIndexer: async (indexerChainId, aacChain, auctionApp, indexerApp) => {
@@ -233,7 +215,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 // }
 
                 // Check on-chain state
-                const infoResult = await indexerApp.publicClient.query<string>(
+                const infoResult = await indexerApp.query<string>(
                     JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
                 );
                 const { data } = JSON.parse(infoResult) as { data: { subscriptionInfo: SubscriptionInfo | null } };
@@ -254,11 +236,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 }
 
                 // Not initialized, perform mutation
-                await indexerApp.publicClient.systemMutate<string>(
+                await indexerApp.mutate<string>(
                     JSON.stringify(INDEXER_MUTATION.Initialize(aacChain, auctionApp))
                 );
 
-                const postInitResult = await indexerApp.publicClient.query<string>(
+                const postInitResult = await indexerApp.query<string>(
                     JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
                 );
 
@@ -300,7 +282,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     checkSubscriptionInfo: async (indexerApp) => {
-        const result = await indexerApp.publicClient.query<string>(
+        const result = await indexerApp.query<string>(
             JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
         );
         // console.log('checkSubscriptionInfo', result)
@@ -374,7 +356,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             }));
 
             try {
-                const result = await aacApp.publicClient.query<string>(
+                const result = await aacApp.query<string>(
                     JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
 
@@ -473,7 +455,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             try {
                 // Fetch from API
-                const result = await aacApp.publicClient.query<string>(
+                const result = await aacApp.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionInfo(auctionId))
                 );
 
@@ -663,7 +645,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             try {
                 // TEMPORARY: Use AAC.AuctionsByCreator (no pagination)
-                const result = await aacApp.publicClient.query<string>(
+                const result = await aacApp.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionsByCreator(creator))
                 );
                 // console.log('AuctionsByCreator (AAC)', result);
@@ -748,7 +730,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             try {
                 // TEMPORARY: Use AAC.BidHistory instead of INDEXER.BidHistory
-                const result = await aacApp.publicClient.query<string>(
+                const result = await aacApp.query<string>(
                     JSON.stringify(AAC_QUERY.BidHistory(auctionId, offset, limit))
                 );
                 // console.log('BidHistory (AAC)', result);
@@ -790,145 +772,75 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchMyCommitment: async (auctionId, userChain, uicApp) => {
-        // Validate userChain to prevent undefined keys in cache
-        if (!userChain) {
-            console.warn('[fetchMyCommitment] userChain is required');
+    fetchUserBids: async (auctionId, address, aacApp) => {
+        // Validate address to prevent undefined keys in cache
+        if (!address) {
+            console.warn('[fetchUserBids] address is required');
             return;
         }
 
-        const key = `my-commitment-${auctionId}-${userChain}`;
+        const key = `my-commitment-${auctionId}-${address}`;
 
         await queryDeduplicator.deduplicate(key, async () => {
             set((state) => {
-                const newMap = new Map(state.userCommitments);
+                const newMap = new Map(state.userBids);
                 const auctionMap = newMap.get(auctionId) ?? new Map();
-                const existing = auctionMap.get(userChain);
+                const existing = auctionMap.get(address);
 
-                auctionMap.set(userChain, {
+                auctionMap.set(address, {
                     data: existing?.data ?? null,
                     timestamp: existing?.timestamp ?? Date.now(),
                     status: 'loading',
                     error: null,
                 });
                 newMap.set(auctionId, auctionMap);
-                return { userCommitments: newMap };
+                return { userBids: newMap };
             });
 
             try {
-                if (!uicApp.walletClient) {
+                if (!aacApp) {
                     throw new Error('Wallet is not connected');
                 }
 
-                const result = await uicApp.walletClient.query<string>(
-                    JSON.stringify(UIC_QUERY.MyCommitmentForAuction(Number(auctionId)))
+                const result = await aacApp.query<string>(
+                    JSON.stringify(AAC_QUERY.UserBids(address, Number(auctionId)))
                 );
 
                 // console.log('MyCommitmentForAuction:', JSON.parse(result));
 
                 const { data } = JSON.parse(result) as {
-                    data: { myCommitmentForAuction: UserCommitment | null }
+                    data: { userBids: BidRecord[] | null }
                 };
 
                 set((state) => {
-                    const newMap = new Map(state.userCommitments);
+                    const newMap = new Map(state.userBids);
                     const auctionMap = newMap.get(auctionId) ?? new Map();
 
-                    auctionMap.set(userChain, {
-                        data: data.myCommitmentForAuction,
+                    auctionMap.set(address, {
+                        data: data.userBids,
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
                     });
                     newMap.set(auctionId, auctionMap);
-                    return { userCommitments: newMap };
+                    return { userBids: newMap };
                 });
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to fetch user commitment');
 
                 set((state) => {
-                    const newMap = new Map(state.userCommitments);
+                    const newMap = new Map(state.userBids);
                     const auctionMap = newMap.get(auctionId) ?? new Map();
-                    const existing = auctionMap.get(userChain);
+                    const existing = auctionMap.get(address);
 
-                    auctionMap.set(userChain, {
+                    auctionMap.set(address, {
                         data: existing?.data ?? null,
                         timestamp: existing?.timestamp ?? Date.now(),
                         status: 'error',
                         error,
                     });
                     newMap.set(auctionId, auctionMap);
-                    return { userCommitments: newMap };
-                });
-
-                throw error;
-            }
-        });
-    },
-
-    fetchAllMyCommitments: async (userChain, uicApp) => {
-        // Validate userChain to prevent undefined keys in cache
-        if (!userChain) {
-            console.warn('[fetchAllMyCommitments] userChain is required');
-            return;
-        }
-
-        const key = `all-my-commitments-${userChain}`;
-
-        await queryDeduplicator.deduplicate(key, async () => {
-            set((state) => {
-                const newMap = new Map(state.allMyCommitments);
-                const existing = newMap.get(userChain);
-
-                newMap.set(userChain, {
-                    data: existing?.data ?? null,
-                    timestamp: existing?.timestamp ?? Date.now(),
-                    status: 'loading',
-                    error: null,
-                });
-                return { allMyCommitments: newMap };
-            });
-
-            try {
-                if (!uicApp.walletClient) {
-                    throw new Error('Wallet is not connected');
-                }
-
-                const result = await uicApp.walletClient.query<string>(
-                    JSON.stringify(UIC_QUERY.MyAuctionCommitments())
-                );
-                // console.log('MyAuctionCommitments:', JSON.parse(result));
-
-                // console.log('MyAuctionCommitments', JSON.parse(result))
-                const { data } = JSON.parse(result) as {
-                    data: { myAuctionCommitment: AuctionCommitment[] | null }
-                };
-
-                set((state) => {
-                    const newMap = new Map(state.allMyCommitments);
-
-                    newMap.set(userChain, {
-                        data: data.myAuctionCommitment,
-                        timestamp: Date.now(),
-                        status: 'success',
-                        error: null,
-                    });
-                    return { allMyCommitments: newMap };
-                });
-            } catch (err) {
-                const error = err instanceof Error ? err : new Error('Failed to fetch all commitments');
-
-                set((state) => {
-                    const newMap = new Map(state.allMyCommitments);
-                    const existing = newMap.get(userChain);
-
-                    newMap.set(userChain, {
-                        data: existing?.data ?? null,
-                        timestamp: existing?.timestamp ?? Date.now(),
-                        status: 'error',
-                        error,
-                    });
-                    return { allMyCommitments: newMap };
+                    return { userBids: newMap };
                 });
 
                 throw error;
@@ -1010,17 +922,17 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    invalidateUserCommitment: (auctionId, userChain) => {
+    invalidateUserBids: (auctionId, address) => {
         set((state) => {
-            const newMap = new Map(state.userCommitments);
+            const newMap = new Map(state.userBids);
             const auctionMap = newMap.get(auctionId);
 
             if (auctionMap) {
-                if (userChain) {
+                if (address) {
                     // Invalidate specific user
-                    const existing = auctionMap.get(userChain);
+                    const existing = auctionMap.get(address);
                     if (existing) {
-                        auctionMap.set(userChain, {
+                        auctionMap.set(address, {
                             ...existing,
                             timestamp: 0
                         });
@@ -1037,34 +949,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 newMap.set(auctionId, auctionMap);
             }
 
-            return { userCommitments: newMap };
-        });
-    },
-
-    invalidateAllMyCommitments: (userChain) => {
-        set((state) => {
-            const newMap = new Map(state.allMyCommitments);
-
-            if (userChain) {
-                // Invalidate specific user
-                const existing = newMap.get(userChain);
-                if (existing) {
-                    newMap.set(userChain, {
-                        ...existing,
-                        timestamp: 0
-                    });
-                }
-            } else {
-                // Invalidate all users
-                newMap.forEach((value, key) => {
-                    newMap.set(key, {
-                        ...value,
-                        timestamp: 0
-                    });
-                });
-            }
-
-            return { allMyCommitments: newMap };
+            return { userBids: newMap };
         });
     },
 
@@ -1103,19 +988,13 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             });
 
             // Mark user commitments as stale
-            const newUserCommitments = new Map(state.userCommitments);
-            newUserCommitments.forEach((auctionMap, auctionId) => {
+            const newUserBids = new Map(state.userBids);
+            newUserBids.forEach((auctionMap, auctionId) => {
                 const newAuctionMap = new Map(auctionMap);
-                newAuctionMap.forEach((value, userChain) => {
-                    newAuctionMap.set(userChain, { ...value, timestamp: 0 });
+                newAuctionMap.forEach((value, address) => {
+                    newAuctionMap.set(address, { ...value, timestamp: 0 });
                 });
-                newUserCommitments.set(auctionId, newAuctionMap);
-            });
-
-            // Mark all my commitments as stale
-            const newAllMyCommitments = new Map(state.allMyCommitments);
-            newAllMyCommitments.forEach((value, key) => {
-                newAllMyCommitments.set(key, { ...value, timestamp: 0 });
+                newUserBids.set(auctionId, newAuctionMap);
             });
 
             return {
@@ -1129,8 +1008,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 settledAuctions: newSettledAuctions,
                 auctionsByCreator: newAuctionsByCreator,
                 bidHistory: newBidHistory,
-                userCommitments: newUserCommitments,
-                allMyCommitments: newAllMyCommitments,
+                userBids: newUserBids,
             };
         });
     },
@@ -1200,21 +1078,16 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 if (!entry || entry.status === 'idle') return true;
                 return now - entry.timestamp > BID_HISTORY_TTL;
             }
-            case 'userCommitment': {
+            case 'userBids': {
                 if (!key) return true;
-                const [auctionId, userChain] = key.split(':');
-                const auctionMap = get().userCommitments.get(auctionId);
-                if (!auctionMap || !userChain) return true;
-                const entry = auctionMap.get(userChain);
+                const [auctionId, address] = key.split(':');
+                const auctionMap = get().userBids.get(auctionId);
+                if (!auctionMap || !address) return true;
+                const entry = auctionMap.get(address);
                 if (!entry || entry.status === 'idle') return true;
-                return now - entry.timestamp > USER_COMMITMENT_TTL;
+                return now - entry.timestamp > USER_BID_TTL;
             }
-            case 'allMyCommitments': {
-                if (!key) return true;
-                const entry = get().allMyCommitments.get(key);
-                if (!entry || entry.status === 'idle') return true;
-                return now - entry.timestamp > USER_COMMITMENT_TTL;
-            }
+        
             default:
                 return true;
         }
