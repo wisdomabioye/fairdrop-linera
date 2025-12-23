@@ -11,6 +11,7 @@ export const AuctionStatus = {
 export type AuctionStatus = typeof AuctionStatus[keyof typeof AuctionStatus];
 
 export interface AuctionParam {
+    image: string;
     itemName: string;
     totalSupply: number;
     startPrice: string;
@@ -81,6 +82,7 @@ export interface AuctionWithId {
     totalBids: number;
     totalBidders: number;
     params: {
+        image: string;
         itemName: string;
         totalSupply: number;
         startPrice: string;
@@ -120,6 +122,7 @@ export function transformAuctionStatus(auction: AuctionWithId): AuctionStatus {
 export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
     return {
         auctionId: auction.auctionId,
+        image: auction.params.image,
         itemName: auction.params.itemName,
         totalSupply: auction.params.totalSupply,
         startPrice: auction.params.startPrice,

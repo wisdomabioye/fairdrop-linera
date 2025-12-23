@@ -7,7 +7,7 @@ import { useSyncStatus } from '@/providers/sync-provider';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Copy, Check, Loader2, User, LogOut, Wallet, Hash, ChevronDown } from 'lucide-react';
+import { Copy, Check, Loader2, User, LogOut, Wallet, Hash, ChevronDown, LayoutDashboard, Gavel } from 'lucide-react';
 import { APP_ROUTES } from '@/config/app.route';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -151,12 +151,20 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
         {/* Navigation Links */}
         <div className="p-2">
           <Link
-            href={APP_ROUTES.myAuctions}
+            href="/my"
             onClick={() => setIsOpen(false)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/5 transition-all group"
           >
-            <User className="w-4 h-4 group-hover:text-primary transition-colors" />
-            <span>My Auctions</span>
+            <LayoutDashboard className="w-4 h-4 group-hover:text-primary transition-colors" />
+            <span>My Dashboard</span>
+          </Link>
+          <Link
+            href="/creator/auctions"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/5 transition-all group"
+          >
+            <Gavel className="w-4 h-4 group-hover:text-primary transition-colors" />
+            <span>Creator Dashboard</span>
           </Link>
         </div>
 

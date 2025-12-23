@@ -11,8 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WalletConnectButton } from '@/components/wallet';
 import { useSyncStatus } from '@/providers';
-import { useCachedMyCommitment } from '@/hooks/useCachedMyCommitment';
-import { useAuctionMutations } from '@/hooks/useAuctionMutations';
+import { useCachedMyCommitment } from '@/hooks/auctions/use-cached-my-commitment';
+import { useAuctionMutations } from '@/hooks/auctions/use-auction-mutations';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
 import type { ApplicationClient } from 'linera-react-client';
 

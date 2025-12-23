@@ -3,10 +3,11 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { AppLineraProvider } from '@/providers';
 import { ThemeProvider } from '@/components/theme';
-import { DashboardShell } from '@/components/dashboard/layout/dashboard-shell';
+import { Header } from '@/components/layout/header';
+import { Footer } from '@/components/layout/footer';
 import { APP_INFO } from '@/config/app.config';
 
-import './globals.css';
+import '../globals.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -53,9 +54,11 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AppLineraProvider>
-            <DashboardShell>
-              {children}
-            </DashboardShell>
+              <Header />
+              <main className="flex-1 flex flex-col">
+                {children}
+              </main>
+              <Footer />
           </AppLineraProvider>
 
           {/* Toast Notifications */}
