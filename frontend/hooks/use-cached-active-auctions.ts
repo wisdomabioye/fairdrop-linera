@@ -79,7 +79,7 @@ export function useCachedActiveAuctions(
         allAuctionsCache,
         fetchActiveAuctions,
         isStale: checkIsStale,
-        startPollingActiveAuctions
+        // startPollingActiveAuctions
     } = useAuctionStore();
 
     // Local state for managing polling subscription
@@ -110,7 +110,7 @@ export function useCachedActiveAuctions(
      */
     const refetch = useCallback(async () => {
         if (!aacApp || skip || isPublicClientSyncing) return;
-
+        console.log('aacApp', aacApp)
         try {
             setIsRefetching(true);
             await fetchActiveAuctions(offset, limit, aacApp);
@@ -145,12 +145,12 @@ export function useCachedActiveAuctions(
         }
 
         // Start polling
-        const unsubscribe = startPollingActiveAuctions(offset, limit, aacApp, pollInterval);
-        setPollingUnsubscribe(() => unsubscribe);
+        // const unsubscribe = startPollingActiveAuctions(offset, limit, aacApp, pollInterval);
+        // setPollingUnsubscribe(() => unsubscribe);
 
         // Cleanup
         return () => {
-            unsubscribe();
+            // unsubscribe();
             setPollingUnsubscribe(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps

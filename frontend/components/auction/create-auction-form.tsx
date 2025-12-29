@@ -17,7 +17,7 @@ import { TokenSelector } from '@/components/shared';
 import { ImageUpload } from '@/components/shared';
 import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
-import { UIC_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 import { APP_ROUTES } from '@/config/app.route';
 import { getTokenList } from '@/config/app.token-store';
 import { useSyncStatus } from '@/providers';
@@ -42,9 +42,9 @@ export function CreateAuctionFormMultistep({
   onCancel
 }: CreateAuctionFormProps) {
   const router = useRouter();
-  const uicApp = useLineraApplication(UIC_APP_ID);
+  const aacApp = useLineraApplication(AAC_APP_ID);
   const { isConnected, isConnecting, connect, address } = useWalletConnection();
-  const { isWalletClientSyncing } = useSyncStatus();
+  const { isClientSyncing } = useSyncStatus();
 
   // Current step
   const [currentStep, setCurrentStep] = useState(0);
@@ -75,7 +75,7 @@ export function CreateAuctionFormMultistep({
 
   // Mutation hook
   const { createAuction, isCreating } = useAuctionMutations({
-    uicApp: uicApp.app,
+    aacApp: aacApp.app,
     onCreateSuccess: (auctionId) => {
       toast.success('Auction created successfully!');
       if (onSuccess) {
@@ -182,11 +182,11 @@ export function CreateAuctionFormMultistep({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!startDate || !endDate || !uicApp.app) {
+    if (!startDate || !endDate || !aacApp.app) {
       return;
     }
 
-    if (!isConnected || !uicApp.app.walletClient) {
+    if (!isConnected || !aacApp.canWrite) {
       throw new Error('Please connect your wallet');
     }
 
@@ -538,7 +538,7 @@ export function CreateAuctionFormMultistep({
             ) : isConnected ? (
               <Button
                 type="submit"
-                disabled={isCreating || !uicApp.app || isWalletClientSyncing}
+                disabled={isCreating || !aacApp.app || isClientSyncing}
                 className="ml-auto gap-2"
               >
                 {isCreating ? (
@@ -546,10 +546,10 @@ export function CreateAuctionFormMultistep({
                     <Spinner className="h-4 w-4" />
                     Creating Auction...
                   </>
-                ) : isWalletClientSyncing ? (
+                ) : isClientSyncing ? (
                   <>
                     <Spinner className="h-4 w-4" />
-                    Wallet is Syncing...
+                    Syncing...
                   </>
                 ) : (
                   'Create Auction'

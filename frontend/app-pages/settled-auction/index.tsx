@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { useLineraApplication } from 'linera-react-client';
 import { useCachedSettledAuctions, useAuctionMutations, useCachedMyCommitment } from '@/hooks';
-import { AAC_APP_ID, UIC_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
@@ -18,7 +18,6 @@ import { APP_ROUTES } from '@/config/app.route';
 export default function SettledAuctions() {
     const router = useRouter();
     const aacApp = useLineraApplication(AAC_APP_ID); // same as uicApp
-    // const uicApp = useLineraApplication(UIC_APP_ID);
 
     const {
         auctions,
@@ -34,7 +33,7 @@ export default function SettledAuctions() {
     });
 
     const { claimSettlement, isClaiming } = useAuctionMutations({
-        uicApp: aacApp.app,
+        aacApp: aacApp.app,
         onClaimSuccess: (auctionId) => {
             toast.success('Settlement claimed successfully!', {
                 description: `Auction ID: ${auctionId}`
@@ -148,16 +147,16 @@ function SettledAuctionCard({
     onClaimClick: (id: number) => void;
     isClaiming: boolean;
 }) {
-    const uicApp = useLineraApplication(UIC_APP_ID);
+    const aacApp = useLineraApplication(AAC_APP_ID);
 
-    const { commitment } = useCachedMyCommitment({
+    const { commitment, totalQuantity } = useCachedMyCommitment({
         auctionId: auction.auctionId.toString(),
-        uicApp: uicApp.app,
-        skip: !uicApp.app
+        aacApp: aacApp.app,
+        skip: !aacApp.app
     });
 
-    const hasCommitment = commitment && commitment.totalQuantity > 0;
-    const hasClaimed = commitment?.settlement && commitment.totalQuantity > 0;
+    const hasCommitment = totalQuantity && totalQuantity > 0;
+    const hasClaimed = hasCommitment && commitment?.filter(c => !c.claimed);
 
     return (
         <AuctionCard

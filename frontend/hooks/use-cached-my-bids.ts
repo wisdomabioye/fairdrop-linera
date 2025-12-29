@@ -36,8 +36,10 @@ export interface UseCachedMyCommitmentOptions {
 export interface UseCachedMyCommitmentResult {
     /** User's total committed quantity */
     totalQuantity: number | null;
-    /** Full commitment data */
-    userBids: BidRecord[] | null;
+    /** Total Amount Paid */
+    totalPaid: number | null;
+    /** User bid data for this auction */
+    commitment: BidRecord[] | null;
     /** Is initial loading? (only true on very first fetch) */
     loading: boolean;
     /** Is currently fetching? (may be true while showing cached data) */
@@ -76,12 +78,11 @@ export function useCachedMyCommitment(
 
     // Derived state
     const commitment = entry?.data ?? null;
-    const totalQuantity = commitment?.totalQuantity ?? null;
     const loading = entry?.status === 'loading' && !commitment;
     const isFetching = entry?.status === 'loading';
     const error = entry?.error ?? null;
     const hasLoadedOnce = entry?.status === 'success' || commitment !== null;
-    const isStale = checkIsStale('userCommitment', `${auctionId}:${address}`);
+    const isStale = checkIsStale('userBids', `${auctionId}:${address}`);
 
     /**
      * Fetch user commitment
@@ -92,7 +93,7 @@ export function useCachedMyCommitment(
         try {
             await fetchUserBids(auctionId, address, aacApp);
         } catch (err) {
-            console.error('[useCachedMyCommitment] Refetch failed:', err);
+            console.error('[useCachedMyBids] Refetch failed:', err);
         }
     }, [aacApp, skip, address, isClientSyncing, auctionId, fetchUserBids]);
 
@@ -115,8 +116,9 @@ export function useCachedMyCommitment(
     }, [skip, aacApp, address, auctionId, isClientSyncing, isStale]);
 
     return {
-        totalQuantity,
-        userBids,
+        totalQuantity: commitment?.reduce((prev, curr) => prev + curr.quantity, 0) ?? 0,
+        totalPaid: commitment?.reduce((prev, curr) => prev + curr.amountPaid, 0) ?? 0,
+        commitment,
         loading,
         isFetching,
         error,

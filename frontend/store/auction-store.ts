@@ -215,7 +215,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 // }
 
                 // Check on-chain state
-                const infoResult = await indexerApp.query<string>(
+                const infoResult = await indexerApp.public.query<string>(
                     JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
                 );
                 const { data } = JSON.parse(infoResult) as { data: { subscriptionInfo: SubscriptionInfo | null } };
@@ -236,11 +236,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 }
 
                 // Not initialized, perform mutation
-                await indexerApp.mutate<string>(
+                await indexerApp.public.systemMutate<string>(
                     JSON.stringify(INDEXER_MUTATION.Initialize(aacChain, auctionApp))
                 );
 
-                const postInitResult = await indexerApp.query<string>(
+                const postInitResult = await indexerApp.public.query<string>(
                     JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
                 );
 
@@ -282,7 +282,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     checkSubscriptionInfo: async (indexerApp) => {
-        const result = await indexerApp.query<string>(
+        const result = await indexerApp.public.query<string>(
             JSON.stringify(INDEXER_QUERY.SubscriptionInfo())
         );
         // console.log('checkSubscriptionInfo', result)
@@ -356,14 +356,15 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             }));
 
             try {
-                const result = await aacApp.query<string>(
+                const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
-
+                console.log('AllAuctions' , result)
                 const { data } = JSON.parse(result) as {
                     data: { allAuctions: AuctionWithId[] | null }
                 };
 
+         
                 const allAuctions = (data.allAuctions || []).map(transformAuctionWithId);
                 const fetchedIds = allAuctions.map(a => String(a.auctionId));
 
@@ -395,6 +396,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
                 return fetchedIds;
             } catch (err) {
+                console.log('err', err)
                 const error = err instanceof Error ? err : new Error('Failed to fetch all auctions');
 
                 set((state) => ({
@@ -455,10 +457,10 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             try {
                 // Fetch from API
-                const result = await aacApp.query<string>(
+                const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionInfo(auctionId))
                 );
-
+                console.log('AuctionInfo', result);
                 const parsed = JSON.parse(result) as {
                     data: { auctionInfo: AuctionWithId | null } | null
                 };
@@ -645,10 +647,10 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             try {
                 // TEMPORARY: Use AAC.AuctionsByCreator (no pagination)
-                const result = await aacApp.query<string>(
+                const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionsByCreator(creator))
                 );
-                // console.log('AuctionsByCreator (AAC)', result);
+                console.log('AuctionsByCreator (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { auctionsByCreator: AuctionWithId[] | null }
@@ -730,10 +732,10 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
             try {
                 // TEMPORARY: Use AAC.BidHistory instead of INDEXER.BidHistory
-                const result = await aacApp.query<string>(
+                const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.BidHistory(auctionId, offset, limit))
                 );
-                // console.log('BidHistory (AAC)', result);
+                console.log('BidHistory (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { bidHistory: BidRecord[] | null }
@@ -779,7 +781,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             return;
         }
 
-        const key = `my-commitment-${auctionId}-${address}`;
+        const key = `my-bid-${auctionId}-${address}`;
 
         await queryDeduplicator.deduplicate(key, async () => {
             set((state) => {
@@ -802,11 +804,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     throw new Error('Wallet is not connected');
                 }
 
-                const result = await aacApp.query<string>(
+                const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.UserBids(address, Number(auctionId)))
                 );
 
-                // console.log('MyCommitmentForAuction:', JSON.parse(result));
+                console.log('MyCommitmentForAuction:', JSON.parse(result));
 
                 const { data } = JSON.parse(result) as {
                     data: { userBids: BidRecord[] | null }

@@ -68,7 +68,7 @@ export function calculateCurrentPrice(
   }
 
   // If auction is settled or ended, use the final current price from summary
-  if (status === AuctionStatus.Settled || status === AuctionStatus.Ended) {
+  if (status === AuctionStatus.Settled) {
     return auction.currentPrice || floorPrice;
   }
 
@@ -199,14 +199,6 @@ export function getAuctionStatusBadge(auction: AuctionSummary): {
       variant: 'success',
       text: 'Settled',
       className: 'gradient-auction-winning'
-    };
-  }
-
-  if (status === AuctionStatus.Ended) {
-    return {
-      variant: 'secondary',
-      text: 'Ended',
-      className: ''
     };
   }
 

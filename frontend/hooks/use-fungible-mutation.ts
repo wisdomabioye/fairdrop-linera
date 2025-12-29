@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
 import { FUNGIBLE_MUTATION } from '@/lib/gql/queries';
-import type { ApplicationClient } from 'linera-react-client';
+import type { FungibleChain } from '@/lib/utils/fungible-client-adapter';
 
 export interface UseFungibleMutationsOptions {
-    /** The fungible token application client */
-    fungibleApp: ApplicationClient | null;
+    /** The normalized fungible chain (wallet or public) */
+    chainApp?: FungibleChain | null;
     /** Callback after successful mint */
     onMintSuccess?: () => void;
     /** Callback after successful transfer */
@@ -51,7 +51,7 @@ export interface UseFungibleMutationsResult {
 
 export function useFungibleMutations(options: UseFungibleMutationsOptions): UseFungibleMutationsResult {
     const {
-        fungibleApp,
+        chainApp,
         onMintSuccess,
         onTransferSuccess,
         onApproveSuccess,
@@ -85,8 +85,8 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
     // Mint operation
     const mint = useCallback(
         async (owner: string, amount: string): Promise<boolean> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setMintError(err);
                 onError?.(err);
                 return false;
@@ -96,7 +96,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setMintError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.Mint(owner, Number(amount)))
                 );
 
@@ -122,14 +122,14 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsMinting(false);
             }
         },
-        [fungibleApp, onMintSuccess, onError]
+        [chainApp, onMintSuccess, onError]
     );
 
     // Transfer operation
     const transfer = useCallback(
         async (owner: string, amount: string, targetAccount: string): Promise<boolean> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setTransferError(err);
                 onError?.(err);
                 return false;
@@ -139,7 +139,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setTransferError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.Transfer(owner, Number(amount), targetAccount))
                 );
 
@@ -165,14 +165,14 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsTransferring(false);
             }
         },
-        [fungibleApp, onTransferSuccess, onError]
+        [chainApp, onTransferSuccess, onError]
     );
 
     // Approve operation
     const approve = useCallback(
         async (owner: string, spender: string, allowance: string): Promise<boolean> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setApproveError(err);
                 onError?.(err);
                 return false;
@@ -182,7 +182,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setApproveError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.Approve(owner, spender, Number(allowance)))
                 );
 
@@ -208,14 +208,14 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsApproving(false);
             }
         },
-        [fungibleApp, onApproveSuccess, onError]
+        [chainApp, onApproveSuccess, onError]
     );
 
     // TransferFrom operation
     const transferFrom = useCallback(
         async (owner: string, spender: string, amount: string, targetAccount: string): Promise<boolean> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setTransferFromError(err);
                 onError?.(err);
                 return false;
@@ -225,7 +225,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setTransferFromError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.TransferFrom(owner, spender, Number(amount), targetAccount))
                 );
 
@@ -250,14 +250,14 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsTransferringFrom(false);
             }
         },
-        [fungibleApp, onError]
+        [chainApp, onError]
     );
 
     // Claim operation
     const claim = useCallback(
         async (sourceAccount: string, amount: string, targetAccount: string): Promise<boolean> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setClaimError(err);
                 onError?.(err);
                 return false;
@@ -267,7 +267,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setClaimError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.Claim(sourceAccount, Number(amount), targetAccount))
                 );
 
@@ -292,14 +292,14 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsClaiming(false);
             }
         },
-        [fungibleApp, onError]
+        [chainApp, onError]
     );
 
     // Get balance (mutation-based query)
     const getBalance = useCallback(
         async (owner: string): Promise<string | null> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setQueryError(err);
                 onError?.(err);
                 return null;
@@ -309,7 +309,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setQueryError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.Balance(owner))
                 );
 
@@ -330,14 +330,14 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsQuerying(false);
             }
         },
-        [fungibleApp, onError]
+        [chainApp, onError]
     );
 
     // Get ticker symbol (mutation-based query)
     const getTickerSymbol = useCallback(
         async (): Promise<string | null> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setQueryError(err);
                 onError?.(err);
                 return null;
@@ -347,7 +347,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setQueryError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.TickerSymbol())
                 );
 
@@ -368,14 +368,14 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsQuerying(false);
             }
         },
-        [fungibleApp, onError]
+        [chainApp, onError]
     );
 
     // Get token name (mutation-based query)
     const getTokenName = useCallback(
         async (): Promise<string | null> => {
-            if (!fungibleApp?.walletClient) {
-                const err = new Error('Wallet not connected');
+            if (!chainApp) {
+                const err = new Error('Fungible chain not initialized');
                 setQueryError(err);
                 onError?.(err);
                 return null;
@@ -385,7 +385,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
             setQueryError(null);
 
             try {
-                const result = await fungibleApp.walletClient.mutate<string>(
+                const result = await chainApp.mutate<string>(
                     JSON.stringify(FUNGIBLE_MUTATION.TokenName())
                 );
 
@@ -406,7 +406,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsQuerying(false);
             }
         },
-        [fungibleApp, onError]
+        [chainApp, onError]
     );
 
     return {

@@ -16,21 +16,19 @@ import {
     useCachedActiveAuctions,
     useCachedSettledAuctions,
     useCachedAuctionsByCreator,
-    useCachedAllMyCommitments,
 } from '@/hooks';
 import { useTokenStore } from '@/store/token-store';
 import { getTokenList } from '@/config/app.token-store';
-import { AAC_APP_ID, UIC_APP_ID } from '@/config/app.config';
+import { AAC_APP_ID } from '@/config/app.config';
 
 export function EagerLoader({
     children
 }: {
     children: React.ReactNode;
 }) {
-    const aacApp = useLineraApplication(AAC_APP_ID); // Same as uicApp
-    // const uicApp = useLineraApplication(UIC_APP_ID);
     const { isConnected, walletAddress } = useLineraClient();
-    const { isWalletClientSyncing } = useSyncStatus();
+    const aacApp = useLineraApplication(AAC_APP_ID); // Same as uicApp
+    const { isClientSyncing } = useSyncStatus();
 
     // ============ Token Store Actions ============
     const { fetchAccounts, fetchTokenInfo } = useTokenStore();
@@ -123,16 +121,10 @@ export function EagerLoader({
         enablePolling: !!walletAddress && loadTier3,
     });
 
-    // Load user's commitments for all auctions (for "My Bids" page)
-    useCachedAllMyCommitments({
-        uicApp: aacApp.app, // uicApp is the same with aacApp
-        skip: !isConnected || !loadTier3,
-    });
-
     // ============ TIER 4: NICE-TO-HAVE (T=1500ms) - Background Updates ============
     // Load balances and token info for all supported tokens
     useEffect(() => {
-        if (!isConnected || isWalletClientSyncing || !walletAddress || !loadTier4) return;
+        if (!isConnected || isClientSyncing || !walletAddress || !loadTier4) return;
 
         // Load token info and balances for each token
         tokenApps.forEach(({ token, app }) => {
@@ -149,7 +141,7 @@ export function EagerLoader({
             });
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isConnected, isWalletClientSyncing, walletAddress, loadTier4, fetchAccounts, fetchTokenInfo]);
+    }, [isConnected, isClientSyncing, walletAddress, loadTier4, fetchAccounts, fetchTokenInfo]);
 
     return (
         children

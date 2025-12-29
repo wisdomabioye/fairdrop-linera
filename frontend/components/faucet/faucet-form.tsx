@@ -30,7 +30,7 @@ const POLLING_INTERVAL = 30000;
 
 export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   const { isConnected, address } = useWalletConnection();
-  const { isWalletClientSyncing } = useSyncStatus();
+  const { isClientSyncing } = useSyncStatus();
   const tokens = getTokenList();
 
   const [selectedTokenId, setSelectedTokenId] = useState<string>(
@@ -44,6 +44,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
 
   const selectedToken = tokens.find(t => t.appId === selectedTokenId);
   const fungibleApp = useLineraApplication(selectedTokenId);
+  const walletChainId = fungibleApp.app?.wallet?.getChainId();
 
   // Token store for centralized state management
   const {
@@ -57,22 +58,39 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
 
   // Polling callback for balance and token info
   const pollTokenData = useCallback(async () => {
-    if (!address || !selectedTokenId || !fungibleApp.app || isWalletClientSyncing) {
+    if (!address || !selectedTokenId || !fungibleApp.app || isClientSyncing) {
       return;
     }
 
     try {
       // Only refetch balance if stale
-      if (isBalanceStale(selectedTokenId, address)) {
-        await fetchBalance(selectedTokenId, address, fungibleApp.app);
+      if (
+        walletChainId
+        &&
+        isBalanceStale(
+          selectedTokenId, 
+          walletChainId, 
+          address
+        )
+      ) {
+        await fetchBalance(
+          selectedTokenId,
+          walletChainId,
+          address, 
+          fungibleApp.app
+        );
       }
 
       // Fetch token info on first load (it has 60s TTL so won't refetch often)
-      await fetchTokenInfo(selectedTokenId, fungibleApp.app);
+      await fetchTokenInfo(
+        selectedTokenId, 
+        walletChainId as string,
+        fungibleApp.app,
+      );
     } catch (error) {
       console.error('[FaucetForm] Failed to fetch token data:', error);
     }
-  }, [address, selectedTokenId, fungibleApp.app, isWalletClientSyncing, fetchBalance, fetchTokenInfo, isBalanceStale]);
+  }, [address, selectedTokenId, fungibleApp.app, isClientSyncing, fetchBalance, fetchTokenInfo, isBalanceStale]);
 
   // Set up polling with usePolling hook (immediate: true for initial fetch)
   usePolling(pollTokenData, POLLING_INTERVAL, { immediate: true });
@@ -83,7 +101,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     isMinting,
     mintError,
   } = useFungibleMutations({
-    fungibleApp: fungibleApp.app,
+    chainApp: fungibleApp.app?.wallet,
     onMintSuccess: () => {
       // Add to mint history
       const newRecord: MintRecord = {
@@ -102,12 +120,17 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
       setOptimisticBalance(null);
 
       // Invalidate balance to force immediate refresh
-      invalidateBalance(selectedTokenId, address);
+      invalidateBalance(selectedTokenId, walletChainId as string, address);
 
       // Trigger immediate refresh (bypass polling)
       setTimeout(() => {
         if (address && fungibleApp.app) {
-          fetchBalance(selectedTokenId, address, fungibleApp.app);
+          fetchBalance(
+            selectedTokenId, 
+            walletChainId as string,
+            address, 
+            fungibleApp.app
+          );
         }
       }, 500);
 
@@ -130,13 +153,13 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   });
 
   // Get user balance from token store
-  const actualBalance = address && selectedTokenId
-    ? getBalance(selectedTokenId, address)
+  const actualBalance = address && selectedTokenId && walletChainId
+    ? getBalance(selectedTokenId, walletChainId, address)
     : null;
 
   // Get loading status from token store
-  const balanceStatus = address && selectedTokenId
-    ? getBalanceStatus(selectedTokenId, address)
+  const balanceStatus = address && selectedTokenId && walletChainId
+    ? getBalanceStatus(selectedTokenId, walletChainId, address)
     : 'idle';
 
   const accountsLoading = balanceStatus === 'loading';
@@ -167,9 +190,9 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
       return;
     }
 
-    if (isWalletClientSyncing) {
-      toast.warning('Wallet syncing', {
-        description: 'Please wait for wallet to finish syncing'
+    if (isClientSyncing) {
+      toast.warning('Client is syncing', {
+        description: 'Please wait for client to finish syncing'
       });
       return;
     }
@@ -182,7 +205,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     await mint(address, amount);
   };
 
-  const canSubmit = isConnected && !!fungibleApp.app && !!amount && Number(amount) > 0 && !isMinting && !isWalletClientSyncing;
+  const canSubmit = isConnected && !!fungibleApp.app && !!amount && Number(amount) > 0 && !isMinting && !isClientSyncing;
 
   // Wallet connection guard
   if (!isConnected) {
@@ -213,7 +236,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Unified Status Bar */}
             <UnifiedStatusBar
-              isWalletSyncing={isWalletClientSyncing}
+              isWalletSyncing={isClientSyncing}
               isLoading={accountsLoading}
               isMinting={isMinting}
               error={mintError || accountsError}
@@ -232,7 +255,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
               tokens={tokens}
               value={selectedTokenId}
               onValueChange={setSelectedTokenId}
-              disabled={isMinting || isWalletClientSyncing}
+              disabled={isMinting || isClientSyncing}
             />
 
             {/* Amount Input */}
@@ -244,7 +267,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
                 placeholder="Enter amount"
                 value={amount}
                 onChange={handleAmountChange}
-                disabled={isMinting || isWalletClientSyncing}
+                disabled={isMinting || isClientSyncing}
                 className="h-14 text-lg font-semibold"
               />
             </div>
@@ -253,7 +276,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
             <AmountPresets
               selectedAmount={amount}
               onSelectAmount={handleQuickAmount}
-              disabled={isMinting || isWalletClientSyncing}
+              disabled={isMinting || isClientSyncing}
             />
 
             {/* Submit Button */}

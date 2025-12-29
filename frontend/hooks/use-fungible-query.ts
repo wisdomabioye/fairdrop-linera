@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { FUNGIBLE_QUERY } from '@/lib/gql/queries';
 import { pollingManager } from '@/lib/utils/polling-manager';
 import { queryDeduplicator } from '@/lib/utils/query-deduplicator';
-import type { ApplicationClient } from 'linera-react-client';
+import type { FungibleChain } from '@/lib/utils/fungible-client-adapter';
 import type {
     FungibleAccounts,
     FungibleAllowances,
@@ -11,8 +11,8 @@ import type {
 } from '@/lib/gql/types';
 
 export interface UseFungibleQueryOptions {
-    /** The fungible token application client */
-    fungibleApp: ApplicationClient | null;
+    /** The normalized fungible chain (wallet or public) */
+    chainApp?: FungibleChain | null;
     /** Auto-fetch on mount */
     autoFetch?: boolean;
     /** Polling interval in milliseconds (optional) */
@@ -51,7 +51,7 @@ export interface UseFungibleQueryResult {
 }
 
 export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQueryResult {
-    const { fungibleApp, autoFetch = false, pollingInterval, appId = 'unknown', isWalletSyncing = false } = options;
+    const { chainApp, autoFetch = false, pollingInterval, appId = 'unknown', isWalletSyncing = false } = options;
 
     // Accounts state
     const [accounts, setAccounts] = useState<AccountBalance[]>([]);
@@ -71,11 +71,6 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
 
     // Fetch accounts with deduplication
     const fetchAccounts = useCallback(async () => {
-        if (!fungibleApp?.walletClient) {
-            setAccountsError(new Error('Fungible app not initialized'));
-            return;
-        }
-
         // Don't fetch if wallet is syncing
         if (isWalletSyncing) {
             // console.debug('[useFungibleQuery] Skipping fetch - wallet is syncing');
@@ -88,8 +83,15 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         setAccountsError(null);
 
         try {
+
+
             await queryDeduplicator.deduplicate(dedupeKey, async () => {
-                const result = await fungibleApp.walletClient!.query<string>(
+                if (!chainApp) {
+                    setAccountsError(new Error('Fungible chainApp not initialized'));
+                    return;
+                }
+
+                const result = await chainApp.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.Accounts())
                 );
                 // console.log('Accounts', result)
@@ -112,15 +114,10 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         } finally {
             setAccountsLoading(false);
         }
-    }, [fungibleApp, appId, isWalletSyncing]);
+    }, [chainApp, appId, isWalletSyncing]);
 
     // Fetch allowances with deduplication
     const fetchAllowances = useCallback(async () => {
-        if (!fungibleApp?.walletClient) {
-            setAllowancesError(new Error('Fungible app not initialized'));
-            return;
-        }
-
         // Don't fetch if wallet is syncing
         if (isWalletSyncing) {
             // console.debug('[useFungibleQuery] Skipping allowances fetch - wallet is syncing');
@@ -134,7 +131,12 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
 
         try {
             await queryDeduplicator.deduplicate(dedupeKey, async () => {
-                const result = await fungibleApp.walletClient!.query<string>(
+                if (!chainApp) {
+                    setAllowancesError(new Error('Fungible chainApp not initialized'));
+                    return;
+                }
+
+                const result = await chainApp.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.Allowances())
                 );
 
@@ -156,15 +158,10 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         } finally {
             setAllowancesLoading(false);
         }
-    }, [fungibleApp, appId, isWalletSyncing]);
+    }, [chainApp, appId, isWalletSyncing]);
 
     // Fetch token info (ticker symbol and token name)
     const fetchTokenInfo = useCallback(async () => {
-        if (!fungibleApp?.walletClient) {
-            setTokenInfoError(new Error('Fungible app not initialized'));
-            return;
-        }
-
         // Don't fetch if wallet is syncing
         if (isWalletSyncing) {
             // console.debug('[useFungibleQuery] Skipping token info fetch - wallet is syncing');
@@ -178,8 +175,13 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
 
         try {
             await queryDeduplicator.deduplicate(dedupeKey, async () => {
+                if (!chainApp) {
+                    setTokenInfoError(new Error('Fungible chainApp not initialized'));
+                    return;
+                }
+
                 // Fetch ticker symbol
-                const tickerResult = await fungibleApp.walletClient!.query<string>(
+                const tickerResult = await chainApp.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.TickerSymbol())
                 );
                 const tickerParsed = JSON.parse(tickerResult) as { data: { tickerSymbol: string } | null, errors?: unknown[] };
@@ -189,7 +191,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
                 }
 
                 // Fetch token name
-                const nameResult = await fungibleApp.walletClient!.query<string>(
+                const nameResult = await chainApp.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.TokenName())
                 );
                 const nameParsed = JSON.parse(nameResult) as { data: { tokenName: string } | null, errors?: unknown[] };
@@ -208,7 +210,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         } finally {
             setTokenInfoLoading(false);
         }
-    }, [fungibleApp, appId, isWalletSyncing]);
+    }, [chainApp, appId, isWalletSyncing]);
 
     // Helper to get balance for a specific account
     const getAccountBalance = useCallback((owner: string): string | null => {
@@ -267,17 +269,17 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
 
     // Auto-fetch on mount (only once, skip if syncing)
     useEffect(() => {
-        if (autoFetch && fungibleApp && !initialFetchDone.current && !isWalletSyncing) {
+        if (autoFetch && chainApp && !initialFetchDone.current && !isWalletSyncing) {
             initialFetchDone.current = true;
             fetchAccountsRef.current();
             fetchAllowancesRef.current();
             fetchTokenInfoRef.current();
         }
-    }, [autoFetch, fungibleApp, isWalletSyncing]);
+    }, [autoFetch, chainApp, isWalletSyncing]);
 
     // Smart polling with PollingManager (skip if syncing)
     useEffect(() => {
-        if (!pollingInterval || !fungibleApp || isWalletSyncing) {
+        if (!pollingInterval || !chainApp || isWalletSyncing) {
             return;
         }
 
@@ -299,7 +301,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         return () => {
             unsubscribe();
         };
-    }, [pollingInterval, fungibleApp, appId, isWalletSyncing]);
+    }, [pollingInterval, chainApp, appId, isWalletSyncing]);
 
     return {
         accounts,

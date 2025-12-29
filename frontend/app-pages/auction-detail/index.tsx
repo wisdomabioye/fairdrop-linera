@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Package, Share2 } from 'lucide-react';
-import { useLineraApplication } from 'linera-react-client';
+import { useLineraApplication, useWalletConnection } from 'linera-react-client';
 import { useCachedAuctionSummary, useCachedMyCommitment } from '@/hooks';
 import { AAC_APP_ID } from '@/config/app.config';
 import { BidHistory } from '@/components/auction/bid-history';
@@ -34,7 +34,7 @@ export default function AuctionDetailPage() {
   const auctionId = searchParams?.get('id') || '';
 
   const aacApp = useLineraApplication(AAC_APP_ID);
-
+  const { address } = useWalletConnection();
   const [currentPrice, setCurrentPrice] = useState('0');
 
   // Fetch auction details
@@ -52,10 +52,10 @@ export default function AuctionDetailPage() {
   });
 
   // Fetch user's commitment (for active auctions display)
-  const { commitment } = useCachedMyCommitment({
+  const { commitment, totalQuantity } = useCachedMyCommitment({
     auctionId,
-    uicApp: aacApp.app,
-    skip: !auctionId || !aacApp.app?.walletClient
+    aacApp: aacApp.app,
+    skip: !auctionId || !aacApp.app
   });
 
   // Update price only for active auctions
@@ -249,7 +249,7 @@ export default function AuctionDetailPage() {
           {/* Bid History */}
           <BidHistory
             auctionId={auctionId}
-            currentUserChain={aacApp.app?.walletClient?.getChainId()}
+            currentUserWalletAddress={address}
           />
         </div>
 
@@ -258,7 +258,7 @@ export default function AuctionDetailPage() {
           {/* Status-aware Actions (Bid/Claim) */}
           <DetailSidebarActions
             auction={auction}
-            uicApp={aacApp.app}
+            aacApp={aacApp.app}
             onBidSuccess={() => {
               refetch();
             }}
@@ -268,7 +268,7 @@ export default function AuctionDetailPage() {
           />
 
           {/* User's Commitment (for active auctions) */}
-          {auction.status === AuctionStatus.Active && commitment && commitment.totalQuantity > 0 && (
+          {auction.status === AuctionStatus.Active && commitment && totalQuantity && totalQuantity > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Your Bids</CardTitle>
@@ -276,7 +276,7 @@ export default function AuctionDetailPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Total Quantity</span>
-                  <span className="font-semibold">{commitment.totalQuantity}</span>
+                  <span className="font-semibold">{totalQuantity}</span>
                 </div>
               </CardContent>
             </Card>

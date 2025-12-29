@@ -21,14 +21,14 @@ export interface BidHistoryProps {
   auctionId: string;
   limit?: number;
   compact?: boolean;
-  currentUserChain?: string;
+  currentUserWalletAddress?: string;
 }
 
 export function BidHistory({
   auctionId,
   limit = 20,
   compact = false,
-  currentUserChain
+  currentUserWalletAddress
 }: BidHistoryProps) {
   const aacApp = useLineraApplication(AAC_APP_ID);
   const [offset, setOffset] = useState(0);
@@ -130,7 +130,7 @@ export function BidHistory({
             </thead>
             <tbody>
               {bids.map((bid) => {
-                const isCurrentUser = currentUserChain && bid.userChain === currentUserChain;
+                const isCurrentUser = currentUserWalletAddress && bid.userAccount.toLowerCase() === currentUserWalletAddress.toLowerCase();
 
                 return (
                   <tr
@@ -146,7 +146,7 @@ export function BidHistory({
                           <div className="h-2 w-2 rounded-full bg-primary" />
                         )}
                         <code className="text-xs bg-muted px-2 py-1 rounded">
-                          {truncateAddress(bid.userChain, 8, 6)}
+                          {truncateAddress(bid.userAccount, 8, 6)}
                         </code>
                       </div>
                     </td>
@@ -182,7 +182,7 @@ export function BidHistory({
         {/* Mobile Card View */}
         <div className="md:hidden space-y-3">
           {bids.map((bid) => {
-            const isCurrentUser = currentUserChain && bid.userChain === currentUserChain;
+            const isCurrentUser = currentUserWalletAddress && bid.userAccount.toLowerCase() === currentUserWalletAddress.toLowerCase();
 
             return (
               <div
@@ -194,7 +194,7 @@ export function BidHistory({
               >
                 <div className="flex items-center justify-between">
                   <code className="text-xs bg-muted px-2 py-1 rounded">
-                    {truncateAddress(bid.userChain, 6, 4)}
+                    {truncateAddress(bid.userAccount, 6, 4)}
                   </code>
                   {bid.claimed ? (
                     <div className="flex items-center gap-1 text-success text-xs">

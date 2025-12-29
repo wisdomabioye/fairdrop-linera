@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import { useLineraChain } from 'linera-react-client';
+import { useLineraClient } from 'linera-react-client';
 import { useAuctionStore } from '@/store/auction-store';
+import { useChain } from '@/hooks/use-chain';
 
 export interface SyncStatus {
     /** True if either wallet or public client is syncing */
@@ -27,8 +28,10 @@ export function SyncProvider({
 }: {
     children: React.ReactNode;
 } & SyncProviderOptions) {
-    const { chain, isReady } = useLineraChain();
+    const { isConnected, isInitialized } = useLineraClient();
+    const { publicChain, walletChain } = useChain();
     const { invalidateAll } = useAuctionStore();
+    const [isWalletClientSyncing, setIsWalletClientSyncing] = useState(false);
     const [isPublicClientSyncing, setIsPublicClientSyncing] = useState(false);
 
     const publicTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -39,17 +42,28 @@ export function SyncProvider({
     // Track if this is the first sync completion (skip invalidation on initial load)
     const hasCompletedFirstPublicSyncRef = useRef(false);
 
-    const isClientSyncing = isPublicClientSyncing;
+    const isClientSyncing = isPublicClientSyncing || isWalletClientSyncing;
 
     /**
      * Set initial syncing state when public client becomes available
      */
     useEffect(() => {
-        if (chain && isReady) {
+        if (isInitialized) {
             console.log('[SyncProvider] Public client available, assuming initial sync');
             setIsPublicClientSyncing(true);
+
+            // Clear existing timer
+            if (publicTimerRef.current) {
+                clearTimeout(publicTimerRef.current);
+            }
+
+            // Set debounce timer to clear initial sync state
+            publicTimerRef.current = setTimeout(() => {
+                console.log('[SyncProvider] Initial sync settled');
+                setIsPublicClientSyncing(false);
+            }, debounceTimeout);
         }
-    }, [chain, isReady]);
+    }, [isInitialized, debounceTimeout]);
 
     /**
      * Handle sync completion - call invalidateAll when syncing stops
@@ -72,8 +86,8 @@ export function SyncProvider({
     /**
      * Handle public client notifications
      */
-    const handlePublicNotification = useCallback(() => {
-        // console.log('[SyncProvider] Public client notification received');
+    const handlePublicNotification = useCallback((data: unknown) => {
+        console.log('[SyncProvider] Public client notification received', data);
 
         // Set syncing state
         setIsPublicClientSyncing(true);
@@ -94,14 +108,14 @@ export function SyncProvider({
      * Subscribe to public client notifications
      */
     useEffect(() => {
-        if (!chain || !isReady) {
+        if (!publicChain) {
             return;
         }
 
         console.log('[SyncProvider] Setting up public client notification listener');
 
         // Subscribe to notifications
-        chain.onNotification(handlePublicNotification);
+        publicChain.onNotification(handlePublicNotification);
 
         // Cleanup
         return () => {
@@ -110,7 +124,7 @@ export function SyncProvider({
                 clearTimeout(publicTimerRef.current);
             }
         };
-    }, [chain, isReady, handlePublicNotification]);
+    }, [publicChain, handlePublicNotification]);
 
     const value: SyncStatus = {
         isClientSyncing,

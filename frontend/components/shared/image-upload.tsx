@@ -18,23 +18,37 @@ export interface ImageUploadProps {
 }
 
 /**
- * Default upload placeholder function
- * Replace this with your actual upload implementation (e.g., to S3, Cloudinary, IPFS, etc.)
+ * Default upload function using Next.js API route
  */
 const defaultUploadPlaceholder = async (file: File): Promise<string> => {
-  // Simulate upload delay
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  try {
+    // Create form data with the file
+    const formData = new FormData();
+    formData.append('file', file);
 
-  // For now, create a local object URL
-  // In production, this should upload to your storage service and return the public URL
-  const url = URL.createObjectURL(file);
+    // Upload via our API route to avoid CORS issues
+    const response = await fetch('/api/uploader', {
+      method: 'POST',
+      body: formData,
+    });
 
-  console.warn(
-    '[ImageUpload] Using placeholder upload function. ' +
-    'Please implement actual file upload to your storage service.'
-  );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Upload failed with status: ${response.status}`);
+    }
 
-  return url;
+    const data = await response.json();
+
+    if (!data.ok || !data.url) {
+      throw new Error(data.error || 'Failed to upload image');
+    }
+    console.log('data')
+    // Return the image URL
+    return data.url;
+  } catch (error) {
+    console.error('[ImageUpload] Upload failed:', error);
+    throw new Error(error instanceof Error ? error.message : 'Failed to upload image to storage service');
+  }
 };
 
 export function ImageUpload({

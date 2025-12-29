@@ -20,7 +20,7 @@ interface WalletMenuProps {
 
 export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMenuProps) {
   const { walletChainId } = useLineraClient();
-  const { isWalletClientSyncing } = useSyncStatus();
+  const { isClientSyncing } = useSyncStatus();
   const [isOpen, setIsOpen] = React.useState(false);
   const [copiedAddress, setCopiedAddress] = React.useState(false);
   const [copiedChainId, setCopiedChainId] = React.useState(false);
@@ -52,7 +52,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
           className={cn(
             'group relative px-4 py-2 rounded-lg border text-sm font-medium shadow-lg transition-all',
             'bg-gradient-to-r hover:shadow-xl',
-            isWalletClientSyncing
+            isClientSyncing
               ? 'from-warning/10 to-warning/5 border-warning/30 text-warning hover:shadow-warning/20'
               : 'from-success/10 to-success/5 border-success/30 text-success hover:shadow-success/20'
           )}
@@ -60,7 +60,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
           <div className="flex items-center gap-2">
             {/* Status Indicator */}
             <div className="relative">
-              {isWalletClientSyncing ? (
+              {isClientSyncing ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
                 <>
@@ -96,7 +96,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
               <Wallet className="w-4 h-4 text-primary" />
               <span className="text-sm font-semibold text-text-primary">Wallet</span>
             </div>
-            {isWalletClientSyncing && (
+            {isClientSyncing && (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-warning/10 border border-warning/30">
                 <Loader2 className="w-3 h-3 text-warning animate-spin" />
                 <span className="text-xs font-medium text-warning">Syncing...</span>
