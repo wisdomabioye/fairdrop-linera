@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
 import { FUNGIBLE_MUTATION } from '@/lib/gql/queries';
-import type { FungibleChain } from '@/lib/utils/fungible-client-adapter';
+import { type RecipientAccount } from '@/lib/gql/types';
+import { type ChainApp } from 'linera-react-client';
 
 export interface UseFungibleMutationsOptions {
     /** The normalized fungible chain (wallet or public) */
-    chainApp?: FungibleChain | null;
+    chainApp?: ChainApp | null;
     /** Callback after successful mint */
     onMintSuccess?: () => void;
     /** Callback after successful transfer */
@@ -22,7 +23,7 @@ export interface UseFungibleMutationsResult {
     mintError: Error | null;
 
     // Transfer operation
-    transfer: (owner: string, amount: string, targetAccount: string) => Promise<boolean>;
+    transfer: (owner: string, amount: string, targetAccount: RecipientAccount) => Promise<boolean>;
     isTransferring: boolean;
     transferError: Error | null;
 
@@ -32,12 +33,12 @@ export interface UseFungibleMutationsResult {
     approveError: Error | null;
 
     // TransferFrom operation
-    transferFrom: (owner: string, spender: string, amount: string, targetAccount: string) => Promise<boolean>;
+    transferFrom: (owner: string, spender: string, amount: string, targetAccount: RecipientAccount) => Promise<boolean>;
     isTransferringFrom: boolean;
     transferFromError: Error | null;
 
     // Claim operation
-    claim: (sourceAccount: string, amount: string, targetAccount: string) => Promise<boolean>;
+    claim: (sourceAccount: string, amount: string, targetAccount: RecipientAccount) => Promise<boolean>;
     isClaiming: boolean;
     claimError: Error | null;
 
@@ -127,7 +128,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
 
     // Transfer operation
     const transfer = useCallback(
-        async (owner: string, amount: string, targetAccount: string): Promise<boolean> => {
+        async (owner: string, amount: string, targetAccount: RecipientAccount): Promise<boolean> => {
             if (!chainApp) {
                 const err = new Error('Fungible chain not initialized');
                 setTransferError(err);
@@ -213,7 +214,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
 
     // TransferFrom operation
     const transferFrom = useCallback(
-        async (owner: string, spender: string, amount: string, targetAccount: string): Promise<boolean> => {
+        async (owner: string, spender: string, amount: string, targetAccount: RecipientAccount): Promise<boolean> => {
             if (!chainApp) {
                 const err = new Error('Fungible chain not initialized');
                 setTransferFromError(err);
@@ -255,7 +256,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
 
     // Claim operation
     const claim = useCallback(
-        async (sourceAccount: string, amount: string, targetAccount: string): Promise<boolean> => {
+        async (sourceAccount: string, amount: string, targetAccount: RecipientAccount): Promise<boolean> => {
             if (!chainApp) {
                 const err = new Error('Fungible chain not initialized');
                 setClaimError(err);

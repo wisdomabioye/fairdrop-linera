@@ -15,7 +15,7 @@
 import { create } from 'zustand';
 import { queryDeduplicator } from '@/lib/utils/query-deduplicator';
 import { FUNGIBLE_QUERY } from '@/lib/gql/queries';
-import type { FungibleChain } from '@/lib/utils/fungible-client-adapter';
+import type { ChainApp } from 'linera-react-client';
 
 // TTL constants (in milliseconds)
 const BALANCE_TTL = 10000; // 10 seconds - balances can change frequently
@@ -60,9 +60,9 @@ export interface TokenStore {
     tokenInfo: Map<string, TokenInfoCacheEntry>; // `${tokenId}:${chainId}` -> info
 
     // ============ Fetch Actions ============
-    fetchBalance: (tokenId: string, chainId: string, address: string, chainApp: FungibleChain) => Promise<void>;
-    fetchTokenInfo: (tokenId: string, chainId: string, chainApp: FungibleChain) => Promise<void>;
-    fetchAccounts: (tokenId: string, chainId: string, chainApp: FungibleChain) => Promise<void>;
+    fetchBalance: (tokenId: string, chainId: string, address: string, chainApp: ChainApp) => Promise<void>;
+    fetchTokenInfo: (tokenId: string, chainId: string, chainApp: ChainApp) => Promise<void>;
+    fetchAccounts: (tokenId: string, chainId: string, chainApp: ChainApp) => Promise<void>;
 
     // ============ Getters ============
     getBalance: (tokenId: string, chainId: string, address: string) => string | null;

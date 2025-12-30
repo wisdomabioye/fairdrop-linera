@@ -131,12 +131,20 @@ export function EagerLoader({
             if (!token || !app) return;
 
             // Fetch token info (name, symbol) - cached for 100 minutes
-            fetchTokenInfo(token.appId, app).catch((err) => {
+            fetchTokenInfo(
+                token.appId, 
+                app.wallet?.getChainId() as string, 
+                app.wallet!
+            ).catch((err) => {
                 console.error(`[EagerLoader] Failed to fetch token info for ${token.symbol}:`, err);
             });
 
             // Fetch all accounts (balances) for this user
-            fetchAccounts(token.appId, app).catch((err) => {
+            fetchAccounts(
+                token.appId, 
+                app.wallet?.getChainId() as string,
+                app.wallet!
+            ).catch((err) => {
                 console.error(`[EagerLoader] Failed to fetch accounts for ${token.symbol}:`, err);
             });
         });

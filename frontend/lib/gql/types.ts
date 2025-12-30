@@ -1,5 +1,10 @@
 import { microsecondsToMilliseconds } from '@/lib/utils/auction-utils';
 
+export interface RecipientAccount {
+    chainId: string;
+    owner: string;
+}
+
 export const AuctionStatus = {
     Scheduled: 'Scheduled',
     Active: 'Active',

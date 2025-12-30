@@ -1,6 +1,7 @@
 
 
 import { QueryBatchBuilder, formatGraphQLValue } from './query-builder';
+import { RecipientAccount } from './types';
 
 /**
  * AAC Query Batch Builder
@@ -568,21 +569,46 @@ export const FUNGIBLE_MUTATION = {
         }
     },
 
-    Transfer (owner: string, amount: number, target_account: string) {
+    Transfer (owner: string, amount: number, target_account: RecipientAccount) {
         return {
-            query: `mutation { transfer(owner: ${formatGraphQLValue(owner)}, amount: ${formatGraphQLValue(String(amount))}, targetAccount: ${formatGraphQLValue(target_account)}) }`
+            query: `mutation { 
+            transfer(
+                owner: ${formatGraphQLValue(owner)}, 
+                amount: ${formatGraphQLValue(String(amount))}, 
+                targetAccount: {
+                    chainId: ${formatGraphQLValue(target_account.chainId)},
+                    owner: ${formatGraphQLValue(target_account.owner)}
+                }
+            )}`
         }
     },
 
-    TransferFrom (owner: string, spender: string, amount: number, target_account: string) {
+    TransferFrom (owner: string, spender: string, amount: number, target_account: RecipientAccount) {
         return {
-            query: `mutation { transferFrom(owner: ${formatGraphQLValue(owner)}, spender: ${formatGraphQLValue(spender)}, amount: ${formatGraphQLValue(String(amount))}, targetAccount: ${formatGraphQLValue(target_account)}) }`
+            query: `mutation { 
+            transferFrom(
+                owner: ${formatGraphQLValue(owner)}, 
+                spender: ${formatGraphQLValue(spender)}, 
+                amount: ${formatGraphQLValue(String(amount))}, 
+                targetAccount: {
+                    chainId: ${formatGraphQLValue(target_account.chainId)},
+                    owner: ${formatGraphQLValue(target_account.owner)}
+                }    
+            )}`
         }
     },
 
-    Claim (source_account: string, amount: number, target_account: string) {
+    Claim (source_account: string, amount: number, target_account: RecipientAccount) {
         return {
-            query: `mutation { transferFrom(sourceAccount: ${formatGraphQLValue(source_account)}, amount: ${formatGraphQLValue(String(amount))}, targetAccount: ${formatGraphQLValue(target_account)}) }`
+            query: `mutation { 
+            transferFrom(
+                sourceAccount: ${formatGraphQLValue(source_account)}, 
+                amount: ${formatGraphQLValue(String(amount))}, 
+                targetAccount: {
+                    chainId: ${formatGraphQLValue(target_account.chainId)},
+                    owner: ${formatGraphQLValue(target_account.owner)}
+                }
+            )}`
         }
     },
 

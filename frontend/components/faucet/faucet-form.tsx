@@ -58,7 +58,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
 
   // Polling callback for balance and token info
   const pollTokenData = useCallback(async () => {
-    if (!address || !selectedTokenId || !fungibleApp.app || isClientSyncing) {
+    if (!address || !selectedTokenId || !fungibleApp.app?.wallet || isClientSyncing) {
       return;
     }
 
@@ -77,7 +77,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
           selectedTokenId,
           walletChainId,
           address, 
-          fungibleApp.app
+          fungibleApp.app.wallet
         );
       }
 
@@ -85,7 +85,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
       await fetchTokenInfo(
         selectedTokenId, 
         walletChainId as string,
-        fungibleApp.app,
+        fungibleApp.app.wallet,
       );
     } catch (error) {
       console.error('[FaucetForm] Failed to fetch token data:', error);
@@ -129,7 +129,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
             selectedTokenId, 
             walletChainId as string,
             address, 
-            fungibleApp.app
+            fungibleApp.app.wallet!
           );
         }
       }, 500);
