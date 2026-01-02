@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import { Check, ChevronsUpDown, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,7 +34,7 @@ export interface TokenSelectorProps {
   className?: string;
 }
 
-export function TokenSelector({
+export const TokenSelector = memo(function TokenSelector({
   tokens,
   value,
   onValueChange,
@@ -49,14 +49,24 @@ export function TokenSelector({
 }: TokenSelectorProps) {
   const [open, setOpen] = useState(false);
 
-  // Filter out excluded token
+  // Filter out excluded token (memoized)
   const availableTokens = useMemo(() => {
     return excludeTokenId
       ? tokens.filter((token) => token.appId !== excludeTokenId)
       : tokens;
   }, [tokens, excludeTokenId]);
 
-  const selectedToken = availableTokens.find((token) => token.appId === value);
+  // Memoize selected token lookup
+  const selectedToken = useMemo(
+    () => availableTokens.find((token) => token.appId === value),
+    [availableTokens, value]
+  );
+
+  // Memoize token selection handler
+  const handleSelect = useCallback((tokenAppId: string) => {
+    onValueChange(tokenAppId);
+    setOpen(false);
+  }, [onValueChange]);
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -127,10 +137,7 @@ export function TokenSelector({
                     <CommandItem
                       key={token.appId}
                       value={`${token.name} ${token.symbol} ${token.appId}`}
-                      onSelect={() => {
-                        onValueChange(token.appId);
-                        setOpen(false);
-                      }}
+                      onSelect={() => handleSelect(token.appId)}
                       className={cn(
                         'px-3 py-3 cursor-pointer',
                         'hover:bg-primary/5',
@@ -206,4 +213,4 @@ export function TokenSelector({
       ) : null}
     </div>
   );
-}
+});

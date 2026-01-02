@@ -13,7 +13,6 @@ export interface BalanceDisplayProps {
   address: string;
   chainApp: ChainApp | null;
   tokenSymbol?: string;
-  tokenName?: string;
   className?: string;
 }
 
@@ -23,13 +22,11 @@ export const BalanceDisplay = memo(function BalanceDisplay({
   address,
   chainApp,
   tokenSymbol = '',
-  tokenName = '',
   className,
 }: BalanceDisplayProps) {
   const {
     getBalance,
     getTokenSymbol,
-    getTokenName,
     getBalanceStatus,
     fetchBalance,
     fetchTokenInfo,
@@ -59,45 +56,36 @@ export const BalanceDisplay = memo(function BalanceDisplay({
 
   const balance = getBalance(tokenId, chainId, address);
   const symbol = getTokenSymbol(tokenId, chainId) || tokenSymbol;
-  const name = getTokenName(tokenId, chainId) || tokenName;
   const status = getBalanceStatus(tokenId, chainId, address);
   const isLoading = status === 'loading';
 
   return (
-    <Card className={cn('p-6 border-2', className)}>
-      <div className="space-y-4">
+    <Card className={cn('bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20', className)}>
+      <div className="p-4 md:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 flex items-center justify-center">
-              <Wallet className="h-5 w-5 text-green-500" />
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 flex items-center justify-center">
+              <Wallet className="h-4 w-4 text-green-500" />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Your Balance</p>
-              <p className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
-                {address.slice(0, 12)}...{address.slice(-8)}
-              </p>
-            </div>
+            <span className="text-sm font-medium text-muted-foreground">Balance</span>
           </div>
-          <TrendingUp className="h-5 w-5 text-green-500" />
+          <TrendingUp className="h-4 w-4 text-green-500" />
         </div>
 
         {/* Balance Amount */}
         <div className="space-y-1">
           {isLoading ? (
-            <div className="h-10 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-10 w-full bg-muted animate-pulse rounded" />
           ) : (
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold">
+            <>
+              <div className="text-3xl md:text-4xl font-bold tracking-tight">
                 {balance || '0'}
-              </span>
-              <span className="text-xl text-muted-foreground font-medium">
+              </div>
+              <div className="text-sm text-muted-foreground font-medium">
                 {symbol}
-              </span>
-            </div>
-          )}
-          {name && (
-            <p className="text-sm text-muted-foreground">{name}</p>
+              </div>
+            </>
           )}
         </div>
       </div>

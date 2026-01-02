@@ -138,8 +138,6 @@ NEXT_PUBLIC_AAC_APP=your-auction-app-id
 NEXT_PUBLIC_INDEXER_APP=your-indexer-app-id
 NEXT_PUBLIC_INDEXER_CHAIN_ID=indexer-chain-id
 NEXT_PUBLIC_AAC_CHAIN=auction-chain-id
-NEXT_PUBLIC_LUSD_APP_ID=test-token-app-id
-NEXT_PUBLIC_FUSD_APP_ID=test2-token-app-id
 ```
 
 ### Development
@@ -346,8 +344,6 @@ Set these in Vercel dashboard:
 - `NEXT_PUBLIC_INDEXER_APP`
 - `NEXT_PUBLIC_INDEXER_CHAIN_ID`
 - `NEXT_PUBLIC_AAC_CHAIN`
-- `NEXT_PUBLIC_LUSD_APP_ID`
-- `NEXT_PUBLIC_FUSD_APP_ID`
 
 ---
 

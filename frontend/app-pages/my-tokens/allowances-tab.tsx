@@ -21,8 +21,8 @@ export interface AllowancesTabProps {
 }
 
 export const AllowancesTab = memo(function AllowancesTab({
-  tokenId,
-  chainId,
+  // tokenId,
+  // chainId,
   chainApp,
   canWrite,
   tokenSymbol,

@@ -19,7 +19,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { ChainApp } from 'linera-react-client';
 
 export interface ChainOption {
   chainId: string;
@@ -30,7 +29,8 @@ export interface ChainOption {
 export interface ChainSelectorAdvancedProps {
   value: string | null;
   onChainChange: (chainId: string, canWrite: boolean) => void;
-  fungibleApp: ChainApp | null;
+  walletChainId: string | null;
+  publicChainId: string | null;
   allowCustom?: boolean;
   disabled?: boolean;
   className?: string;
@@ -49,7 +49,8 @@ const truncateChainId = (chainId: string): string => {
 export const ChainSelectorAdvanced = memo(function ChainSelectorAdvanced({
   value,
   onChainChange,
-  fungibleApp,
+  walletChainId,
+  publicChainId,
   allowCustom = true,
   disabled = false,
   className,
@@ -57,23 +58,6 @@ export const ChainSelectorAdvanced = memo(function ChainSelectorAdvanced({
   const [chains, setChains] = useState<ChainOption[]>([]);
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-
-  // Get wallet and public chain IDs (memoized)
-  const walletChainId = useMemo(() => {
-    try {
-      return fungibleApp?.getChainId() || null;
-    } catch {
-      return null;
-    }
-  }, [fungibleApp]);
-
-  const publicChainId = useMemo(() => {
-    try {
-      return fungibleApp?.getChainId() || null;
-    } catch {
-      return null;
-    }
-  }, [fungibleApp]);
 
   // Initialize default chains
   useEffect(() => {

@@ -21,9 +21,9 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
       }}
     >
       <SyncProvider>
-        <EagerLoader>
+        {/* <EagerLoader> */}
           {children}
-        </EagerLoader>
+        {/* </EagerLoader> */}
       </SyncProvider>
     </LineraProvider>
   )

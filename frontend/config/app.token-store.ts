@@ -6,16 +6,20 @@ export type TokenInfo = {
     appId: string;
 }
 
+
+const LUSD_APP_ID = '90c35bf5f9f580bfe75c38f3fd6ec07e2386d43a3e561d9b9a3b47eabc96be2d';
+const FUSD_APP_ID = 'b025bec560dffb150616b687b0aff00c94dd46f4448a5929e3c6d4b35712e386';
+
 export const TOKEN_STORE: Record<ApplicationId, TokenInfo> = {
-    [process.env.NEXT_PUBLIC_LUSD_APP_ID!]: {
+    [LUSD_APP_ID]: {
         name: 'LN USD Token',
         symbol: 'LUSD',
-        appId: process.env.NEXT_PUBLIC_LUSD_APP_ID!
+        appId: LUSD_APP_ID
     },
-    [process.env.NEXT_PUBLIC_FUSD_APP_ID!]: {
+    [FUSD_APP_ID]: {
         name: 'fUSD Token',
         symbol: 'fUSD',
-        appId: process.env.NEXT_PUBLIC_FUSD_APP_ID!
+        appId: FUSD_APP_ID
     }
 }
 

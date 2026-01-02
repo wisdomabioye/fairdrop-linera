@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import { useLineraClient } from 'linera-react-client';
 import { useAuctionStore } from '@/store/auction-store';
 import { useChain } from '@/hooks/use-chain';
 
@@ -28,8 +27,7 @@ export function SyncProvider({
 }: {
     children: React.ReactNode;
 } & SyncProviderOptions) {
-    const { isConnected, isInitialized } = useLineraClient();
-    const { publicChain, walletChain } = useChain();
+    const { publicChain, walletChain, isConnected, isInitialized } = useChain();
     const { invalidateAll } = useAuctionStore();
     const [isWalletClientSyncing, setIsWalletClientSyncing] = useState(false);
     const [isPublicClientSyncing, setIsPublicClientSyncing] = useState(false);

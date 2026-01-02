@@ -2482,7 +2482,7 @@ packages:
     engines: {node: '>= 12.0.0'}
 
   linera-react-client@file:../../../dev/linera-react-client/linera-react-client-1.2.10.tgz:
-    resolution: {integrity: sha512-t9y8Rs/ZdgiKfKzuiSs14b8ia4tDwIC23Izq0wS1Wq1M4z/1Wjb6w2CxqeY2wv45QvZ6/wBjAwbHsI+6JnvsYg==, tarball: file:../../../dev/linera-react-client/linera-react-client-1.2.10.tgz}
+    resolution: {integrity: sha512-23Sa3u1S4xAAYwcMII+h3ldSZAXRpuMz/B7TmAaV6NYIzONcgkTlyffzBiB7YVYpbl6HqFJnuShn+LD09R3BAg==, tarball: file:../../../dev/linera-react-client/linera-react-client-1.2.10.tgz}
     version: 1.2.10
     peerDependencies:
       react: '>=18.0.0'
