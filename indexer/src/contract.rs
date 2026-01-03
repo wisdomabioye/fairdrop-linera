@@ -283,6 +283,14 @@ impl IndexerContract {
             AuctionEvent::RefundIssued { .. } => {
                 // Refund issued event - informational only, no state update needed
             }
+
+            AuctionEvent::ProceedsClaimed { .. } => {
+                // Proceeds sent to creator event - informational only, no state update needed
+            }
+
+            AuctionEvent::UnsoldTokenRefunded { .. } => {
+                // Unsold token refunded event - informational only, no state update needed
+            }
         }
     }
 }

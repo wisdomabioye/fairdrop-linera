@@ -65,6 +65,16 @@ pub enum AuctionOperation {
     ClaimSettlement {
         auction_id: u64,
     },
+
+    /// Withdraw proceeds by auction creator when auction end or cancelled
+    WithdrawProceed {
+        auction_id: u64,
+    },
+
+    /// Withdraw unsold token by auction creator when auction end or cancelled
+    WithdrawUnsoldToken {
+        auction_id: u64,
+    },
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]

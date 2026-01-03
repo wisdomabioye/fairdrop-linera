@@ -88,6 +88,20 @@ pub enum AuctionEvent {
         user_account: AccountOwner,
         refund_amount: Amount,
     },
+
+    /// Proceeds sent to creator account on AAC Chain
+    ProceedsClaimed {
+        auction_id: AuctionId,
+        user_account: AccountOwner,
+        proceeds_amount: Amount,
+    },
+
+    /// Proceeds sent to creator account on AAC Chain
+    UnsoldTokenRefunded {
+        auction_id: AuctionId,
+        user_account: AccountOwner,
+        refund_amount: Amount,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]

@@ -70,6 +70,8 @@ impl Contract for AuctionContract {
             }
 
             AuctionOperation::Buy { auction_id, quantity } => {
+                // Buyer must have tranferred payment token to the AAC_CHAIN before attempting to place bid
+                // Panic if not enough payment token
                 self.handle_place_bid(auction_id, quantity).await
             }
 
@@ -98,6 +100,15 @@ impl Contract for AuctionContract {
             AuctionOperation::ClaimSettlement { auction_id } => {
                 self.handle_claim_settlement(auction_id).await
             }
+
+            AuctionOperation::WithdrawProceed { auction_id } => {
+                self.withdraw_auction_proceeds(auction_id).await
+            }
+
+            AuctionOperation::WithdrawUnsoldToken { auction_id } => {
+                self.withdraw_auction_unsold_token(auction_id).await
+            }
+
         }
     }
 
@@ -548,7 +559,8 @@ impl AuctionContract {
         let total_supply = auction.total_supply;
         let sold = auction.sold;
         let payment_token_app = auction.params.payment_token_app;
-
+        let max_bid_amount = auction.params.max_bid_amount;
+        
         // Check time expiration first
         if now > end_time && current_status == AuctionStatus::Active {
             // Set clearing price and settle
@@ -593,7 +605,37 @@ impl AuctionContract {
             return Err(());
         }
 
-        let accepted_quantity = quantity.min(remaining);
+        let mut accepted_quantity = quantity.min(remaining);
+
+        // Check user's cumulative bid against max_bid_amount
+        let user_current_total = self.state.user_totals
+            .get(&(auction_id, bidder))
+            .await
+            .unwrap()
+            .unwrap_or(Amount::ZERO);
+
+        let new_total = user_current_total.saturating_add(accepted_quantity);
+
+        // Adjust accepted_quantity if new total would exceed max_bid_amount
+        if new_total > max_bid_amount {
+            let allowed = max_bid_amount.saturating_sub(user_current_total);
+            accepted_quantity = allowed.min(accepted_quantity);
+
+            // Reject if no quantity can be accepted (user already at max)
+            if accepted_quantity == Amount::ZERO {
+                let event = AuctionEvent::BidRejected {
+                    auction_id,
+                    user_account: bidder,
+                    reason: format!(
+                        "Maximum bid amount reached. Your total: {}, Max allowed: {}",
+                        user_current_total, max_bid_amount
+                    ),
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+                return Err(());
+            }
+        }
+
         let amount_paid = current_price.saturating_mul(accepted_quantity.into());
 
         // Check if this bid will exhaust supply
@@ -681,6 +723,124 @@ impl AuctionContract {
         self.runtime.emit(AUCTION_STREAM.into(), &event);
 
         bid
+    }
+
+    /// Withdraw auction proceeds by auction creator
+    /// Auction must have ended or cancelled
+    async fn withdraw_auction_proceeds(&mut self, auction_id: u64) -> AuctionResponse {
+        let creator = self.runtime.authenticated_signer()
+            .expect("Caller must be authenticated");
+        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+        
+        if creator != auction.params.creator {
+            panic!("Only Auction creator can withdraw proceeds");
+        }
+
+        if auction.status != AuctionStatus::Settled 
+        || auction.status != AuctionStatus::Cancelled {
+            panic!("Auction must have ended or cancelled");
+        }
+
+        let clearing_price = auction.clearing_price.expect("Clearing price not set");
+        let proceeds_amount = auction.sold.saturating_mul(clearing_price.into());
+
+        // User account on AAC (Send proceeds to creator on AAC)
+        let user_account = Account {
+            chain_id: self.runtime.chain_id(), // AAC
+            owner: creator,
+        };
+
+        // Transfer from AAC (app-owned) to creator account
+        let transfer_operation = FungibleOperation::Transfer {
+            owner: self.runtime.application_id().into(), // From app escrow
+            amount: proceeds_amount,
+            target_account: user_account,
+        };
+
+        // Convert untyped ApplicationId to typed for the call
+        let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
+            std::mem::transmute(auction.params.payment_token_app)
+        };
+
+        // Call fungible token application (synchronous - same chain)
+        match self.runtime.call_application(true, typed_app, &transfer_operation) {
+            FungibleResponse::Ok => {
+                // Emit proceed claimed event
+                let event = AuctionEvent::ProceedsClaimed {
+                    auction_id,
+                    user_account: creator,
+                    proceeds_amount,
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+            }
+            _ => {
+                // This should not fail since escrow has the funds
+                panic!("Failed to send proceed to creator");
+            }
+        }
+
+        AuctionResponse::Ok
+    }
+
+    /// Withdraw auction unsold token by auction creator
+    /// Auction must have ended or cancelled
+    async fn withdraw_auction_unsold_token(&mut self, auction_id: u64) -> AuctionResponse {
+        let creator = self.runtime.authenticated_signer()
+            .expect("Caller must be authenticated");
+        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+        
+        if creator != auction.params.creator {
+            panic!("Only Auction creator can withdraw proceeds");
+        }
+
+        if auction.status != AuctionStatus::Settled 
+        || auction.status != AuctionStatus::Cancelled {
+            panic!("Auction must have ended or cancelled");
+        }
+
+        let unsold_token = auction.params.total_supply.saturating_sub(auction.sold);
+
+        if unsold_token <= Amount::ZERO {
+            panic!("No unsold token");
+        }
+
+        // User account on AAC (Send unsold token to creator on AAC)
+        let user_account = Account {
+            chain_id: self.runtime.chain_id(), // AAC
+            owner: creator,
+        };
+
+        // Transfer from AAC (app-owned) to creator account
+        let transfer_operation = FungibleOperation::Transfer {
+            owner: self.runtime.application_id().into(), // From app escrow
+            amount: unsold_token,
+            target_account: user_account,
+        };
+
+        // Convert untyped ApplicationId to typed for the call
+        let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
+            std::mem::transmute(auction.params.auction_token_app)
+        };
+
+        // Call fungible token application (synchronous - same chain)
+        match self.runtime.call_application(true, typed_app, &transfer_operation) {
+            FungibleResponse::Ok => {
+                // Emit proceed claimed event
+                let event = AuctionEvent::UnsoldTokenRefunded {
+                    auction_id,
+                    user_account: creator,
+                    refund_amount: unsold_token,
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+            }
+            _ => {
+                // This should not fail since escrow has the funds
+                panic!("Failed to refund unsold token to creator");
+            }
+        }
+
+
+        AuctionResponse::Ok
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -889,5 +1049,7 @@ impl AuctionContract {
             }
         }
     }
+
+
 
 }
