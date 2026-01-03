@@ -291,6 +291,19 @@ impl IndexerContract {
             AuctionEvent::UnsoldTokenRefunded { .. } => {
                 // Unsold token refunded event - informational only, no state update needed
             }
+
+            // Internal Balance System Events - informational only
+            AuctionEvent::TokenDeposited { .. } => {
+                // Token deposited to internal balance - informational only
+            }
+
+            AuctionEvent::TokenWithdrawn { .. } => {
+                // Token withdrawn from internal balance - informational only
+            }
+
+            AuctionEvent::InternalTransfer { .. } => {
+                // Internal balance transfer - informational only
+            }
         }
     }
 }

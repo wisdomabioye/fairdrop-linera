@@ -4,11 +4,11 @@ mod state;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use linera_sdk::graphql::GraphQLMutationRoot;
-use linera_sdk::linera_base_types::{Amount, AccountOwner, WithServiceAbi};
+use linera_sdk::linera_base_types::{Amount, AccountOwner, ApplicationId, WithServiceAbi};
 use linera_sdk::views::View;
 use linera_sdk::{Service, ServiceRuntime};
 use auction::AuctionAbi;
-use shared::types::{AuctionId, BidRecord};
+use shared::types::{AuctionId, BidRecord, GlobalStats, TokenVolume};
 use std::sync::Arc;
 use self::state::{AuctionState, AuctionData};
 
@@ -275,5 +275,126 @@ impl QueryRoot {
             .collect();
 
         Ok(result)
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Internal Balance System Queries
+    // ─────────────────────────────────────────────────────────
+
+    /// Get user's balance for a specific token
+    async fn user_balance(
+        &self,
+        user: AccountOwner,
+        token_app: ApplicationId,
+    ) -> Result<Amount, String> {
+        let balance = self
+            .state
+            .user_balances
+            .get(&(user, token_app))
+            .await
+            .map_err(|e| e.to_string())?
+            .unwrap_or(Amount::ZERO);
+
+        Ok(balance)
+    }
+
+    /// Get token balances for a user (for specified tokens)
+    /// Efficient O(k) lookup where k = number of tokens queried
+    async fn user_balances(
+        &self,
+        user: AccountOwner,
+        token_apps: Vec<ApplicationId>,
+    ) -> Result<Vec<TokenVolume>, String> {
+        let mut result = Vec::new();
+
+        for token_app in token_apps {
+            if let Some(amount) = self
+                .state
+                .user_balances
+                .get(&(user, token_app))
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                if amount > Amount::ZERO {
+                    result.push(TokenVolume { token_app, amount });
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Get global statistics (TEMPORARY until indexer is ready)
+    async fn global_stats(&self) -> Result<GlobalStats, String> {
+        let total_auctions = *self.state.next_auction_id.get();
+        let total_bids = *self.state.next_bid_id.get();
+
+        // Get all deposited tokens
+        let deposit_indices = self
+            .state
+            .total_deposited
+            .indices()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let mut deposited_by_token = Vec::new();
+        for token_app in deposit_indices {
+            if let Some(amount) = self
+                .state
+                .total_deposited
+                .get(&token_app)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                deposited_by_token.push(TokenVolume { token_app, amount });
+            }
+        }
+
+        // Get all withdrawn tokens
+        let withdraw_indices = self
+            .state
+            .total_withdrawn
+            .indices()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let mut withdrawn_by_token = Vec::new();
+        for token_app in withdraw_indices {
+            if let Some(amount) = self
+                .state
+                .total_withdrawn
+                .get(&token_app)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                withdrawn_by_token.push(TokenVolume { token_app, amount });
+            }
+        }
+
+        // Calculate TVL (deposited - withdrawn)
+        let mut total_value_locked = Vec::new();
+        for deposited in &deposited_by_token {
+            let withdrawn_amount = withdrawn_by_token
+                .iter()
+                .find(|w| w.token_app == deposited.token_app)
+                .map(|w| w.amount)
+                .unwrap_or(Amount::ZERO);
+
+            let tvl = deposited.amount.saturating_sub(withdrawn_amount);
+            if tvl > Amount::ZERO {
+                total_value_locked.push(TokenVolume {
+                    token_app: deposited.token_app,
+                    amount: tvl,
+                });
+            }
+        }
+
+        Ok(GlobalStats {
+            total_auctions,
+            total_bids,
+            deposited_by_token,
+            withdrawn_by_token,
+            total_value_locked,
+        })
     }
 }

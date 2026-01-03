@@ -116,3 +116,21 @@ pub struct AuctionSummary {
     pub total_bids: u64,
     pub total_bidders: u64,
 }
+
+/// Token volume for a specific token
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+pub struct TokenVolume {
+    pub token_app: ApplicationId,
+    pub amount: Amount,
+}
+
+/// Global statistics for the auction application
+/// TEMPORARY: Until indexer is ready, then derive from events
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+pub struct GlobalStats {
+    pub total_auctions: u64,
+    pub total_bids: u64,
+    pub deposited_by_token: Vec<TokenVolume>,
+    pub withdrawn_by_token: Vec<TokenVolume>,
+    pub total_value_locked: Vec<TokenVolume>,
+}

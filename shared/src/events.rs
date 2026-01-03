@@ -102,6 +102,37 @@ pub enum AuctionEvent {
         user_account: AccountOwner,
         refund_amount: Amount,
     },
+
+    // ═══════════════════════════════════════════════════════════
+    // Internal Balance System Events
+    // ═══════════════════════════════════════════════════════════
+
+    /// Token deposited to internal balance
+    TokenDeposited {
+        user: AccountOwner,
+        token_app: ApplicationId,
+        amount: Amount,
+        new_balance: Amount,
+    },
+
+    /// Token withdrawn from internal balance
+    TokenWithdrawn {
+        user: AccountOwner,
+        token_app: ApplicationId,
+        amount: Amount,
+        remaining_balance: Amount,
+        target_chain: ChainId,
+    },
+
+    /// Internal balance transfer between accounts
+    /// Replaces PaymentReceived, RefundIssued, ProceedsClaimed, UnsoldTokenRefunded
+    InternalTransfer {
+        from: AccountOwner,
+        to: AccountOwner,
+        token_app: ApplicationId,
+        amount: Amount,
+        reason: String,  // "lock_auction_tokens", "bid", "settlement_refund", "settlement_allocation", "proceeds", "unsold_return"
+    },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]

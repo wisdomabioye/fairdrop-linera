@@ -1,5 +1,5 @@
 use async_graphql::{SimpleObject};
-use linera_sdk::linera_base_types::{Amount, AccountOwner, Timestamp};
+use linera_sdk::linera_base_types::{Amount, AccountOwner, ApplicationId, Timestamp};
 use linera_sdk::views::{linera_views, MapView, RegisterView, RootView, ViewStorageContext};
 use shared::types::{AuctionId, AuctionParams, AuctionStatus, BidRecord};
 
@@ -24,6 +24,22 @@ pub struct AuctionState {
 
     /// Next bid ID (AAC only, for generating unique bid IDs)
     pub next_bid_id: RegisterView<u64>,
+
+    // ─────────────────────────────────────────────────────────
+    // Internal Balance System
+    // ─────────────────────────────────────────────────────────
+
+    /// Balance ledger: (AccountOwner, TokenApp) → Balance
+    /// Flat structure for efficient storage and queries
+    pub user_balances: MapView<(AccountOwner, ApplicationId), Amount>,
+
+    /// TEMPORARY: Global stats (until indexer is ready)
+    /// Total deposited per token (for treasury/accounting)
+    pub total_deposited: MapView<ApplicationId, Amount>,
+
+    /// TEMPORARY: Global stats (until indexer is ready)
+    /// Total withdrawn per token (for treasury/accounting)
+    pub total_withdrawn: MapView<ApplicationId, Amount>,
 }
 
 /// Auction state data (stored on AAC chain)

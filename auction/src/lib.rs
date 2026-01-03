@@ -1,5 +1,5 @@
 use async_graphql::{Request, Response};
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, Timestamp, ContractAbi, ServiceAbi};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp, ContractAbi, ServiceAbi};
 use linera_sdk::graphql::GraphQLMutationRoot;
 use serde::{Deserialize, Serialize};
 use shared::types::{ AuctionParamsInput, AuctionId };
@@ -74,6 +74,23 @@ pub enum AuctionOperation {
     /// Withdraw unsold token by auction creator when auction end or cancelled
     WithdrawUnsoldToken {
         auction_id: u64,
+    },
+
+    // ─────────────────────────────────────────────────────────
+    // Internal Balance System Operations
+    // ─────────────────────────────────────────────────────────
+
+    /// Deposit tokens to internal balance
+    Deposit {
+        token_app: ApplicationId,
+        amount: Amount,
+    },
+
+    /// Withdraw tokens to specified chain
+    Withdraw {
+        token_app: ApplicationId,
+        amount: Amount,
+        target_chain: ChainId,
     },
 }
 
