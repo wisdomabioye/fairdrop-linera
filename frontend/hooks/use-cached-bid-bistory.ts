@@ -53,8 +53,8 @@ export interface UseCachedBidHistoryResult {
     isFetching: boolean;
     /** Any errors */
     error: Error | null;
-    /** Has loaded at least once? */
-    hasLoadedOnce: boolean;
+    /** Fetch status: 'idle' | 'loading' | 'success' | 'error' */
+    status: 'idle' | 'loading' | 'success' | 'error';
     /** Is cached data stale? */
     isStale: boolean;
     /** Manually refetch bid history */
@@ -87,24 +87,22 @@ export function useCachedBidHistory(
 
     // Local state for managing polling subscription
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
-    const [isRefetching, setIsRefetching] = useState(false);
 
     // Get cached entry
     const entry = bidHistory.get(auctionId);
 
     // Derived state
     const bids = entry?.data ?? null;
-    const isFetching = entry?.status === 'loading';
+    const status = entry?.status ?? 'idle';
+    const isFetching = status === 'loading';
     const error = entry?.error ?? null;
-    const hasLoadedOnce = entry?.status === 'success' || bids !== null;
     const isStale = checkIsStale('bidHistory', auctionId);
 
-    // Loading state: show loading if no data exists AND (currently fetching OR syncing OR will fetch soon)
-    const loading = !bids && (
-        entry?.status === 'loading' ||
-        isRefetching ||
+    // CRITICAL: Distinguish initial load vs unavailable data
+    const loading = (
+        status === 'loading' ||
         isPublicClientSyncing ||
-        (!hasLoadedOnce && !skip && !!aacApp) // Initial load state
+        (status === 'idle' && !skip && !!aacApp)
     );
 
     /**
@@ -114,12 +112,9 @@ export function useCachedBidHistory(
         if (!aacApp || skip || isPublicClientSyncing) return;
 
         try {
-            setIsRefetching(true);
             await fetchBidHistory(auctionId, offset, limit, aacApp);
         } catch (err) {
             console.error('[useCachedBidHistory] Refetch failed:', err);
-        } finally {
-            setIsRefetching(false);
         }
     }, [aacApp, skip, isPublicClientSyncing, auctionId, offset, limit, fetchBidHistory]);
 
@@ -162,7 +157,7 @@ export function useCachedBidHistory(
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
+        status,
         isStale,
         refetch
     };

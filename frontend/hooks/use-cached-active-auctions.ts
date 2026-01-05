@@ -51,8 +51,8 @@ export interface UseCachedActiveAuctionsResult {
     isFetching: boolean;
     /** Any errors */
     error: Error | null;
-    /** Has loaded at least once? */
-    hasLoadedOnce: boolean;
+    /** Fetch status: 'idle' | 'loading' | 'success' | 'error' */
+    status: 'idle' | 'loading' | 'success' | 'error';
     /** Is cached data stale? */
     isStale: boolean;
     /** Manually refetch auctions */
@@ -84,7 +84,6 @@ export function useCachedActiveAuctions(
 
     // Local state for managing polling subscription
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
-    const [isRefetching, setIsRefetching] = useState(false);
 
     // Derived state - map IDs to full auction data from normalized cache
     const auctions = activeAuctions?.auctionIds
@@ -92,17 +91,19 @@ export function useCachedActiveAuctions(
             .map(id => allAuctionsCache.get(id)?.data)
             .filter(Boolean) as AuctionSummary[]
         : null;
-    const isFetching = activeAuctions?.status === 'loading';
+    const status = activeAuctions?.status ?? 'idle';
+    const isFetching = status === 'loading';
     const error = activeAuctions?.error ?? null;
-    const hasLoadedOnce = activeAuctions?.status === 'success' || auctions !== null;
     const isStale = checkIsStale('activeAuctions');
 
-    // Loading state: show loading if no data exists AND (currently fetching OR syncing OR will fetch soon)
-    const loading = !auctions && (
-        activeAuctions?.status === 'loading' ||
-        isRefetching ||
+    // CRITICAL: Distinguish initial load vs unavailable data
+    // status === 'idle' && auctions === null → Initial load (show loading)
+    // status === 'success' && auctions === null → Fetched but no data (show empty state)
+    // status === 'error' → Failed (show error)
+    const loading = (
+        status === 'loading' ||
         isPublicClientSyncing ||
-        (!hasLoadedOnce && !skip && !!aacApp) // Initial load state
+        (status === 'idle' && !skip && !!aacApp)
     );
 
     /**
@@ -110,17 +111,13 @@ export function useCachedActiveAuctions(
      */
     const refetch = useCallback(async () => {
         if (!aacApp || skip || isPublicClientSyncing) return;
-        console.log('aacApp', aacApp)
+
         try {
-            setIsRefetching(true);
             await fetchActiveAuctions(offset, limit, aacApp);
         } catch (err) {
             console.error('[useCachedActiveAuctions] Refetch failed:', err);
-        } finally {
-            setIsRefetching(false);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [aacApp, skip, offset, limit, isPublicClientSyncing]);
+    }, [aacApp, skip, isPublicClientSyncing, offset, limit, fetchActiveAuctions]);
 
     /**
      * Initial fetch and refetch on stale data
@@ -161,7 +158,7 @@ export function useCachedActiveAuctions(
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
+        status,
         isStale,
         refetch
     };

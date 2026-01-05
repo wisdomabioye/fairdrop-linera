@@ -172,6 +172,92 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
 }
 
 /**
+ * ============================================================================
+ * BATCH QUERY USAGE GUIDE
+ * ============================================================================
+ *
+ * The AACQueryBatchBuilder above allows batching multiple queries into a single
+ * GraphQL request to the Auction Authority Chain (AAC).
+ *
+ * **Performance Benefits:**
+ * - Reduces N API calls → 1 API call
+ * - Reduces network latency (1 round-trip instead of N)
+ * - Reduces server load (1 GraphQL parse/execute cycle instead of N)
+ *
+ * **When to Batch (Decision Tree):**
+ *
+ * 1. ✅ Fetching THE SAME query type for MULTIPLE items
+ *    - Example: userBalances for N different tokens (N calls → 1 call)
+ *    - Example: Multiple auction prices in a portfolio view
+ *    - Example: Bid history for multiple auctions in admin dashboard
+ *
+ * 2. ✅ Queries ALWAYS fetched together (guaranteed co-dependencies)
+ *    - Example: Auction detail page needs auction + bidHistory + userBids
+ *    - Example: User portfolio needs balances + deposits + withdrawals
+ *
+ * 3. ❌ DON'T batch unrelated queries that live on different pages
+ *    - Example: Active auctions (home page) + settled auctions (history page)
+ *    - Example: Global stats (dashboard) + user profile (settings)
+ *
+ * 4. ❌ DON'T batch constant data that only needs one fetch ever
+ *    - Example: Token metadata (name, symbol) - cache forever, no need to batch
+ *    - Example: Auction terms/rules that never change
+ *
+ * **Canonical Example: userBalances (see auction-store.fetchUserBalances)**
+ *
+ * BEFORE (N+1 Problem):
+ * ```typescript
+ * // User has 5 tokens → 5 individual API calls
+ * for (const tokenApp of tokenApps) {
+ *   const balance = await AAC_QUERY.UserBalance(address, tokenApp);
+ * }
+ * ```
+ *
+ * AFTER (Batched):
+ * ```typescript
+ * // User has 5 tokens → 1 batched API call
+ * const balances = await AAC_QUERY.UserBalances(address, tokenApps);
+ * // Returns array of {tokenApp, amount} objects
+ * ```
+ *
+ * **How to Use AACQueryBatchBuilder:**
+ *
+ * ```typescript
+ * const builder = new AACQueryBatchBuilder();
+ *
+ * // Add multiple fragments
+ * builder
+ *   .auctionSummary('1')
+ *   .bidHistory('1', 0, 50)
+ *   .userBids('1', userAddress);
+ *
+ * // Build and execute
+ * const query = builder.build();
+ * const result = await aacApp.graphql(query);
+ *
+ * // Access results
+ * const auction = result.auctionSummary_1;
+ * const bids = result.bidHistory_1;
+ * const userBids = result.userBids_1;
+ * ```
+ *
+ * **Naming Convention:**
+ * - Query results are named: `{method}_{auctionId}` or `{method}_{address}`
+ * - Example: `auctionSummary_1`, `userBids_0x123...`
+ * - This prevents conflicts when batching the same query type for different IDs
+ *
+ * **Current Batched Queries:**
+ * - ✅ userBalances (address, tokenApps[]) - CANONICAL EXAMPLE
+ *
+ * **Future Batching Opportunities:**
+ * - Auction detail page (auction + bidHistory + userBids)
+ * - Portfolio view (multiple userBalance calls for different tokens)
+ * - Admin dashboard (multiple auction stats)
+ *
+ * ============================================================================
+ */
+
+/**
  * Indexer Chain Query
  */
 export const INDEXER_QUERY = {

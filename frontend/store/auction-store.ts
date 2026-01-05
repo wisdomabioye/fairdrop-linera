@@ -44,6 +44,7 @@ const AUCTION_DATA_TTL = 6000; // 6s (polling: 5s) - auction data changes freque
 const AUCTION_LIST_TTL = 12000; // 12s (polling: 10s) - auction lists
 const BID_HISTORY_TTL = 6000; // 6s (polling: 5s) - bid history
 const USER_BID_TTL = 10000; // 10s - user commitments (no default polling)
+const USER_BALANCES_TTL = 10000; // 10s - user balances on AAC (deposits/withdrawals)
 
 // Store types
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -93,6 +94,16 @@ export interface UserBidsCacheEntry {
 }
 
 /**
+ * Cache entry for user balances (multiple tokens)
+ */
+export interface UserBalancesCacheEntry {
+    data: Map<string, number> | null; // tokenApp -> amount
+    timestamp: number;
+    status: FetchStatus;
+    error: Error | null;
+}
+
+/**
  * Metadata for all auctions fetch operations
  */
 export interface AllAuctionsMetadata {
@@ -124,6 +135,7 @@ export interface AuctionStore {
     auctionsByCreator: Map<string, AuctionListCacheEntry>; // creator -> auctions
     bidHistory: Map<string, BidHistoryCacheEntry>; // auctionId -> bids
     userBids: Map<string, Map<string, UserBidsCacheEntry>>; // auctionId -> address -> userBids
+    userBalances: Map<string, UserBalancesCacheEntry>; // address -> balances (multiple tokens)
 
     // ============ Indexer Actions ============
     initializeIndexer: (
@@ -143,6 +155,7 @@ export interface AuctionStore {
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchUserBids: (auctionId: string, address: string, aacApp: ApplicationClient) => Promise<void>;
+    fetchUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient) => Promise<void>;
 
     // ============ Internal Fetch Methods ============
     _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<string[]>;
@@ -154,6 +167,7 @@ export interface AuctionStore {
     invalidateAuctionsByCreator: (creator: string) => void;
     invalidateBidHistory: (auctionId: string) => void;
     invalidateUserBids: (auctionId: string, address?: string) => void;
+    invalidateUserBalances: (address: string) => void;
     invalidateAll: () => void;
 
     // ============ Polling Actions ============
@@ -164,7 +178,7 @@ export interface AuctionStore {
 
     // ============ Utility Actions ============
     isStale: (
-        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids',
+        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids' | 'userBalances',
         key?: string
     ) => boolean;
 }
@@ -188,6 +202,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     auctionsByCreator: new Map(),
     bidHistory: new Map(),
     userBids: new Map(),
+    userBalances: new Map(),
 
     // ============ Indexer Initialization ============
     initializeIndexer: async (indexerChainId, aacChain, auctionApp, indexerApp) => {
@@ -850,6 +865,112 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
+    /**
+     * Fetch user balances for multiple tokens in a single batched request
+     * Uses AAC_QUERY.UserBalances to reduce N requests → 1 request
+     */
+    fetchUserBalances: async (address, tokenApps, aacApp) => {
+        // Validate inputs
+        if (!address) {
+            console.warn('[fetchUserBalances] address is required');
+            return;
+        }
+        if (!tokenApps || tokenApps.length === 0) {
+            console.warn('[fetchUserBalances] no token apps provided');
+            return;
+        }
+
+        const key = `user-balances-${address}`;
+
+        // Check cache first
+        const cached = get().userBalances.get(address);
+        if (cached && cached.status === 'success') {
+            const age = Date.now() - cached.timestamp;
+            if (age < USER_BALANCES_TTL) {
+                // Cache hit - fresh data
+                return
+            }
+        }
+
+        await queryDeduplicator.deduplicate(key, async () => {
+            // Set loading state
+            set((state) => {
+                const newMap = new Map(state.userBalances);
+                const existing = newMap.get(address);
+
+                newMap.set(address, {
+                    data: existing?.data ?? null,
+                    timestamp: existing?.timestamp ?? Date.now(),
+                    status: 'loading',
+                    error: null,
+                });
+
+                return { userBalances: newMap };
+            });
+
+            try {
+                if (!aacApp) {
+                    throw new Error('AAC App is not connected');
+                }
+
+                // Use batched query to fetch all balances at once
+                const result = await aacApp.public.query<string>(
+                    JSON.stringify(AAC_QUERY.UserBalances(address, tokenApps))
+                );
+
+                console.log('UserBalances (batched):', JSON.parse(result));
+
+                const { data } = JSON.parse(result) as {
+                    data: { userBalances: Array<{ tokenApp: string; amount: number }> | null }
+                };
+
+                // Convert array to Map for efficient lookups
+                const balancesMap = new Map<string, number>();
+                (data.userBalances || []).forEach(item => {
+                    balancesMap.set(item.tokenApp, item.amount);
+                });
+
+                // Ensure all requested tokens are in the map (default to 0 if not found)
+                tokenApps.forEach(tokenApp => {
+                    if (!balancesMap.has(tokenApp)) {
+                        balancesMap.set(tokenApp, 0);
+                    }
+                });
+
+                set((state) => {
+                    const newMap = new Map(state.userBalances);
+
+                    newMap.set(address, {
+                        data: balancesMap,
+                        timestamp: Date.now(),
+                        status: 'success',
+                        error: null,
+                    });
+
+                    return { userBalances: newMap };
+                });
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch user balances');
+
+                set((state) => {
+                    const newMap = new Map(state.userBalances);
+                    const existing = newMap.get(address);
+
+                    newMap.set(address, {
+                        data: existing?.data ?? null,
+                        timestamp: existing?.timestamp ?? Date.now(),
+                        status: 'error',
+                        error,
+                    });
+
+                    return { userBalances: newMap };
+                });
+
+                throw error;
+            }
+        });
+    },
+
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId) => {
         set((state) => {
@@ -955,6 +1076,22 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
+    invalidateUserBalances: (address) => {
+        set((state) => {
+            const newMap = new Map(state.userBalances);
+            const existing = newMap.get(address);
+
+            if (existing) {
+                newMap.set(address, {
+                    ...existing,
+                    timestamp: 0
+                });
+            }
+
+            return { userBalances: newMap };
+        });
+    },
+
     invalidateAll: () => {
         set((state) => {
             // Mark all auctions as stale (timestamp = 0) instead of deleting
@@ -999,6 +1136,12 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 newUserBids.set(auctionId, newAuctionMap);
             });
 
+            // Mark user balances as stale
+            const newUserBalances = new Map(state.userBalances);
+            newUserBalances.forEach((value, address) => {
+                newUserBalances.set(address, { ...value, timestamp: 0 });
+            });
+
             return {
                 auctions: newAuctions,
                 allAuctionsCache: newAllAuctions,
@@ -1011,6 +1154,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 auctionsByCreator: newAuctionsByCreator,
                 bidHistory: newBidHistory,
                 userBids: newUserBids,
+                userBalances: newUserBalances,
             };
         });
     },
@@ -1089,7 +1233,13 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 if (!entry || entry.status === 'idle') return true;
                 return now - entry.timestamp > USER_BID_TTL;
             }
-        
+            case 'userBalances': {
+                if (!key) return true;
+                const entry = get().userBalances.get(key);
+                if (!entry || entry.status === 'idle') return true;
+                return now - entry.timestamp > USER_BALANCES_TTL;
+            }
+
             default:
                 return true;
         }

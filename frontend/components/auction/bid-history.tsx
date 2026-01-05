@@ -38,7 +38,6 @@ export function BidHistory({
     loading,
     isFetching,
     error,
-    hasLoadedOnce
   } = useCachedBidHistory({
     auctionId,
     offset,
@@ -56,7 +55,7 @@ export function BidHistory({
   };
 
   // Loading state
-  if (loading && !hasLoadedOnce) {
+  if (loading) {
     return (
       <Card className={compact ? 'border-0 shadow-none' : undefined}>
         <CardHeader>

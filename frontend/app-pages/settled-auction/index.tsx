@@ -24,7 +24,6 @@ export default function SettledAuctions() {
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
         refetch
     } = useCachedSettledAuctions({
         offset: 0,
@@ -78,7 +77,7 @@ export default function SettledAuctions() {
             </header>
 
             {/* Loading State */}
-            {((loading && !hasLoadedOnce)) && (
+            {((loading)) && (
                 <AuctionSkeletonGrid count={4} />
             )}
 

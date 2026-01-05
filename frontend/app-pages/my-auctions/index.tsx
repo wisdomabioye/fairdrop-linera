@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Hammer, TrendingDown, Plus } from 'lucide-react';
-import { useLineraApplication, useWalletConnection, type ApplicationClient } from 'linera-react-client';
-import { useCachedAuctionsByCreator, useCachedAuctionSummary } from '@/hooks';
+import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useCachedAuctionsByCreator } from '@/hooks';
 import { AAC_APP_ID } from '@/config/app.config';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { BidDialog } from '@/components/auction/bid-dialog';
@@ -15,7 +15,7 @@ import { WalletConnectionPrompt } from '@/components/wallet/wallet-connection-pr
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { APP_ROUTES } from '@/config/app.route';
-import { AuctionStatus, type AuctionSummary, type UserCommitment } from '@/lib/gql/types';
+import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 
 export default function MyAuctionsPage() {
     const router = useRouter();
@@ -238,79 +238,6 @@ function AuctionGroup({
                     onBidClick={onBidClick}
                 />
             ))}
-        </div>
-    );
-}
-
-// My Bids Grid Component
-function MyBidsGrid({
-    commitments,
-    aacApp,
-    onBidClick
-}: {
-    commitments: { auctionId: string; commitment: UserCommitment }[];
-    aacApp: ApplicationClient | null;
-    onBidClick: (id: number) => void;
-}) {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {commitments.map((item) => (
-                <BidCommitmentCard
-                    key={item.auctionId}
-                    auctionId={item.auctionId}
-                    commitment={item.commitment}
-                    aacApp={aacApp}
-                    onBidClick={onBidClick}
-                />
-            ))}
-        </div>
-    );
-}
-
-// Bid Commitment Card Component
-function BidCommitmentCard({
-    auctionId,
-    commitment,
-    aacApp,
-    onBidClick
-}: {
-    auctionId: string;
-    commitment: UserCommitment;
-    aacApp: ApplicationClient | null;
-    onBidClick: (id: number) => void;
-}) {
-    // Fetch auction details
-    const { auction, loading } = useCachedAuctionSummary({
-        auctionId: auctionId.toString(),
-        aacApp,
-        skip: !aacApp
-    });
-
-    if (loading || !auction) {
-        return (
-            <div className="h-64 animate-pulse bg-muted rounded-lg" />
-        );
-    }
-
-    return (
-        <div className="relative">
-            {/* Commitment Badge Overlay */}
-            {commitment && (
-                <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
-                    <div className="bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs font-semibold shadow-lg">
-                        Qty: {commitment.totalQuantity}
-                    </div>
-                    {commitment.settlement && (
-                        <div className="bg-green-600 text-white px-2 py-1 rounded-md text-xs font-semibold shadow-lg">
-                            Won: {commitment.settlement.allocatedQuantity}
-                        </div>
-                    )}
-                </div>
-            )}
-            <AuctionCard
-                auction={auction}
-                onBidClick={onBidClick}
-            />
         </div>
     );
 }

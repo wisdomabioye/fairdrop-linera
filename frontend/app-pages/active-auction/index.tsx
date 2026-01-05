@@ -32,7 +32,6 @@ export default function ActiveAuctions() {
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
         refetch
     } = useCachedActiveAuctions({
         offset: 0,
@@ -85,7 +84,7 @@ export default function ActiveAuctions() {
             </header>
 
             {/* Loading State */}
-            {((loading || (isFetching && !auctions?.length))) && (
+            {loading && (
                 <AuctionSkeletonGrid count={4} />
             )}
 
@@ -120,7 +119,7 @@ export default function ActiveAuctions() {
                         <AuctionCard
                             key={auction.auctionId}
                             auction={auction}
-                            isRefreshing={isFetching && hasLoadedOnce}
+                            isRefreshing={isFetching}
                             onBidClick={handleBidClick}
                         />
                     ))}

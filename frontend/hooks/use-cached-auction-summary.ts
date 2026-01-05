@@ -47,8 +47,8 @@ export interface UseCachedAuctionSummaryResult {
     isFetching: boolean;
     /** Any errors */
     error: Error | null;
-    /** Has loaded at least once? */
-    hasLoadedOnce: boolean;
+    /** Fetch status: 'idle' | 'loading' | 'success' | 'error' */
+    status: 'idle' | 'loading' | 'success' | 'error';
     /** Is cached data stale? */
     isStale: boolean;
     /** Manually refetch auction */
@@ -82,21 +82,22 @@ export function useCachedAuctionSummary(
 
     // Local state for managing polling subscription
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
-    const [isRefetching, setIsRefetching] = useState(false);
 
     // Derived state
     const auction = entry?.data ?? null;
-    const isFetching = entry?.status === 'loading';
+    const status = entry?.status ?? 'idle';
+    const isFetching = status === 'loading';
     const error = entry?.error ?? null;
-    const hasLoadedOnce = entry?.status === 'success' || auction !== null;
     const isStale = checkIsStale('auction', auctionId);
 
-    // Loading state: show loading if no data exists AND (currently fetching OR syncing OR will fetch soon)
-    const loading = !auction && (
-        entry?.status === 'loading' ||
-        isRefetching ||
+    // CRITICAL: Distinguish initial load vs unavailable data
+    // status === 'idle' && auction === null → Initial load (show loading)
+    // status === 'success' && auction === null → Fetched but no data (show empty state)
+    // status === 'error' → Failed (show error)
+    const loading = (
+        status === 'loading' ||
         isPublicClientSyncing ||
-        (!hasLoadedOnce && !skip && !!aacApp) // Initial load state
+        (status === 'idle' && !skip && !!aacApp)
     );
 
     /**
@@ -106,12 +107,9 @@ export function useCachedAuctionSummary(
         if (!aacApp || skip || isPublicClientSyncing) return;
 
         try {
-            setIsRefetching(true);
             await fetchAuctionSummary(auctionId, aacApp);
         } catch (err) {
             console.error('[useCachedAuctionSummary] Refetch failed:', err);
-        } finally {
-            setIsRefetching(false);
         }
     }, [aacApp, skip, isPublicClientSyncing, auctionId, fetchAuctionSummary]);
 
@@ -153,7 +151,7 @@ export function useCachedAuctionSummary(
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
+        status,
         isStale,
         refetch
     };

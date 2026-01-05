@@ -48,8 +48,8 @@ export interface UseCachedSettledAuctionsResult {
     isFetching: boolean;
     /** Any errors */
     error: Error | null;
-    /** Has loaded at least once? */
-    hasLoadedOnce: boolean;
+    /** Fetch status: 'idle' | 'loading' | 'success' | 'error' */
+    status: 'idle' | 'loading' | 'success' | 'error';
     /** Is cached data stale? */
     isStale: boolean;
     /** Manually refetch auctions */
@@ -85,11 +85,16 @@ export function useCachedSettledAuctions(
             .map(id => allAuctionsCache.get(id)?.data)
             .filter(Boolean) as AuctionSummary[]
         : null;
-    const loading = settledAuctions?.status === 'loading' && !auctions;
-    const isFetching = settledAuctions?.status === 'loading';
+    const status = settledAuctions?.status ?? 'idle';
+    const isFetching = status === 'loading';
     const error = settledAuctions?.error ?? null;
-    const hasLoadedOnce = settledAuctions?.status === 'success' || auctions !== null;
     const isStale = checkIsStale('settledAuctions');
+
+    // CRITICAL: Distinguish initial load vs unavailable data
+    const loading = (
+        status === 'loading' ||
+        (status === 'idle' && !skip && !!aacApp)
+    );
 
     /**
      * Fetch settled auctions
@@ -148,7 +153,7 @@ export function useCachedSettledAuctions(
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
+        status,
         isStale,
         refetch
     };

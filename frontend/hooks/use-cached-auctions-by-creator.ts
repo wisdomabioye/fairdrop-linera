@@ -52,8 +52,8 @@ export interface UseCachedAuctionsByCreatorResult {
     isFetching: boolean;
     /** Any errors */
     error: Error | null;
-    /** Has loaded at least once? */
-    hasLoadedOnce: boolean;
+    /** Fetch status: 'idle' | 'loading' | 'success' | 'error' */
+    status: 'idle' | 'loading' | 'success' | 'error';
     /** Is cached data stale? */
     isStale: boolean;
     /** Manually refetch auctions */
@@ -96,11 +96,16 @@ export function useCachedAuctionsByCreator(
             .map(id => allAuctionsCache.get(id)?.data)
             .filter(Boolean) as AuctionSummary[]
         : null;
-    const loading = creatorAuctions?.status === 'loading' && !auctions;
-    const isFetching = creatorAuctions?.status === 'loading';
+    const status = creatorAuctions?.status ?? 'idle';
+    const isFetching = status === 'loading';
     const error = creatorAuctions?.error ?? null;
-    const hasLoadedOnce = creatorAuctions?.status === 'success' || auctions !== null;
     const isStale = checkIsStale('auctionsByCreator', creator);
+
+    // CRITICAL: Distinguish initial load vs unavailable data
+    const loading = (
+        status === 'loading' ||
+        (status === 'idle' && !skip && !!aacApp && !!creator)
+    );
 
     /**
      * Fetch auctions by creator
@@ -158,7 +163,7 @@ export function useCachedAuctionsByCreator(
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
+        status,
         isStale,
         refetch
     };

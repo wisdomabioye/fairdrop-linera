@@ -46,8 +46,8 @@ export interface UseCachedMyCommitmentResult {
     isFetching: boolean;
     /** Any errors */
     error: Error | null;
-    /** Has loaded at least once? */
-    hasLoadedOnce: boolean;
+    /** Fetch status: 'idle' | 'loading' | 'success' | 'error' */
+    status: 'idle' | 'loading' | 'success' | 'error';
     /** Is cached data stale? */
     isStale: boolean;
     /** Manually refetch commitment */
@@ -78,11 +78,17 @@ export function useCachedMyCommitment(
 
     // Derived state
     const commitment = entry?.data ?? null;
-    const loading = entry?.status === 'loading' && !commitment;
-    const isFetching = entry?.status === 'loading';
+    const status = entry?.status ?? 'idle';
+    const isFetching = status === 'loading';
     const error = entry?.error ?? null;
-    const hasLoadedOnce = entry?.status === 'success' || commitment !== null;
     const isStale = checkIsStale('userBids', `${auctionId}:${address}`);
+
+    // CRITICAL: Distinguish initial load vs unavailable data
+    const loading = (
+        status === 'loading' ||
+        isClientSyncing ||
+        (status === 'idle' && !skip && !!aacApp && !!address)
+    );
 
     /**
      * Fetch user commitment
@@ -122,7 +128,7 @@ export function useCachedMyCommitment(
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
+        status,
         isStale,
         refetch
     };

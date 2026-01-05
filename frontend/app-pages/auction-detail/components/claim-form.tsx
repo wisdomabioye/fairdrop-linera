@@ -41,7 +41,7 @@ export function ClaimForm({
     totalPaid = 0,
     loading,
     error: fetchError,
-    hasLoadedOnce
+    isFetching
   } = useCachedMyCommitment({
     auctionId,
     aacApp,
@@ -107,7 +107,7 @@ export function ClaimForm({
   }
 
   // State 3: Loading commitment data
-  if (loading || (!hasLoadedOnce && !fetchError)) {
+  if (loading || (isFetching && !fetchError)) {
     return (
       <Card>
         <CardHeader>
