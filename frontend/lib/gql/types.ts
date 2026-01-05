@@ -35,6 +35,8 @@ export interface AuctionSummary extends AuctionParam {
     currentPrice: string;
     sold: number;
     clearingPrice: string | null;
+    lastPriceUpdate: number | null;
+    settledAt: number | null;
     status: AuctionStatus;
     totalBids: number;
     totalBidders: number;
@@ -57,20 +59,23 @@ export interface SettlementResult {
     refund: string;
 }
 
-export interface UserCommitment {
-    totalQuantity: number;
-    settlement: SettlementResult | null;
-}
-
-export interface AuctionCommitment {
-    auctionId: string;
-    commitment: UserCommitment;
-}
-
 export interface SubscriptionInfo {
     aacChain: string;
     auctionApp: string;
     initialized: boolean;
+}
+
+export interface AuctionChainTokenBalance {
+    tokenApp: string; // Token Application Id
+    amount: number;
+}
+
+export interface AuctionGlobalStats {
+    totalAuctions: number;
+    totalBids: number;
+    depositedByToken: AuctionChainTokenBalance[],
+    withdrawnByToken: AuctionChainTokenBalance[],
+    totalValueLocked: AuctionChainTokenBalance[],
 }
 
 
@@ -133,6 +138,8 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
         endTime: microsecondsToMilliseconds(auction.params.endTime),
         creator: auction.params.creator,
         currentPrice: auction.currentPrice,
+        settledAt: auction.settledAt,
+        lastPriceUpdate: auction.lastPriceUpdate,
         sold: auction.sold,
         clearingPrice: auction.clearingPrice,
         status: transformAuctionStatus(auction),

@@ -1,7 +1,7 @@
 
 
 import { QueryBatchBuilder, formatGraphQLValue } from './query-builder';
-import { RecipientAccount } from './types';
+import { RecipientAccount, AuctionParam } from './types';
 
 /**
  * AAC Query Batch Builder
@@ -49,20 +49,6 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
         return this.addFragment(queryBody);
     }
 
-    claimableSettlement(auction_id: number, user_chain: string): this {
-        const queryBody = `claimableSettlement(auctionId: ${auction_id}, userChain: ${formatGraphQLValue(user_chain)}) {
-                    totalQuantity
-
-                    settlement {
-                        allocatedQuantity
-                        clearingPrice
-                        totalCost
-                        refund
-                    }
-                }`;
-        return this.addFragment(queryBody);
-    }
-
     allAuctions(offset: number, limit: number): this {
         const queryBody = `allAuctions(offset: ${offset}, limit: ${limit}) {
                     auctionId
@@ -79,6 +65,8 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
 
                     params {
                         itemName
+                        image
+                        maxBidAmount
                         totalSupply
                         startPrice
                         floorPrice
@@ -87,6 +75,8 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
                         startTime
                         endTime
                         creator
+                        paymentTokenApp
+                        auctionTokenApp
                     }
                 }`;
         return this.addFragment(queryBody);
@@ -108,6 +98,8 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
 
                     params {
                         itemName
+                        image
+                        maxBidAmount
                         totalSupply
                         startPrice
                         floorPrice
@@ -116,6 +108,8 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
                         startTime
                         endTime
                         creator
+                        paymentTokenApp
+                        auctionTokenApp
                     }
                 }`;
         return this.addFragment(queryBody);
@@ -135,7 +129,7 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
     }
 
     userBids(user: string, auction_id: number): this {
-        const queryBody = `userBids(user: ${formatGraphQLValue(user)}, auction_id: ${auction_id}) {
+        const queryBody = `userBids(user: ${formatGraphQLValue(user)}, auctionId: ${auction_id}) {
                     bidId
                     auctionId
                     userAccount
@@ -144,6 +138,35 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
                     timestamp
                     claimed
                 }`;
+        return this.addFragment(queryBody);
+    }
+
+    userBalance (user: string, token_app: string): this {
+        const queryBody = `userBalance(user: ${formatGraphQLValue(user)}, tokenApp: ${formatGraphQLValue(token_app)})`;
+        
+        return this.addFragment(queryBody);
+    }
+
+    userBalances (user: string, token_apps: string[]): this {
+        const queryBody = `
+            userBalances(user: ${formatGraphQLValue(user)}, tokenApps: ${formatGraphQLValue(token_apps)}) {
+                tokenApp
+                amount
+            }`;
+
+        return this.addFragment(queryBody);
+    }
+
+    globalStats (): this {
+        const queryBody = `
+            globalStats {
+                totalAuctions
+                totalBids
+                depositedByToken { tokenApp amount }
+                withdrawnByToken { tokenApp amount }
+                totalValueLocked { tokenApp amount }
+            }`;
+        
         return this.addFragment(queryBody);
     }
 }
@@ -360,23 +383,6 @@ export const AAC_QUERY = {
         }
     },
 
-    ClaimableSettlement (auction_id: number, user_chain: string) {
-        return {
-            query: `query {
-                claimableSettlement(auctionId: ${auction_id}, userChain: ${formatGraphQLValue(user_chain)}) {
-                    totalQuantity
-
-                    settlement {
-                        allocatedQuantity
-                        clearingPrice
-                        totalCost
-                        refund
-                    }
-                }
-            }`
-        }
-    },
-
     // ─────────────────────────────────────────────────────────
     // Temporary Indexer Replacement Queries
     // TODO: Switch back to INDEXER_QUERY once event streaming is stable
@@ -401,6 +407,8 @@ export const AAC_QUERY = {
 
                     params {
                         itemName
+                        image
+                        maxBidAmount
                         totalSupply
                         startPrice
                         floorPrice
@@ -409,6 +417,8 @@ export const AAC_QUERY = {
                         startTime
                         endTime
                         creator
+                        paymentTokenApp
+                        auctionTokenApp
                     }
                 }
             }`
@@ -434,6 +444,8 @@ export const AAC_QUERY = {
 
                     params {
                         itemName
+                        image
+                        maxBidAmount
                         totalSupply
                         startPrice
                         floorPrice
@@ -442,6 +454,8 @@ export const AAC_QUERY = {
                         startTime
                         endTime
                         creator
+                        paymentTokenApp
+                        auctionTokenApp
                     }
                 }
             }`
@@ -468,7 +482,7 @@ export const AAC_QUERY = {
     UserBids (user: string, auction_id: number) {
         return {
             query: `query {
-                userBids(user: ${formatGraphQLValue(user)}, auction_id: ${auction_id}) {
+                userBids(user: ${formatGraphQLValue(user)}, auctionId: ${auction_id}) {
                     bidId
                     auctionId
                     userAccount
@@ -476,6 +490,39 @@ export const AAC_QUERY = {
                     amountPaid
                     timestamp
                     claimed
+                }
+            }`
+        }
+    },
+
+    UserBalance (user: string, token_app: string) {
+        return {
+            query: `query {
+                userBalance(user: ${formatGraphQLValue(user)}, tokenApp: ${formatGraphQLValue(token_app)})
+            }`
+        }
+    },
+
+    UserBalances (user: string, token_apps: string[]) {
+        return {
+            query: `query {
+                userBalances(user: ${formatGraphQLValue(user)}, tokenApps: ${formatGraphQLValue(token_apps)}) {
+                    tokenApp
+                    amount
+                }
+            }`
+        }
+    },
+
+    GlobalStats () {
+        return {
+            query: `query {
+                globalStats {
+                    totalAuctions
+                    totalBids
+                    depositedByToken { tokenApp amount }
+                    withdrawnByToken { tokenApp amount }
+                    totalValueLocked { tokenApp amount }
                 }
             }`
         }
@@ -488,29 +535,27 @@ export const AAC_QUERY = {
 export const AAC_MUTATION = {
     CreateAuction ({
         itemName,
+        image,
         totalSupply,
+        maxBidAmount,
         startPrice,
         floorPrice,
         priceDecayInterval,
         priceDecayAmount,
         startTime,
         endTime,
-        creator
-    }: {
-        itemName: string;
-        totalSupply: number
-        startPrice: string;
-        floorPrice: string;
-        priceDecayInterval: number;
-        priceDecayAmount: string;
-        startTime: number;
-        endTime: number;
-        creator: string;
-    }) {
+        creator,
+        paymentTokenApp,
+        auctionTokenApp
+    }: AuctionParam) {
         const query = `mutation {
             createAuction(
                 params: {
                     itemName: ${formatGraphQLValue(itemName)},
+                    image: ${formatGraphQLValue(image)},
+                    maxBidAmount: ${formatGraphQLValue(maxBidAmount)},
+                    paymentTokenApp: ${formatGraphQLValue(paymentTokenApp)},
+                    auctionTokenApp: ${formatGraphQLValue(auctionTokenApp)},
                     totalSupply: ${totalSupply},
                     startPrice: ${formatGraphQLValue(startPrice)},
                     floorPrice: ${formatGraphQLValue(floorPrice)},
@@ -552,6 +597,30 @@ export const AAC_MUTATION = {
     ClaimSettlement (auction_id: number) {
         return {
             query: `mutation { claimSettlement(auctionId: ${auction_id}) }`
+        }
+    },
+
+    WithdrawProceed (auction_id: number) {
+        return {
+            query: `mutation { withdrawProceed(auctionId: ${auction_id}) }`
+        }
+    },
+
+    WithdrawUnsoldToken (auction_id: number) {
+        return {
+            query: `mutation { withdrawUnsoldToken(auctionId: ${auction_id}) }`
+        }
+    },
+
+    Deposit (token_app: number, amount: string) {
+        return {
+            query: `mutation { deposit(tokenApp: ${token_app}, amount: ${amount}) }`
+        }
+    },
+
+    Withdraw (token_app: number, amount: string, target_chain: string) {
+        return {
+            query: `mutation { withdraw(tokenApp: ${token_app}, amount: ${amount}, targetChain: ${target_chain}) }`
         }
     }
 }
