@@ -12,8 +12,8 @@ import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
 import { Button } from '@/components/ui/button';
-import type { AuctionSummary } from '@/lib/gql/types';
 import { APP_ROUTES } from '@/config/app.route';
+import type { AuctionSummary } from '@/lib/gql/types';
 
 export default function ActiveAuctions() {
     const router = useRouter();

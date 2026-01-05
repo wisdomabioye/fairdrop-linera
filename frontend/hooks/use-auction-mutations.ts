@@ -39,6 +39,10 @@ export interface UseAuctionMutationsOptions {
     onBuySuccess?: (auctionId: number, quantity: number) => void;
     /** Callback after successful settlement claim */
     onClaimSuccess?: (auctionId: number) => void;
+    /** Callback after successful deposit */
+    onDepositSuccess?: (tokenApp: string, amount: string) => void;
+    /** Callback after successful withdrawal */
+    onWithdrawSuccess?: (tokenApp: string, amount: string, targetChain: string) => void;
     /** Callback after any mutation error */
     onError?: (error: Error) => void;
 }
@@ -51,6 +55,10 @@ export interface UseAuctionMutationsResult {
     buy: (auctionId: number, quantity: number) => Promise<boolean>;
     /** Claim settlement */
     claimSettlement: (auctionId: number) => Promise<boolean>;
+    /** Deposit tokens to AAC */
+    deposit: (tokenApp: string, amount: string) => Promise<boolean>;
+    /** Withdraw tokens from AAC */
+    withdraw: (tokenApp: string, amount: string, targetChain: string) => Promise<boolean>;
     /** Trigger changes on Public Client */
     trigger: () => Promise<void>;
     // Loading states
@@ -60,6 +68,10 @@ export interface UseAuctionMutationsResult {
     isBuying: boolean;
     /** Is claim operation in progress? */
     isClaiming: boolean;
+    /** Is deposit in progress? */
+    isDepositing: boolean;
+    /** Is withdrawal in progress? */
+    isWithdrawing: boolean;
 
     // Error state
     /** Last mutation error */
@@ -74,6 +86,8 @@ export function useAuctionMutations(
         onCreateSuccess,
         onBuySuccess,
         onClaimSuccess,
+        onDepositSuccess,
+        onWithdrawSuccess,
         onError
     } = options;
     const { address } = useWalletConnection();
@@ -84,13 +98,16 @@ export function useAuctionMutations(
     const {
         invalidateActiveAuctions,
         invalidateAuction,
-        invalidateBidHistory
+        invalidateBidHistory,
+        invalidateUserBalances
     } = useAuctionStore();
 
     // Loading states
     const [isCreating, setIsCreating] = useState(false);
     const [isBuying, setIsBuying] = useState(false);
     const [isClaiming, setIsClaiming] = useState(false);
+    const [isDepositing, setIsDepositing] = useState(false);
+    const [isWithdrawing, setIsWithdrawing] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
     const trigger = useCallback(
@@ -279,14 +296,127 @@ export function useAuctionMutations(
         [aacApp, onClaimSuccess, onError, trigger, isClientSyncing]
     );
 
+    /**
+     * Deposit tokens to AAC
+     */
+    const deposit = useCallback(
+        async (tokenApp: string, amount: string): Promise<boolean> => {
+            if (!aacApp?.wallet || !address) {
+                const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            setIsDepositing(true);
+            setError(null);
+
+            try {
+                const result = await aacApp.wallet.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.Deposit(Number(tokenApp), amount)),
+                    { owner: address }
+                );
+
+                console.log('[useAuctionMutations] Deposit result:', result);
+
+                // Trigger publicClient
+                await trigger();
+
+                // Invalidate user balances cache
+                invalidateUserBalances(address);
+
+                onDepositSuccess?.(tokenApp, amount);
+                return true;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to deposit');
+                setError(error);
+                console.error('[useAuctionMutations] Deposit failed:', error);
+                onError?.(error);
+                return false;
+            } finally {
+                setIsDepositing(false);
+            }
+        },
+        [aacApp, address, onDepositSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+    );
+
+    /**
+     * Withdraw tokens from AAC
+     */
+    const withdraw = useCallback(
+        async (tokenApp: string, amount: string, targetChain: string): Promise<boolean> => {
+            if (!aacApp?.wallet || !address) {
+                const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            if (!targetChain) {
+                const err = new Error('Target chain is required');
+                setError(err);
+                onError?.(err);
+                return false;
+            }
+
+            setIsWithdrawing(true);
+            setError(null);
+
+            try {
+                const result = await aacApp.wallet.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.Withdraw(Number(tokenApp), amount, `"${targetChain}"`)),
+                    { owner: address }
+                );
+
+                console.log('[useAuctionMutations] Withdraw result:', result);
+
+                // Trigger publicClient
+                await trigger();
+
+                // Invalidate user balances cache
+                invalidateUserBalances(address);
+
+                onWithdrawSuccess?.(tokenApp, amount, targetChain);
+                return true;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to withdraw');
+                setError(error);
+                console.error('[useAuctionMutations] Withdraw failed:', error);
+                onError?.(error);
+                return false;
+            } finally {
+                setIsWithdrawing(false);
+            }
+        },
+        [aacApp, address, onWithdrawSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+    );
+
     return {
         createAuction,
         buy,
         claimSettlement,
+        deposit,
+        withdraw,
         trigger,
         isCreating,
         isBuying,
         isClaiming,
+        isDepositing,
+        isWithdrawing,
         error
     };
 }
