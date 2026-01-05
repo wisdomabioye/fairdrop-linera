@@ -1,5 +1,5 @@
 use async_graphql::{scalar, InputObject, SimpleObject};
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, Timestamp};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 pub type AuctionId = u64;
@@ -117,6 +117,12 @@ pub struct AuctionSummary {
     pub total_bidders: u64,
 }
 
+/// Application parameters
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AuctionParameters {
+    pub aac_chain: ChainId,  // The AAC chain ID (needed by chains other than AAC to send messages)
+}
+
 /// Token volume for a specific token
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 pub struct TokenVolume {
@@ -134,3 +140,4 @@ pub struct GlobalStats {
     pub withdrawn_by_token: Vec<TokenVolume>,
     pub total_value_locked: Vec<TokenVolume>,
 }
+

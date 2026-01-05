@@ -9,8 +9,8 @@ use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId
 use linera_sdk::views::{RootView, View};
 use linera_sdk::{Contract, ContractRuntime};
 use shared::events::{AuctionEvent, AUCTION_STREAM};
-// use shared::messages::AuctionMessage;
-use shared::types::{AuctionParams, BidRecord, AuctionStatus /* , SettlementResult */};
+use shared::messages::AuctionMessage;
+use shared::types::{AuctionParams, BidRecord, AuctionStatus, AuctionParameters};
 
 pub struct AuctionContract {
     state: AuctionState,
@@ -24,8 +24,8 @@ impl WithContractAbi for AuctionContract {
 }
 
 impl Contract for AuctionContract {
-    type Message = ();
-    type Parameters = ();
+    type Message = AuctionMessage;
+    type Parameters = AuctionParameters;
     type InstantiationArgument = ();
     type EventValue = AuctionEvent;
 
@@ -37,32 +37,63 @@ impl Contract for AuctionContract {
     }
 
     async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
-        let creator_chain_id = self.runtime.application_creator_chain_id();
+        let app_params = self.runtime.application_parameters();
 
         // Emit initialization event to create the stream
-        // This ensures the stream exists on every chain where the app is deployed
         let event = AuctionEvent::ApplicationInitialized {
-            aac_chain: creator_chain_id
+            aac_chain: app_params.aac_chain
         };
         self.runtime.emit(AUCTION_STREAM.into(), &event);
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
-        match operation {
-            // ═══════════════════════════════════════════════════════════
-            // AAC CHAIN OPERATIONS (when called on AAC)
-            // ═══════════════════════════════════════════════════════════
+        let app_params = self.runtime.application_parameters();
+        let current_chain = self.runtime.chain_id();
 
+        match operation {
             AuctionOperation::CreateAuction { params } => {
-                self.handle_create_auction(params.into()).await
+                if current_chain == app_params.aac_chain {
+                    self.handle_create_auction(params.into()).await
+                } else {
+                    let message = AuctionMessage::CreateAuction { params };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
             AuctionOperation::CancelAuction { auction_id } => {
-                self.handle_cancel_auction(auction_id).await
+                if current_chain == app_params.aac_chain {
+                    self.handle_cancel_auction(auction_id).await
+                } else {
+                    let message = AuctionMessage::CancelAuction { auction_id };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
             AuctionOperation::PruneSettledAuction { auction_id } => {
-                self.handle_prune_settled_auction(auction_id).await
+                if current_chain == app_params.aac_chain {
+                    self.handle_prune_settled_auction(auction_id).await
+                } else {
+                    let message = AuctionMessage::PruneSettledAuction { auction_id };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
             AuctionOperation::Trigger {} => {
@@ -70,7 +101,18 @@ impl Contract for AuctionContract {
             }
 
             AuctionOperation::Buy { auction_id, quantity } => {
-                self.handle_place_bid(auction_id, quantity).await
+                if current_chain == app_params.aac_chain {
+                    self.handle_place_bid(auction_id, quantity).await
+                } else {
+                    let message = AuctionMessage::Buy { auction_id, quantity };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
             AuctionOperation::SubscribeToAuction { aac_chain } => {
@@ -100,47 +142,164 @@ impl Contract for AuctionContract {
             }
 
             AuctionOperation::WithdrawProceed { auction_id } => {
-                self.withdraw_auction_proceeds(auction_id).await
+                if current_chain == app_params.aac_chain {
+                    self.withdraw_auction_proceeds(auction_id).await
+                } else {
+                    let message = AuctionMessage::WithdrawProceed { auction_id };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
             AuctionOperation::WithdrawUnsoldToken { auction_id } => {
-                self.withdraw_auction_unsold_token(auction_id).await
+                if current_chain == app_params.aac_chain {
+                    self.withdraw_auction_unsold_token(auction_id).await
+                } else {
+                    let message = AuctionMessage::WithdrawUnsoldToken { auction_id };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
-            // ═══════════════════════════════════════════════════════════
-            // INTERNAL BALANCE SYSTEM OPERATIONS
-            // ═══════════════════════════════════════════════════════════
-
             AuctionOperation::Deposit { token_app, amount } => {
-                let depositor = self.runtime.authenticated_signer()
+                if current_chain == app_params.aac_chain {
+                    // Deposit should not be called directly on AAC
+                    panic!("Deposit must be called from user chain");
+                } else {
+                    // We should call transfer operation, validate before sending
+                    // cross-chain message for deposit on AAC
+                    if amount == Amount::ZERO {
+                        panic!("Deposit amount must be greater than zero");
+                    }
+
+                    // 1. Transfer tokens from user to app (AAC chain) escrow
+                    let depositor = self.runtime.authenticated_signer()
                     .expect("Caller must be authenticated to deposit");
 
-                match self.execute_deposit(depositor, token_app, amount).await {
-                    Ok(_new_balance) => AuctionResponse::Ok,
-                    Err(reason) => {
-                        panic!("Deposit failed: {}", reason);
+                    let escrow_account = Account {
+                        chain_id: self.runtime.application_parameters().aac_chain, // AAC
+                        owner: self.runtime.application_id().into(), // App-owned escrow
+                    };
+
+                    let transfer_operation = FungibleOperation::Transfer {
+                        owner: depositor,
+                        amount,
+                        target_account: escrow_account,
+                    };
+
+                    let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
+                        std::mem::transmute(token_app)
+                    };
+
+                    match self.runtime.call_application(true, typed_app, &transfer_operation) {
+                        FungibleResponse::Ok => {}
+                        _ => panic!("Token transfer failed. Ensure sufficient balance on AAC"),
                     }
+
+                    // We can now send a cross-chain message to AAC chain to update the record
+                    let message = AuctionMessage::Deposit { token_app, amount };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
                 }
             }
 
             AuctionOperation::Withdraw { token_app, amount, target_chain } => {
-                let withdrawer = self.runtime.authenticated_signer()
-                    .expect("Caller must be authenticated to withdraw");
-
-                match self.execute_withdrawal(withdrawer, token_app, amount, target_chain).await {
-                    Ok(_remaining_balance) => AuctionResponse::Ok,
-                    Err(reason) => {
-                        panic!("Withdrawal failed: {}", reason);
+                if current_chain == app_params.aac_chain {
+                    match self.execute_withdrawal(token_app, amount, target_chain).await {
+                        Ok(_remaining_balance) => AuctionResponse::Ok,
+                        Err(reason) => {
+                            panic!("Withdrawal failed: {}", reason);
+                        }
                     }
+                } else {
+                    let message = AuctionMessage::Withdraw { token_app, amount, target_chain };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
                 }
             }
 
         }
     }
 
-    async fn execute_message(&mut self, _message: Self::Message) {
-        panic!("Cross-chain message is not supported!");
+    async fn execute_message(&mut self, message: Self::Message) {
+        match message {
+            AuctionMessage::CreateAuction { params } => {
+                self.handle_create_auction(params.into()).await;
+            }
+
+            AuctionMessage::CancelAuction { auction_id } => {
+                self.handle_cancel_auction(auction_id).await;
+            }
+
+            AuctionMessage::PruneSettledAuction { auction_id } => {
+                self.handle_prune_settled_auction(auction_id).await;
+            }
+
+            AuctionMessage::Buy { auction_id, quantity } => {
+                self.handle_place_bid(auction_id, quantity).await;
+            }
+
+            AuctionMessage::ClaimSettlement { auction_id } => {
+                self.handle_claim_settlement(auction_id).await;
+            }
+
+            AuctionMessage::WithdrawProceed { auction_id } => {
+                self.withdraw_auction_proceeds(auction_id).await;
+            }
+
+            AuctionMessage::WithdrawUnsoldToken { auction_id } => {
+                self.withdraw_auction_unsold_token(auction_id).await;
+            }
+
+            AuctionMessage::Deposit { token_app, amount } => {
+                let depositor = self.runtime.authenticated_signer()
+                    .expect("Caller must be authenticated to deposit");
+
+                match self.execute_deposit(depositor, token_app, amount).await {
+                    Ok(_new_balance) => {
+                        // AuctionResponse::Ok;
+                    },
+                    Err(reason) => {
+                        panic!("Deposit failed: {}", reason);
+                    }
+                }
+            }
+
+            AuctionMessage::Withdraw { token_app, amount, target_chain } => {
+                match self.execute_withdrawal(token_app, amount, target_chain).await {
+                    Ok(_remaining_balance) => {
+                        // AuctionResponse::Ok;
+                    },
+                    Err(reason) => {
+                        panic!("Withdrawal failed: {}", reason);
+                    }
+                }
+            }
+
+          
+        }
     }
+
 
     async fn process_streams(&mut self, updates: Vec<StreamUpdate>) {
         for update in updates {
@@ -499,30 +658,7 @@ impl AuctionContract {
         token_app: ApplicationId,
         amount: Amount,
     ) -> Result<Amount, String> {
-        if amount == Amount::ZERO {
-            return Err("Deposit amount must be greater than zero".to_string());
-        }
-
-        // 1. Transfer tokens from user to app escrow
-        let escrow_account = Account {
-            chain_id: self.runtime.chain_id(), // AAC
-            owner: self.runtime.application_id().into(), // App-owned escrow
-        };
-
-        let transfer_operation = FungibleOperation::Transfer {
-            owner: depositor,
-            amount,
-            target_account: escrow_account,
-        };
-
-        let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
-            std::mem::transmute(token_app)
-        };
-
-        match self.runtime.call_application(true, typed_app, &transfer_operation) {
-            FungibleResponse::Ok => {}
-            _ => return Err("Token transfer failed. Ensure sufficient balance on AAC".to_string()),
-        }
+        // 1. Transfer must have been done from user chain
 
         // 2. Credit user's internal balance
         let current_balance = self.state.user_balances
@@ -568,11 +704,13 @@ impl AuctionContract {
     /// 5. Emit TokenWithdrawn event
     async fn execute_withdrawal(
         &mut self,
-        withdrawer: AccountOwner,
         token_app: ApplicationId,
         amount: Amount,
         target_chain: ChainId,
     ) -> Result<Amount, String> {
+        let withdrawer = self.runtime.authenticated_signer()
+            .expect("Caller must be authenticated to withdraw");
+
         if amount == Amount::ZERO {
             return Err("Withdrawal amount must be greater than zero".to_string());
         }
@@ -726,15 +864,15 @@ impl AuctionContract {
     }
 
     /// Check if user has sufficient balance
-    async fn has_balance(
-        &self,
-        user: AccountOwner,
-        token_app: ApplicationId,
-        required: Amount,
-    ) -> bool {
-        let balance = self.get_balance(user, token_app).await;
-        balance >= required
-    }
+    // async fn has_balance(
+    //     &self,
+    //     user: AccountOwner,
+    //     token_app: ApplicationId,
+    //     required: Amount,
+    // ) -> bool {
+    //     let balance = self.get_balance(user, token_app).await;
+    //     balance >= required
+    // }
 
     // ═══════════════════════════════════════════════════════════
     // Helper Functions
