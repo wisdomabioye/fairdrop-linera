@@ -37,12 +37,16 @@ export function DepositDialog({
 
   const { deposit, isDepositing, error } = useAuctionMutations({
     aacApp,
-    onDepositSuccess: () => {
-      setAmount('');
-      onOpenChange(false);
+    onSuccess: (event) => {
+      if (event.type === 'deposit') {
+        setAmount('');
+        onOpenChange(false);
+      }
     },
-    onError: (err) => {
-      console.error('[DepositDialog] Deposit failed:', err);
+    onError: (event) => {
+      if (event.type === 'deposit') {
+        console.error('[DepositDialog] Deposit failed:', event.error);
+      }
     }
   });
 

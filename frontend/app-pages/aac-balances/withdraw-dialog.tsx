@@ -43,13 +43,17 @@ export function WithdrawDialog({
 
   const { withdraw, isWithdrawing, error } = useAuctionMutations({
     aacApp,
-    onWithdrawSuccess: () => {
-      setAmount('');
-      setTargetChain(null);
-      onOpenChange(false);
+    onSuccess: (event) => {
+      if (event.type === 'withdraw') {
+        setAmount('');
+        setTargetChain(null);
+        onOpenChange(false);
+      }
     },
-    onError: (err) => {
-      console.error('[WithdrawDialog] Withdraw failed:', err);
+    onError: (event) => {
+      if (event.type === 'withdraw') {
+        console.error('[WithdrawDialog] Withdraw failed:', event.error);
+      }
     }
   });
 

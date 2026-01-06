@@ -30,21 +30,38 @@ import { AAC_MUTATION } from '@/lib/gql/queries';
 import { type ApplicationClient, useWalletConnection } from 'linera-react-client';
 import type { AuctionParam } from '@/lib/gql/types';
 
+export type MutationType = 'create' | 'buy' | 'claim' | 'deposit' | 'withdraw' | 'cancel' | 'withdrawProceed' | 'withdrawUnsoldToken' | 'prune';
+
+/**
+ * Discriminated union for mutation success events
+ * Allows TypeScript to properly narrow types based on mutation type
+ */
+export type MutationSuccessEvent =
+    | { type: 'create'; data: { auctionId: string } }
+    | { type: 'buy'; data: { auctionId: number; quantity: number } }
+    | { type: 'claim'; data: { auctionId: number } }
+    | { type: 'cancel'; data: { auctionId: number } }
+    | { type: 'withdrawProceed'; data: { auctionId: number } }
+    | { type: 'withdrawUnsoldToken'; data: { auctionId: number } }
+    | { type: 'prune'; data: { auctionId: number } }
+    | { type: 'deposit'; data: { tokenApp: string; amount: string } }
+    | { type: 'withdraw'; data: { tokenApp: string; amount: string; targetChain: string } };
+
+/**
+ * Discriminated union for mutation error events
+ */
+export type MutationErrorEvent = {
+    type: MutationType;
+    error: Error;
+};
+
 export interface UseAuctionMutationsOptions {
     /** The AAC application client */
     aacApp: ApplicationClient | null;
-    /** Callback after successful auction creation */
-    onCreateSuccess?: (auctionId: string) => void;
-    /** Callback after successful buy */
-    onBuySuccess?: (auctionId: number, quantity: number) => void;
-    /** Callback after successful settlement claim */
-    onClaimSuccess?: (auctionId: number) => void;
-    /** Callback after successful deposit */
-    onDepositSuccess?: (tokenApp: string, amount: string) => void;
-    /** Callback after successful withdrawal */
-    onWithdrawSuccess?: (tokenApp: string, amount: string, targetChain: string) => void;
+    /** Callback after any successful mutation */
+    onSuccess?: (event: MutationSuccessEvent) => void;
     /** Callback after any mutation error */
-    onError?: (error: Error) => void;
+    onError?: (event: MutationErrorEvent) => void;
 }
 
 export interface UseAuctionMutationsResult {
@@ -55,6 +72,14 @@ export interface UseAuctionMutationsResult {
     buy: (auctionId: number, quantity: number) => Promise<boolean>;
     /** Claim settlement */
     claimSettlement: (auctionId: number) => Promise<boolean>;
+    /** Cancel an auction */
+    cancelAuction: (auctionId: number) => Promise<boolean>;
+    /** Withdraw proceeds from settled auction */
+    withdrawProceed: (auctionId: number) => Promise<boolean>;
+    /** Withdraw unsold tokens from settled auction */
+    withdrawUnsoldToken: (auctionId: number) => Promise<boolean>;
+    /** Prune a settled auction */
+    pruneSettledAuction: (auctionId: number) => Promise<boolean>;
     /** Deposit tokens to AAC */
     deposit: (tokenApp: string, amount: string) => Promise<boolean>;
     /** Withdraw tokens from AAC */
@@ -68,6 +93,14 @@ export interface UseAuctionMutationsResult {
     isBuying: boolean;
     /** Is claim operation in progress? */
     isClaiming: boolean;
+    /** Is auction cancellation in progress? */
+    isCancelling: boolean;
+    /** Is proceed withdrawal in progress? */
+    isWithdrawingProceed: boolean;
+    /** Is unsold token withdrawal in progress? */
+    isWithdrawingUnsoldToken: boolean;
+    /** Is pruning in progress? */
+    isPruning: boolean;
     /** Is deposit in progress? */
     isDepositing: boolean;
     /** Is withdrawal in progress? */
@@ -83,11 +116,7 @@ export function useAuctionMutations(
 ): UseAuctionMutationsResult {
     const {
         aacApp,
-        onCreateSuccess,
-        onBuySuccess,
-        onClaimSuccess,
-        onDepositSuccess,
-        onWithdrawSuccess,
+        onSuccess,
         onError
     } = options;
     const { address } = useWalletConnection();
@@ -106,6 +135,10 @@ export function useAuctionMutations(
     const [isCreating, setIsCreating] = useState(false);
     const [isBuying, setIsBuying] = useState(false);
     const [isClaiming, setIsClaiming] = useState(false);
+    const [isCancelling, setIsCancelling] = useState(false);
+    const [isWithdrawingProceed, setIsWithdrawingProceed] = useState(false);
+    const [isWithdrawingUnsoldToken, setIsWithdrawingUnsoldToken] = useState(false);
+    const [isPruning, setIsPruning] = useState(false);
     const [isDepositing, setIsDepositing] = useState(false);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
     const [error, setError] = useState<Error | null>(null);
@@ -134,14 +167,14 @@ export function useAuctionMutations(
             if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'create', error: err });
                 return false;
             }
 
             if (isClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'create', error: err });
                 return false;
             }
 
@@ -173,7 +206,7 @@ export function useAuctionMutations(
                 invalidateActiveAuctions();
 
                 const auctionId = ''; // Auction ID will be generated by AAC
-                onCreateSuccess?.(auctionId);
+                onSuccess?.({ type: 'create', data: { auctionId } });
 
                 return true;
             } catch (err: any) {
@@ -181,13 +214,13 @@ export function useAuctionMutations(
                 setError(error);
                 console.error('❌ CreateAuction failed:', error);
                 console.error('❌ Error details:', err);
-                onError?.(error);
+                onError?.({ type: 'create', error });
                 return false;
             } finally {
                 setIsCreating(false);
             }
         },
-        [aacApp, onCreateSuccess, onError, invalidateActiveAuctions, trigger, isClientSyncing]
+        [aacApp, onSuccess, onError, invalidateActiveAuctions, trigger, isClientSyncing]
     );
 
     /**
@@ -198,21 +231,21 @@ export function useAuctionMutations(
             if (quantity <= 0) {
                 const err = new Error('Quantity must be greater than 0');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'buy', error: err });
                 return false;
             }
 
             if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'buy', error: err });
                 return false;
             }
 
             if (isClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'buy', error: err });
                 return false;
             }
 
@@ -234,19 +267,19 @@ export function useAuctionMutations(
                 invalidateAuction(auctionId.toString());
                 invalidateBidHistory(auctionId.toString());
 
-                onBuySuccess?.(auctionId, quantity);
+                onSuccess?.({ type: 'buy', data: { auctionId, quantity } });
                 return true;
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to place bid');
                 setError(error);
                 console.error('[useAuctionMutations] Buy failed:', error);
-                onError?.(error);
+                onError?.({ type: 'buy', error });
                 return false;
             } finally {
                 setIsBuying(false);
             }
         },
-        [aacApp, onBuySuccess, onError, invalidateAuction, invalidateBidHistory, trigger, isClientSyncing]
+        [aacApp, onSuccess, onError, invalidateAuction, invalidateBidHistory, trigger, isClientSyncing]
     );
 
     /**
@@ -257,14 +290,14 @@ export function useAuctionMutations(
             if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'claim', error: err });
                 return false;
             }
 
             if (isClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'claim', error: err });
                 return false;
             }
 
@@ -281,19 +314,19 @@ export function useAuctionMutations(
 
                 // Trigger publicClient
                 await trigger();
-                onClaimSuccess?.(auctionId);
+                onSuccess?.({ type: 'claim', data: { auctionId } });
                 return true;
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to claim settlement');
                 setError(error);
                 console.error('[useAuctionMutations] Claim failed:', error);
-                onError?.(error);
+                onError?.({ type: 'claim', error });
                 return false;
             } finally {
                 setIsClaiming(false);
             }
         },
-        [aacApp, onClaimSuccess, onError, trigger, isClientSyncing]
+        [aacApp, onSuccess, onError, trigger, isClientSyncing]
     );
 
     /**
@@ -304,14 +337,14 @@ export function useAuctionMutations(
             if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'deposit', error: err });
                 return false;
             }
 
             if (isClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'deposit', error: err });
                 return false;
             }
 
@@ -332,19 +365,19 @@ export function useAuctionMutations(
                 // Invalidate user balances cache
                 invalidateUserBalances(address);
 
-                onDepositSuccess?.(tokenApp, amount);
+                onSuccess?.({ type: 'deposit', data: { tokenApp, amount } });
                 return true;
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to deposit');
                 setError(error);
                 console.error('[useAuctionMutations] Deposit failed:', error);
-                onError?.(error);
+                onError?.({ type: 'deposit', error });
                 return false;
             } finally {
                 setIsDepositing(false);
             }
         },
-        [aacApp, address, onDepositSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
     );
 
     /**
@@ -355,21 +388,21 @@ export function useAuctionMutations(
             if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'withdraw', error: err });
                 return false;
             }
 
             if (isClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'withdraw', error: err });
                 return false;
             }
 
             if (!targetChain) {
                 const err = new Error('Target chain is required');
                 setError(err);
-                onError?.(err);
+                onError?.({ type: 'withdraw', error: err });
                 return false;
             }
 
@@ -390,31 +423,244 @@ export function useAuctionMutations(
                 // Invalidate user balances cache
                 invalidateUserBalances(address);
 
-                onWithdrawSuccess?.(tokenApp, amount, targetChain);
+                onSuccess?.({ type: 'withdraw', data: { tokenApp, amount, targetChain } });
                 return true;
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to withdraw');
                 setError(error);
                 console.error('[useAuctionMutations] Withdraw failed:', error);
-                onError?.(error);
+                onError?.({ type: 'withdraw', error });
                 return false;
             } finally {
                 setIsWithdrawing(false);
             }
         },
-        [aacApp, address, onWithdrawSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+    );
+
+    /**
+     * Cancel an auction
+     */
+    const cancelAuction = useCallback(
+        async (auctionId: number): Promise<boolean> => {
+            if (!aacApp?.wallet || !address) {
+                const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.({ type: 'cancel', error: err });
+                return false;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.({ type: 'cancel', error: err });
+                return false;
+            }
+
+            setIsCancelling(true);
+            setError(null);
+
+            try {
+                const result = await aacApp.wallet.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.CancelAuction(auctionId)),
+                    { owner: address }
+                );
+
+                console.log('[useAuctionMutations] Cancel auction result:', result);
+
+                // Trigger publicClient
+                await trigger();
+
+                // Invalidate affected caches
+                invalidateAuction(auctionId.toString());
+                invalidateActiveAuctions();
+
+                onSuccess?.({ type: 'cancel', data: { auctionId } });
+                return true;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to cancel auction');
+                setError(error);
+                console.error('[useAuctionMutations] Cancel failed:', error);
+                onError?.({ type: 'cancel', error });
+                return false;
+            } finally {
+                setIsCancelling(false);
+            }
+        },
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateAuction, invalidateActiveAuctions]
+    );
+
+    /**
+     * Withdraw proceeds from settled auction
+     */
+    const withdrawProceed = useCallback(
+        async (auctionId: number): Promise<boolean> => {
+            if (!aacApp?.wallet || !address) {
+                const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.({ type: 'withdrawProceed', error: err });
+                return false;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.({ type: 'withdrawProceed', error: err });
+                return false;
+            }
+
+            setIsWithdrawingProceed(true);
+            setError(null);
+
+            try {
+                const result = await aacApp.wallet.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.WithdrawProceed(auctionId)),
+                    { owner: address }
+                );
+
+                console.log('[useAuctionMutations] Withdraw proceed result:', result);
+
+                // Trigger publicClient
+                await trigger();
+
+                // Invalidate user balances (proceeds go to user's balance)
+                invalidateUserBalances(address);
+
+                onSuccess?.({ type: 'withdrawProceed', data: { auctionId } });
+                return true;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to withdraw proceeds');
+                setError(error);
+                console.error('[useAuctionMutations] Withdraw proceed failed:', error);
+                onError?.({ type: 'withdrawProceed', error });
+                return false;
+            } finally {
+                setIsWithdrawingProceed(false);
+            }
+        },
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+    );
+
+    /**
+     * Withdraw unsold tokens from settled auction
+     */
+    const withdrawUnsoldToken = useCallback(
+        async (auctionId: number): Promise<boolean> => {
+            if (!aacApp?.wallet || !address) {
+                const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.({ type: 'withdrawUnsoldToken', error: err });
+                return false;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.({ type: 'withdrawUnsoldToken', error: err });
+                return false;
+            }
+
+            setIsWithdrawingUnsoldToken(true);
+            setError(null);
+
+            try {
+                const result = await aacApp.wallet.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.WithdrawUnsoldToken(auctionId)),
+                    { owner: address }
+                );
+
+                console.log('[useAuctionMutations] Withdraw unsold token result:', result);
+
+                // Trigger publicClient
+                await trigger();
+
+                // Invalidate user balances (unsold tokens go to user's balance)
+                invalidateUserBalances(address);
+
+                onSuccess?.({ type: 'withdrawUnsoldToken', data: { auctionId } });
+                return true;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to withdraw unsold tokens');
+                setError(error);
+                console.error('[useAuctionMutations] Withdraw unsold token failed:', error);
+                onError?.({ type: 'withdrawUnsoldToken', error });
+                return false;
+            } finally {
+                setIsWithdrawingUnsoldToken(false);
+            }
+        },
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+    );
+
+    /**
+     * Prune a settled auction
+     */
+    const pruneSettledAuction = useCallback(
+        async (auctionId: number): Promise<boolean> => {
+            if (!aacApp?.wallet || !address) {
+                const err = new Error('Wallet not connected');
+                setError(err);
+                onError?.({ type: 'prune', error: err });
+                return false;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.({ type: 'prune', error: err });
+                return false;
+            }
+
+            setIsPruning(true);
+            setError(null);
+
+            try {
+                const result = await aacApp.wallet.mutate<string>(
+                    JSON.stringify(AAC_MUTATION.PruneSettledAuction(auctionId)),
+                    { owner: address }
+                );
+
+                console.log('[useAuctionMutations] Prune settled auction result:', result);
+
+                // Trigger publicClient
+                await trigger();
+
+                // Invalidate affected caches
+                invalidateAuction(auctionId.toString());
+
+                onSuccess?.({ type: 'prune', data: { auctionId } });
+                return true;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to prune settled auction');
+                setError(error);
+                console.error('[useAuctionMutations] Prune failed:', error);
+                onError?.({ type: 'prune', error });
+                return false;
+            } finally {
+                setIsPruning(false);
+            }
+        },
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateAuction]
     );
 
     return {
         createAuction,
         buy,
         claimSettlement,
+        cancelAuction,
+        withdrawProceed,
+        withdrawUnsoldToken,
+        pruneSettledAuction,
         deposit,
         withdraw,
         trigger,
         isCreating,
         isBuying,
         isClaiming,
+        isCancelling,
+        isWithdrawingProceed,
+        isWithdrawingUnsoldToken,
+        isPruning,
         isDepositing,
         isWithdrawing,
         error

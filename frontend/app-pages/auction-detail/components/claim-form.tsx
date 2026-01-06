@@ -50,12 +50,16 @@ export function ClaimForm({
 
   const { claimSettlement, isClaiming, error: claimError } = useAuctionMutations({
     aacApp,
-    onClaimSuccess: () => {
-      toast.success('Successfully claimed your settlement!');
-      onSuccess?.();
+    onSuccess: (event) => {
+      if (event.type === 'claim') {
+        toast.success('Successfully claimed your settlement!');
+        onSuccess?.();
+      }
     },
-    onError: (err) => {
-      toast.error(err.message || 'Failed to claim settlement');
+    onError: (event) => {
+      if (event.type === 'claim') {
+        toast.error(event.error.message || 'Failed to claim settlement');
+      }
     }
   });
 

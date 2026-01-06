@@ -33,16 +33,18 @@ export default function SettledAuctions() {
 
     const { claimSettlement, isClaiming } = useAuctionMutations({
         aacApp: aacApp.app,
-        onClaimSuccess: (auctionId) => {
-            toast.success('Settlement claimed successfully!', {
-                description: `Auction ID: ${auctionId}`
-            });
-            refetch();
+        onSuccess: (event) => {
+            if (event.type === 'claim') {
+                toast.success('Settlement claimed successfully!');
+                refetch();
+            }
         },
-        onError: (error) => {
-            toast.error('Failed to claim settlement', {
-                description: error.message
-            });
+        onError: (event) => {
+            if (event.type === 'claim') {
+                toast.error('Failed to claim settlement', {
+                    description: event.error.message
+                });
+            }
         }
     });
 

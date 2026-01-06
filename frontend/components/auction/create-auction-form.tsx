@@ -76,18 +76,23 @@ export function CreateAuctionFormMultistep({
   // Mutation hook
   const { createAuction, isCreating } = useAuctionMutations({
     aacApp: aacApp.app,
-    onCreateSuccess: (auctionId) => {
-      toast.success('Auction created successfully!');
-      if (onSuccess) {
-        onSuccess(auctionId);
-      } else {
-        router.push(APP_ROUTES.myAuctions);
+    onSuccess: (event) => {
+      if (event.type === 'create') {
+        const { auctionId } = event.data;
+        toast.success('Auction created successfully!');
+        if (onSuccess) {
+          onSuccess(auctionId);
+        } else {
+          router.push(APP_ROUTES.myAuctions);
+        }
       }
     },
-    onError: (error) => {
-      toast.error('Failed to create auction', {
-        description: error.message
-      });
+    onError: (event) => {
+      if (event.type === 'create') {
+        toast.error('Failed to create auction', {
+          description: event.error.message
+        });
+      }
     }
   });
 

@@ -42,7 +42,7 @@ export function BidForm({
   const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
 
   // Fetch user's current commitment
-  const { commitment, totalQuantity, loading: loadingCommitment } = useCachedMyCommitment({
+  const { totalQuantity, loading: loadingCommitment } = useCachedMyCommitment({
     auctionId: auction.auctionId.toString(),
     aacApp: aacApp.app,
     skip: !aacApp.app
@@ -55,18 +55,24 @@ export function BidForm({
     error: mutationError
   } = useAuctionMutations({
     aacApp: aacApp.app,
-    onBuySuccess: (auctionId, qty) => {
-      toast.success('Bid placed successfully!', {
-        description: `You bid ${qty} unit(s) on ${auction.itemName}`
-      });
-      if (onSuccess) {
-        onSuccess(auctionId, qty);
+    onSuccess: (event) => {
+      if (event.type === 'buy') {
+        const { quantity, auctionId } = event.data;
+        toast.success('Bid placed successfully!', {
+          description: `You bid ${quantity} unit(s) on ${auctionId}`
+        });
+
+        if (onSuccess) {
+          onSuccess(auctionId, quantity);
+        }
       }
     },
-    onError: (error) => {
-      toast.error('Bid failed', {
-        description: error.message
-      });
+    onError: (event) => {
+      if (event.type === 'buy') {
+        toast.error('Bid failed', {
+          description: event.error.message
+        });
+      }
     }
   });
 
