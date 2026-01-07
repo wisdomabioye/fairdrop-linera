@@ -1,4 +1,5 @@
 use async_graphql::{scalar, InputObject, SimpleObject};
+use fungible::FungibleTokenAbi;
 use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp};
 use serde::{Deserialize, Serialize};
 
@@ -120,7 +121,11 @@ pub struct AuctionSummary {
 /// Application parameters
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AuctionParameters {
-    pub aac_chain: ChainId,  // The AAC chain ID (needed by chains other than AAC to send messages)
+    /// The AAC chain ID (needed by chains other than AAC to send messages)
+    pub aac_chain: ChainId,
+    /// Supported fungible tokens for deposits, withdrawals, and payments
+    /// These tokens must be registered at instantiation for call_application to work
+    pub supported_tokens: Vec<ApplicationId<FungibleTokenAbi>>,
 }
 
 /// Token volume for a specific token

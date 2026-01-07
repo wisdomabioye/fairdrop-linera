@@ -171,43 +171,46 @@ impl Contract for AuctionContract {
                 }
             }
 
-            AuctionOperation::Deposit { token_app, amount } => {
+            AuctionOperation::Deposit { token_index, amount } => {
                 if current_chain == app_params.aac_chain {
                     // Deposit should not be called directly on AAC
                     panic!("Deposit must be called from user chain");
                 } else {
-                    // We should call transfer operation, validate before sending
-                    // cross-chain message for deposit on AAC
+                    // Validate amount
                     if amount == Amount::ZERO {
                         panic!("Deposit amount must be greater than zero");
                     }
 
-                    // 1. Transfer tokens from user to app (AAC chain) escrow
-                    let depositor = self.runtime.authenticated_signer()
-                    .expect("Caller must be authenticated to deposit");
+                    // Get the token from supported_tokens by index
+                    let token_app = self.get_token_by_index(token_index);
 
-                    let escrow_account = Account {
-                        chain_id: self.runtime.application_parameters().aac_chain, // AAC
-                        owner: self.runtime.application_id().into(), // App-owned escrow
+                    let depositor = self.runtime.authenticated_signer()
+                        .expect("Caller must be authenticated to deposit");
+
+                    // STEP 1 (User Chain): Transfer tokens from user → user's account on AAC chain
+                    // This is a CROSS-CHAIN transfer with the SAME OWNER
+                    let user_account_on_aac = Account {
+                        chain_id: app_params.aac_chain,  // Different chain (AAC)
+                        owner: depositor,                 // Same owner
                     };
 
                     let transfer_operation = FungibleOperation::Transfer {
                         owner: depositor,
                         amount,
-                        target_account: escrow_account,
+                        target_account: user_account_on_aac,
                     };
 
-                    let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
-                        std::mem::transmute(token_app)
-                    };
-
-                    match self.runtime.call_application(true, typed_app, &transfer_operation) {
+                    // Call the token application from parameters (no dynamic loading)
+                    match self.runtime.call_application(true, token_app, &transfer_operation) {
                         FungibleResponse::Ok => {}
-                        _ => panic!("Token transfer failed. Ensure sufficient balance on AAC"),
+                        _ => panic!("Token transfer failed. Ensure sufficient balance"),
                     }
 
-                    // We can now send a cross-chain message to AAC chain to update the record
-                    let message = AuctionMessage::Deposit { token_app, amount };
+                    // STEP 2: Send cross-chain message to AAC to complete the deposit
+                    let message = AuctionMessage::Deposit {
+                        token_index,
+                        amount
+                    };
 
                     self.runtime
                         .prepare_message(message)
@@ -218,7 +221,10 @@ impl Contract for AuctionContract {
                 }
             }
 
-            AuctionOperation::Withdraw { token_app, amount, target_chain } => {
+            AuctionOperation::Withdraw { token_index, amount, target_chain } => {
+                // Get the token from supported_tokens by index
+                let token_app = self.get_token_by_index(token_index);
+
                 if current_chain == app_params.aac_chain {
                     match self.execute_withdrawal(token_app, amount, target_chain).await {
                         Ok(_remaining_balance) => AuctionResponse::Ok,
@@ -227,7 +233,12 @@ impl Contract for AuctionContract {
                         }
                     }
                 } else {
-                    let message = AuctionMessage::Withdraw { token_app, amount, target_chain };
+                    // Send token index in the message
+                    let message = AuctionMessage::Withdraw {
+                        token_index,
+                        amount,
+                        target_chain
+                    };
 
                     self.runtime
                         .prepare_message(message)
@@ -271,13 +282,36 @@ impl Contract for AuctionContract {
                 self.withdraw_auction_unsold_token(auction_id).await;
             }
 
-            AuctionMessage::Deposit { token_app, amount } => {
+            AuctionMessage::Deposit { token_index, amount } => {
                 let depositor = self.runtime.authenticated_signer()
                     .expect("Caller must be authenticated to deposit");
 
+                // Get the token from supported_tokens by index
+                let token_app = self.get_token_by_index(token_index);
+
+                // STEP 2 (AAC Chain): Transfer tokens from user → app escrow
+                // This is a CROSS-OWNER transfer on the SAME CHAIN (AAC)
+                let app_escrow_account = Account {
+                    chain_id: self.runtime.chain_id(),  // Same chain (AAC)
+                    owner: self.runtime.application_id().into(),  // App-owned escrow
+                };
+
+                let transfer_operation = FungibleOperation::Transfer {
+                    owner: depositor,
+                    amount,
+                    target_account: app_escrow_account,
+                };
+
+                // Call the token application from parameters (no dynamic loading)
+                match self.runtime.call_application(true, token_app, &transfer_operation) {
+                    FungibleResponse::Ok => {}
+                    _ => panic!("Token transfer to escrow failed"),
+                }
+
+                // Now update internal balances
                 match self.execute_deposit(depositor, token_app, amount).await {
                     Ok(_new_balance) => {
-                        // AuctionResponse::Ok;
+                        // Deposit successful
                     },
                     Err(reason) => {
                         panic!("Deposit failed: {}", reason);
@@ -285,10 +319,13 @@ impl Contract for AuctionContract {
                 }
             }
 
-            AuctionMessage::Withdraw { token_app, amount, target_chain } => {
+            AuctionMessage::Withdraw { token_index, amount, target_chain } => {
+                // Get the token from supported_tokens by index
+                let token_app = self.get_token_by_index(token_index);
+
                 match self.execute_withdrawal(token_app, amount, target_chain).await {
                     Ok(_remaining_balance) => {
-                        // AuctionResponse::Ok;
+                        // Withdrawal successful
                     },
                     Err(reason) => {
                         panic!("Withdrawal failed: {}", reason);
@@ -648,21 +685,28 @@ impl AuctionContract {
     // ═══════════════════════════════════════════════════════════
 
     /// Execute deposit: ONLY way funds enter the application
-    /// 1. Transfer tokens from user (on AAC) → app escrow (on AAC)
-    /// 2. Credit user's internal balance
-    /// 3. Update global stats
-    /// 4. Emit TokenDeposited event
+    /// Called after tokens have been transferred to app escrow
+    /// 1. Credit user's internal balance
+    /// 2. Update global stats
+    /// 3. Emit TokenDeposited event
+    ///
+    /// NOTE: Before calling this function, tokens must have been transferred:
+    /// - User chain: user → user's account on AAC (cross-chain, same owner)
+    /// - AAC chain: user → app escrow (cross-owner, same chain)
     async fn execute_deposit(
         &mut self,
         depositor: AccountOwner,
-        token_app: ApplicationId,
+        token_app: ApplicationId<FungibleTokenAbi>,
         amount: Amount,
     ) -> Result<Amount, String> {
-        // 1. Transfer must have been done from user chain
+        // Tokens have already been transferred to app escrow in the message handler
 
-        // 2. Credit user's internal balance
+        // Convert to untyped ApplicationId for state storage
+        let token_app_untyped = token_app.forget_abi();
+
+        // 1. Credit user's internal balance
         let current_balance = self.state.user_balances
-            .get(&(depositor, token_app))
+            .get(&(depositor, token_app_untyped))
             .await
             .map_err(|e| format!("Failed to get balance: {}", e))?
             .unwrap_or(Amount::ZERO);
@@ -670,24 +714,24 @@ impl AuctionContract {
         let new_balance = current_balance.saturating_add(amount);
 
         self.state.user_balances
-            .insert(&(depositor, token_app), new_balance)
+            .insert(&(depositor, token_app_untyped), new_balance)
             .map_err(|e| format!("Failed to update balance: {}", e))?;
 
-        // 3. Update global stats
+        // 2. Update global stats
         let total_dep = self.state.total_deposited
-            .get(&token_app)
+            .get(&token_app_untyped)
             .await
             .map_err(|e| format!("Failed to get total deposited: {}", e))?
             .unwrap_or(Amount::ZERO);
 
         self.state.total_deposited
-            .insert(&token_app, total_dep.saturating_add(amount))
+            .insert(&token_app_untyped, total_dep.saturating_add(amount))
             .map_err(|e| format!("Failed to update total deposited: {}", e))?;
 
-        // 4. Emit event
+        // 3. Emit event
         let event = AuctionEvent::TokenDeposited {
             user: depositor,
-            token_app,
+            token_app: token_app_untyped,
             amount,
             new_balance,
         };
@@ -704,7 +748,7 @@ impl AuctionContract {
     /// 5. Emit TokenWithdrawn event
     async fn execute_withdrawal(
         &mut self,
-        token_app: ApplicationId,
+        token_app: ApplicationId<FungibleTokenAbi>,
         amount: Amount,
         target_chain: ChainId,
     ) -> Result<Amount, String> {
@@ -715,9 +759,12 @@ impl AuctionContract {
             return Err("Withdrawal amount must be greater than zero".to_string());
         }
 
+        // Convert to untyped ApplicationId for state storage
+        let token_app_untyped = token_app.forget_abi();
+
         // 1 & 2. Validate and deduct from internal balance
         let current_balance = self.state.user_balances
-            .get(&(withdrawer, token_app))
+            .get(&(withdrawer, token_app_untyped))
             .await
             .map_err(|e| format!("Failed to get balance: {}", e))?
             .unwrap_or(Amount::ZERO);
@@ -732,7 +779,7 @@ impl AuctionContract {
         let remaining_balance = current_balance.saturating_sub(amount);
 
         self.state.user_balances
-            .insert(&(withdrawer, token_app), remaining_balance)
+            .insert(&(withdrawer, token_app_untyped), remaining_balance)
             .map_err(|e| format!("Failed to update balance: {}", e))?;
 
         // 3. Transfer tokens from escrow to user on target chain
@@ -747,16 +794,12 @@ impl AuctionContract {
             target_account: user_account,
         };
 
-        let typed_app: ApplicationId<FungibleTokenAbi> = unsafe {
-            std::mem::transmute(token_app)
-        };
-
-        match self.runtime.call_application(true, typed_app, &transfer_operation) {
+        match self.runtime.call_application(true, token_app, &transfer_operation) {
             FungibleResponse::Ok => {}
             _ => {
                 // Rollback balance change
                 self.state.user_balances
-                    .insert(&(withdrawer, token_app), current_balance)
+                    .insert(&(withdrawer, token_app_untyped), current_balance)
                     .map_err(|e| format!("Failed to rollback balance: {}", e))?;
                 return Err("Token transfer failed".to_string());
             }
@@ -764,19 +807,19 @@ impl AuctionContract {
 
         // 4. Update global stats
         let total_with = self.state.total_withdrawn
-            .get(&token_app)
+            .get(&token_app_untyped)
             .await
             .map_err(|e| format!("Failed to get total withdrawn: {}", e))?
             .unwrap_or(Amount::ZERO);
 
         self.state.total_withdrawn
-            .insert(&token_app, total_with.saturating_add(amount))
+            .insert(&token_app_untyped, total_with.saturating_add(amount))
             .map_err(|e| format!("Failed to update total withdrawn: {}", e))?;
 
         // 5. Emit event
         let event = AuctionEvent::TokenWithdrawn {
             user: withdrawer,
-            token_app,
+            token_app: token_app_untyped,
             amount,
             remaining_balance,
             target_chain,
@@ -1261,6 +1304,30 @@ impl AuctionContract {
         .expect("Failed to transfer unsold tokens to creator");
 
         AuctionResponse::Ok
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Token Application Helpers
+    // ═══════════════════════════════════════════════════════════
+
+    /// Get a token application by index from the supported_tokens list
+    /// This ensures the token comes from parameters (registered at instantiation)
+    /// and avoids dynamic application loading issues
+    fn get_token_by_index(&mut self, token_index: u32) -> ApplicationId<FungibleTokenAbi> {
+        let supported_tokens = &self.runtime.application_parameters().supported_tokens;
+
+        // Validate index is within bounds
+        let index = token_index as usize;
+        if index >= supported_tokens.len() {
+            panic!(
+                "Invalid token index: {}. Supported tokens: 0-{}",
+                token_index,
+                supported_tokens.len().saturating_sub(1)
+            );
+        }
+
+        // Get token from parameters (already typed with FungibleTokenAbi)
+        supported_tokens[index]
     }
 
     // ═══════════════════════════════════════════════════════════

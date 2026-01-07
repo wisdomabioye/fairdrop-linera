@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use linera_sdk::linera_base_types::{ChainId, Amount, ApplicationId};
+use linera_sdk::linera_base_types::{ChainId, Amount};
 use crate::types::{AuctionParamsInput, AuctionId};
 
 /// Messages for the Auction Application (used by both AAC and UIC chains)
@@ -41,16 +41,18 @@ pub enum AuctionMessage {
     },
 
     Deposit {
-        token_app: ApplicationId,
+        /// Index of the token in supported_tokens list (from application parameters)
+        token_index: u32,
         amount: Amount
     },
 
     Withdraw {
-        token_app: ApplicationId,
+        /// Index of the token in supported_tokens list (from application parameters)
+        token_index: u32,
         amount: Amount,
         target_chain: ChainId
     },
-    
+
 }
 
 /// Messages sent to Indexer (not used - Indexer uses events only)

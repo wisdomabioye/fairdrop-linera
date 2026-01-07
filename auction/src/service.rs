@@ -8,7 +8,7 @@ use linera_sdk::linera_base_types::{Amount, AccountOwner, ApplicationId, WithSer
 use linera_sdk::views::View;
 use linera_sdk::{Service, ServiceRuntime};
 use auction::AuctionAbi;
-use shared::types::{AuctionId, BidRecord, GlobalStats, TokenVolume};
+use shared::types::{AuctionId, AuctionParameters, BidRecord, GlobalStats, TokenVolume};
 use std::sync::Arc;
 use self::state::{AuctionState, AuctionData};
 
@@ -17,6 +17,14 @@ struct AuctionWithId {
     auction_id: AuctionId,
     #[graphql(flatten)]
     data: AuctionData,
+}
+
+#[derive(SimpleObject)]
+struct TokenInfo {
+    /// Index of the token in the supported_tokens list
+    index: u32,
+    /// The ApplicationId of the token
+    token_app: ApplicationId,
 }
 
 pub struct AuctionService {
@@ -31,7 +39,7 @@ impl WithServiceAbi for AuctionService {
 }
 
 impl Service for AuctionService {
-    type Parameters = ();
+    type Parameters = AuctionParameters;
 
     async fn new(runtime: ServiceRuntime<Self>) -> Self {
         let state = AuctionState::load(runtime.root_view_storage_context())
@@ -47,6 +55,7 @@ impl Service for AuctionService {
         let schema = Schema::build(
             QueryRoot {
                 state: self.state.clone(),
+                runtime: self.runtime.clone(),
             },
             auction::AuctionOperation::mutation_root(self.runtime.clone()),
             EmptySubscription,
@@ -59,6 +68,7 @@ impl Service for AuctionService {
 
 struct QueryRoot {
     state: Arc<AuctionState>,
+    runtime: Arc<ServiceRuntime<AuctionService>>,
 }
 
 #[Object]
@@ -396,5 +406,23 @@ impl QueryRoot {
             withdrawn_by_token,
             total_value_locked,
         })
+    }
+
+    /// Get list of supported tokens with their indices
+    /// Users need this to know which token_index to use in Deposit/Withdraw operations
+    async fn supported_tokens(&self) -> Result<Vec<TokenInfo>, String> {
+        let params = self.runtime.application_parameters();
+        let supported_tokens = &params.supported_tokens;
+
+        let token_list = supported_tokens
+            .iter()
+            .enumerate()
+            .map(|(index, token_app)| TokenInfo {
+                index: index as u32,
+                token_app: token_app.forget_abi(),
+            })
+            .collect();
+
+        Ok(token_list)
     }
 }

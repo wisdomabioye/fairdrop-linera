@@ -10,3 +10,5 @@ license.workspace = true
 async-graphql.workspace = true
 linera-sdk.workspace = true
 serde.workspace = true
+
+fungible = { path = "../fungible" }

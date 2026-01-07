@@ -8,7 +8,7 @@ export const AAC_APP_ID = process.env.NEXT_PUBLIC_AAC_APP!;
  * The chain where AAC app is running.
  * This is usually our public-chain
  * */
-export const AAC_CHAIN_ID = process.env.NEXT_PUBLIC_AAC_CHAIN!;
+export const AAC_CHAIN_ID = process.env.NEXT_PUBLIC_AAC_CHAIN_ID!;
 /** The indexer chain Id - can be initialize on most chains */
 export const INDEXER_CHAIN_ID = process.env.NEXT_PUBLIC_INDEXER_CHAIN_ID!;
 
