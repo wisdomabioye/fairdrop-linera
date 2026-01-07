@@ -14,16 +14,16 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
       }}
       fallback={<PageLoading />}
       errorFallback={() => <ErrorFallback />}
-      skipProcessInbox={false}
+      skipProcessInbox={true}
       logging={{
         enabled: true,
         level: LogLevel.DEBUG
       }}
     >
       <SyncProvider>
-        {/* <EagerLoader> */}
+        <EagerLoader>
           {children}
-        {/* </EagerLoader> */}
+        </EagerLoader>
       </SyncProvider>
     </LineraProvider>
   )

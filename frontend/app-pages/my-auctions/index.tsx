@@ -39,7 +39,7 @@ export default function MyAuctionsPage() {
     } = useCachedAuctionsByCreator({
         creator: address!,
         offset: 0,
-        limit: 50,
+        limit: 20,
         aacApp: aacApp.app,
         skip: !address || !aacApp.app
     });
