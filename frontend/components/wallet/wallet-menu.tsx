@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { useLineraClient } from 'linera-react-client';
 import { useSyncStatus } from '@/providers/sync-provider';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Copy, Check, Loader2, User, LogOut, Wallet, Hash, ChevronDown } from 'lucide-react';
+import { Copy, Check, Loader2, User, LogOut, Wallet, Hash, ChevronDown, Wallet2 } from 'lucide-react';
 import { APP_ROUTES } from '@/config/app.route';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -20,7 +19,7 @@ interface WalletMenuProps {
 
 export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMenuProps) {
   const { walletChainId } = useLineraClient();
-  const { isClientSyncing } = useSyncStatus();
+  const { isWalletClientSyncing } = useSyncStatus();
   const [isOpen, setIsOpen] = React.useState(false);
   const [copiedAddress, setCopiedAddress] = React.useState(false);
   const [copiedChainId, setCopiedChainId] = React.useState(false);
@@ -52,7 +51,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
           className={cn(
             'group relative px-4 py-2 rounded-lg border text-sm font-medium shadow-lg transition-all',
             'bg-gradient-to-r hover:shadow-xl',
-            isClientSyncing
+            isWalletClientSyncing
               ? 'from-warning/10 to-warning/5 border-warning/30 text-warning hover:shadow-warning/20'
               : 'from-success/10 to-success/5 border-success/30 text-success hover:shadow-success/20'
           )}
@@ -60,7 +59,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
           <div className="flex items-center gap-2">
             {/* Status Indicator */}
             <div className="relative">
-              {isClientSyncing ? (
+              {isWalletClientSyncing ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
                 <>
@@ -96,7 +95,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
               <Wallet className="w-4 h-4 text-primary" />
               <span className="text-sm font-semibold text-text-primary">Wallet</span>
             </div>
-            {isClientSyncing && (
+            {isWalletClientSyncing && (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-warning/10 border border-warning/30">
                 <Loader2 className="w-3 h-3 text-warning animate-spin" />
                 <span className="text-xs font-medium text-warning">Syncing...</span>
@@ -157,6 +156,14 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
           >
             <User className="w-4 h-4 group-hover:text-primary transition-colors" />
             <span>My Auctions</span>
+          </Link>
+          <Link
+            href={APP_ROUTES.aacBalances}
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/5 transition-all group"
+          >
+            <Wallet2 className="w-4 h-4 group-hover:text-primary transition-colors" />
+            <span>AAC Balances</span>
           </Link>
         </div>
 

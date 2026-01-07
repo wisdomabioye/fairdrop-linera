@@ -101,7 +101,7 @@ export function useCachedSettledAuctions(
      */
     const refetch = useCallback(async () => {
         if (!aacApp || skip) return;
-        console.log('aacApp', aacApp)
+        // console.log('aacApp', aacApp)
 
         try {
             await fetchSettledAuctions(offset, limit, aacApp);

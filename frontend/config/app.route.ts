@@ -12,6 +12,7 @@ export const APP_ROUTES = {
   settledAuctions: '/settled-auction',
   createAuction: '/create-auction',
   myAuctions: '/my-auctions',
+  aacBalances: '/aac-balances',
   auctionDetail: (id: string | number) => `/auction-detail?id=${id}`,
 } as const;
 
