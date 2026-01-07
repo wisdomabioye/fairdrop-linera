@@ -698,15 +698,15 @@ export const AAC_MUTATION = {
         }
     },
 
-    Deposit (token_app: number, amount: string) {
+    Deposit (token_app: string, amount: string) {
         return {
-            query: `mutation { deposit(tokenApp: ${token_app}, amount: ${amount}) }`
+            query: `mutation { deposit(tokenApp: ${formatGraphQLValue(token_app)}, amount: ${formatGraphQLValue(amount)}) }`
         }
     },
 
-    Withdraw (token_app: number, amount: string, target_chain: string) {
+    Withdraw (token_app: string, amount: string, target_chain: string) {
         return {
-            query: `mutation { withdraw(tokenApp: ${token_app}, amount: ${amount}, targetChain: ${target_chain}) }`
+            query: `mutation { withdraw(tokenApp: ${formatGraphQLValue(token_app)}, amount: ${formatGraphQLValue(amount)}, targetChain: ${formatGraphQLValue(target_chain)}) }`
         }
     }
 }

@@ -353,7 +353,7 @@ export function useAuctionMutations(
 
             try {
                 const result = await aacApp.wallet.mutate<string>(
-                    JSON.stringify(AAC_MUTATION.Deposit(Number(tokenApp), amount)),
+                    JSON.stringify(AAC_MUTATION.Deposit(tokenApp, amount)),
                     { owner: address }
                 );
 
@@ -411,7 +411,7 @@ export function useAuctionMutations(
 
             try {
                 const result = await aacApp.wallet.mutate<string>(
-                    JSON.stringify(AAC_MUTATION.Withdraw(Number(tokenApp), amount, `"${targetChain}"`)),
+                    JSON.stringify(AAC_MUTATION.Withdraw(tokenApp, amount, `"${targetChain}"`)),
                     { owner: address }
                 );
 
