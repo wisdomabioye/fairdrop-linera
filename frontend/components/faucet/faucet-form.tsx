@@ -1,24 +1,24 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import { Droplet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { TokenSelector } from '@/components/shared';
 import { WalletConnectionPrompt } from '@/components/wallet';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
 import { useFungibleMutations, usePolling } from '@/hooks';
 import { useSyncStatus } from '@/providers';
 import { getTokenList, type TokenInfo } from '@/config/app.token-store';
-import { toast } from 'sonner';
+import { useTokenStore } from '@/store/token-store';
 import { UnifiedStatusBar } from './unified-status-bar';
 import { AmountPresets } from './amount-presets';
 import { BalanceCard } from './balance-card';
 import { MintHistory, type MintRecord } from './mint-history';
 import { SuccessOverlay } from './success-overlay';
-import { TokenSelector } from '@/components/shared';
-import { useTokenStore } from '@/store/token-store';
 
 export interface FaucetFormProps {
   defaultToken?: string;

@@ -949,7 +949,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     JSON.stringify(AAC_QUERY.UserBalances(address, tokenApps))
                 );
 
-                console.log('UserBalances (batched):', JSON.parse(result));
+                // console.log('UserBalances (batched):', JSON.parse(result));
 
                 const { data } = JSON.parse(result) as {
                     data: { userBalances: Array<{ tokenApp: string; amount: number }> | null }

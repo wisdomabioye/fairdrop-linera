@@ -1,24 +1,25 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { FUNGIBLE_QUERY } from '@/lib/gql/queries';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { pollingManager } from '@/lib/utils/polling-manager';
-import { queryDeduplicator } from '@/lib/utils/query-deduplicator';
-import type { FungibleChain } from '@/lib/utils/fungible-client-adapter';
 import type {
-    FungibleAccounts,
-    FungibleAllowances,
     AccountBalance,
     Allowance
 } from '@/lib/gql/types';
+import { useTokenStore } from '@/store/token-store';
+import { ChainApp } from 'linera-react-client';
 
 export interface UseFungibleQueryOptions {
     /** The normalized fungible chain (wallet or public) */
-    chainApp?: FungibleChain | null;
+    chainApp?: ChainApp | null;
+    /** Token application ID (optional - required for store integration) */
+    tokenId?: string;
+    /** Chain ID where this token is being used (optional - required for store integration) */
+    chainId?: string;
+    /** User address for balance lookups */
+    address?: string;
     /** Auto-fetch on mount */
     autoFetch?: boolean;
     /** Polling interval in milliseconds (optional) */
     pollingInterval?: number;
-    /** App ID for deduplication and polling keys */
-    appId?: string;
     /** Whether wallet is currently syncing (prevents queries during sync) */
     isWalletSyncing?: boolean;
 }
@@ -51,206 +52,192 @@ export interface UseFungibleQueryResult {
 }
 
 export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQueryResult {
-    const { chainApp, autoFetch = false, pollingInterval, appId = 'unknown', isWalletSyncing = false } = options;
+    const {
+        chainApp,
+        tokenId,
+        chainId,
+        autoFetch = false,
+        pollingInterval,
+        isWalletSyncing = false
+    } = options;
 
-    // Accounts state
-    const [accounts, setAccounts] = useState<AccountBalance[]>([]);
-    const [accountsLoading, setAccountsLoading] = useState(false);
-    const [accountsError, setAccountsError] = useState<Error | null>(null);
+    const appId = `${tokenId}-${chainId}`;
 
-    // Allowances state
-    const [allowances, setAllowances] = useState<Allowance[]>([]);
-    const [allowancesLoading, setAllowancesLoading] = useState(false);
-    const [allowancesError, setAllowancesError] = useState<Error | null>(null);
+    // Get store state and methods
+    const {
+        balances,
+        allowances: allowancesMap,
+        tokenInfo,
+        fetchAccounts: storeFetchAccounts,
+        fetchAllowances: storeFetchAllowances,
+        fetchTokenInfo: storeFetchTokenInfo,
+        getBalance,
+        getAllowance: storeGetAllowance,
+        getTokenSymbol,
+        getTokenName,
+    } = useTokenStore();
 
-    // Token info state
-    const [tickerSymbol, setTickerSymbol] = useState<string | null>(null);
-    const [tokenName, setTokenName] = useState<string | null>(null);
-    const [tokenInfoLoading, setTokenInfoLoading] = useState(false);
-    const [tokenInfoError, setTokenInfoError] = useState<Error | null>(null);
+    // Derive accounts array from store's balances Map
+    const accounts = useMemo(() => {
+        if (!tokenId || !chainId) return [];
 
-    // Fetch accounts with deduplication
+        const result: AccountBalance[] = [];
+        const prefix = `${tokenId}:${chainId}:`;
+
+        for (const [key, entry] of balances.entries()) {
+            if (key.startsWith(prefix) && entry.status === 'success' && entry.balance) {
+                const owner = key.substring(prefix.length);
+                result.push({
+                    key: owner,
+                    value: entry.balance
+                });
+            }
+        }
+
+        return result;
+    }, [balances, tokenId, chainId]);
+
+    // Derive allowances array from store's allowances Map
+    const allowances = useMemo(() => {
+        if (!tokenId || !chainId) return [];
+
+        const result: Allowance[] = [];
+        const prefix = `${tokenId}:${chainId}:`;
+
+        for (const [key, entry] of allowancesMap.entries()) {
+            if (key.startsWith(prefix) && entry.status === 'success' && entry.allowance) {
+                // Extract owner:spender from key (format: tokenId:chainId:owner:spender)
+                const ownerSpenderPart = key.substring(prefix.length);
+                const [owner, spender] = ownerSpenderPart.split(':');
+
+                if (owner && spender) {
+                    // Create the OwnerSpender serialized key format
+                    const ownerSpenderKey = JSON.stringify({ owner, spender });
+                    result.push({
+                        key: ownerSpenderKey,
+                        value: entry.allowance
+                    });
+                }
+            }
+        }
+
+        return result;
+    }, [allowancesMap, tokenId, chainId]);
+
+    // Get loading/error states from store cache entries
+    const accountsLoading = useMemo(() => {
+        if (!tokenId || !chainId) return false;
+
+        // Check if any account entry is loading
+        const prefix = `${tokenId}:${chainId}:`;
+        for (const [key, entry] of balances.entries()) {
+            if (key.startsWith(prefix) && entry.status === 'loading') {
+                return true;
+            }
+        }
+        return false;
+    }, [balances, tokenId, chainId]);
+
+    const accountsError = useMemo(() => {
+        if (!tokenId || !chainId) return null;
+
+        // Return first error found
+        const prefix = `${tokenId}:${chainId}:`;
+        for (const [key, entry] of balances.entries()) {
+            if (key.startsWith(prefix) && entry.status === 'error') {
+                return entry.error || new Error('Failed to fetch accounts');
+            }
+        }
+        return null;
+    }, [balances, tokenId, chainId]);
+
+    const allowancesLoading = useMemo(() => {
+        if (!tokenId || !chainId) return false;
+
+        const prefix = `${tokenId}:${chainId}:`;
+        for (const [key, entry] of allowancesMap.entries()) {
+            if (key.startsWith(prefix) && entry.status === 'loading') {
+                return true;
+            }
+        }
+        return false;
+    }, [allowancesMap, tokenId, chainId]);
+
+    const allowancesError = useMemo(() => {
+        if (!tokenId || !chainId) return null;
+
+        const prefix = `${tokenId}:${chainId}:`;
+        for (const [key, entry] of allowancesMap.entries()) {
+            if (key.startsWith(prefix) && entry.status === 'error') {
+                return entry.error || new Error('Failed to fetch allowances');
+            }
+        }
+        return null;
+    }, [allowancesMap, tokenId, chainId]);
+
+    // Get token info from store
+    const tickerSymbol = useMemo(() => {
+        if (!tokenId || !chainId) return null;
+        return getTokenSymbol(tokenId, chainId);
+    }, [tokenId, chainId, getTokenSymbol, tokenInfo]);
+
+    const tokenName = useMemo(() => {
+        if (!tokenId || !chainId) return null;
+        return getTokenName(tokenId, chainId);
+    }, [tokenId, chainId, getTokenName, tokenInfo]);
+
+    const tokenInfoLoading = useMemo(() => {
+        if (!tokenId || !chainId) return false;
+
+        const key = `${tokenId}:${chainId}`;
+        const entry = tokenInfo.get(key);
+        return entry?.status === 'loading';
+    }, [tokenInfo, tokenId, chainId]);
+
+    const tokenInfoError = useMemo(() => {
+        if (!tokenId || !chainId) return null;
+
+        const key = `${tokenId}:${chainId}`;
+        const entry = tokenInfo.get(key);
+        return entry?.status === 'error' ? (entry.error || new Error('Failed to fetch token info')) : null;
+    }, [tokenInfo, tokenId, chainId]);
+
+    // Fetch methods - delegate to store
     const fetchAccounts = useCallback(async () => {
-        // Don't fetch if wallet is syncing
-        if (isWalletSyncing) {
-            // console.debug('[useFungibleQuery] Skipping fetch - wallet is syncing');
+        if (isWalletSyncing || !tokenId || !chainId || !chainApp) {
             return;
         }
 
-        const dedupeKey = `fungible-accounts-${appId}`;
+        await storeFetchAccounts(tokenId, chainId, chainApp);
+    }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchAccounts]);
 
-        setAccountsLoading(true);
-        setAccountsError(null);
-
-        try {
-
-
-            await queryDeduplicator.deduplicate(dedupeKey, async () => {
-                if (!chainApp) {
-                    setAccountsError(new Error('Fungible chainApp not initialized'));
-                    return;
-                }
-
-                const result = await chainApp.query<string>(
-                    JSON.stringify(FUNGIBLE_QUERY.Accounts())
-                );
-                // console.log('Accounts', result)
-                const parsed = JSON.parse(result) as { data: FungibleAccounts | null, errors?: unknown[] };
-
-                if (parsed.errors && parsed.errors.length > 0) {
-                    throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
-                }
-
-                if (parsed.data?.accounts?.entries) {
-                    setAccounts(parsed.data.accounts.entries);
-                } else {
-                    setAccounts([]);
-                }
-            });
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error('Failed to fetch accounts');
-            setAccountsError(err);
-            // console.error('Error fetching accounts:', error);
-        } finally {
-            setAccountsLoading(false);
-        }
-    }, [chainApp, appId, isWalletSyncing]);
-
-    // Fetch allowances with deduplication
     const fetchAllowances = useCallback(async () => {
-        // Don't fetch if wallet is syncing
-        if (isWalletSyncing) {
-            // console.debug('[useFungibleQuery] Skipping allowances fetch - wallet is syncing');
+        if (isWalletSyncing || !tokenId || !chainId || !chainApp) {
             return;
         }
 
-        const dedupeKey = `fungible-allowances-${appId}`;
+        await storeFetchAllowances(tokenId, chainId, chainApp);
+    }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchAllowances]);
 
-        setAllowancesLoading(true);
-        setAllowancesError(null);
-
-        try {
-            await queryDeduplicator.deduplicate(dedupeKey, async () => {
-                if (!chainApp) {
-                    setAllowancesError(new Error('Fungible chainApp not initialized'));
-                    return;
-                }
-
-                const result = await chainApp.query<string>(
-                    JSON.stringify(FUNGIBLE_QUERY.Allowances())
-                );
-
-                const parsed = JSON.parse(result) as { data: FungibleAllowances | null, errors?: unknown[] };
-                if (parsed.errors && parsed.errors.length > 0) {
-                    throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
-                }
-
-                if (parsed.data?.allowances?.entries) {
-                    setAllowances(parsed.data.allowances.entries);
-                } else {
-                    setAllowances([]);
-                }
-            });
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error('Failed to fetch allowances');
-            setAllowancesError(err);
-            // console.error('Error fetching allowances:', error);
-        } finally {
-            setAllowancesLoading(false);
-        }
-    }, [chainApp, appId, isWalletSyncing]);
-
-    // Fetch token info (ticker symbol and token name)
     const fetchTokenInfo = useCallback(async () => {
-        // Don't fetch if wallet is syncing
-        if (isWalletSyncing) {
-            // console.debug('[useFungibleQuery] Skipping token info fetch - wallet is syncing');
+        if (isWalletSyncing || !tokenId || !chainId || !chainApp) {
             return;
         }
 
-        const dedupeKey = `fungible-token-info-${appId}`;
-
-        setTokenInfoLoading(true);
-        setTokenInfoError(null);
-
-        try {
-            await queryDeduplicator.deduplicate(dedupeKey, async () => {
-                if (!chainApp) {
-                    setTokenInfoError(new Error('Fungible chainApp not initialized'));
-                    return;
-                }
-
-                // Fetch ticker symbol
-                const tickerResult = await chainApp.query<string>(
-                    JSON.stringify(FUNGIBLE_QUERY.TickerSymbol())
-                );
-                const tickerParsed = JSON.parse(tickerResult) as { data: { tickerSymbol: string } | null, errors?: unknown[] };
-
-                if (tickerParsed.errors && tickerParsed.errors.length > 0) {
-                    throw new Error(`GraphQL error fetching ticker: ${JSON.stringify(tickerParsed.errors)}`);
-                }
-
-                // Fetch token name
-                const nameResult = await chainApp.query<string>(
-                    JSON.stringify(FUNGIBLE_QUERY.TokenName())
-                );
-                const nameParsed = JSON.parse(nameResult) as { data: { tokenName: string } | null, errors?: unknown[] };
-
-                if (nameParsed.errors && nameParsed.errors.length > 0) {
-                    throw new Error(`GraphQL error fetching token name: ${JSON.stringify(nameParsed.errors)}`);
-                }
-
-                setTickerSymbol(tickerParsed.data?.tickerSymbol || null);
-                setTokenName(nameParsed.data?.tokenName || null);
-            });
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error('Failed to fetch token info');
-            setTokenInfoError(err);
-            // console.error('Error fetching token info:', error);
-        } finally {
-            setTokenInfoLoading(false);
-        }
-    }, [chainApp, appId, isWalletSyncing]);
+        await storeFetchTokenInfo(tokenId, chainId, chainApp);
+    }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchTokenInfo]);
 
     // Helper to get balance for a specific account
     const getAccountBalance = useCallback((owner: string): string | null => {
-        // console.log('[getAccountBalance] Looking for owner:', owner);
-        // console.log('[getAccountBalance] Available accounts:', accounts);
-
-        // Try exact match first
-        let account = accounts.find(acc => acc.key === owner);
-
-        // If not found, try case-insensitive match
-        if (!account) {
-            account = accounts.find(acc => acc.key.toLowerCase() === owner.toLowerCase());
-            if (account) {
-                // console.log('[getAccountBalance] Found via case-insensitive match');
-            }
-        }
-
-        const balance = account ? account.value : null;
-        // console.log('[getAccountBalance] Returning balance:', balance);
-        return balance;
-    }, [accounts]);
+        if (!tokenId || !chainId) return null;
+        return getBalance(tokenId, chainId, owner);
+    }, [tokenId, chainId, getBalance]);
 
     // Helper to get allowance for a specific owner-spender pair
-    // Note: OwnerSpender is a scalar, so we need to parse the serialized key
     const getAllowance = useCallback((owner: string, spender: string): string | null => {
-        // Try to find by parsing the serialized OwnerSpender key
-        // The key format depends on how the scalar is serialized
-        const allowance = allowances.find(allow => {
-            try {
-                // Attempt to parse if it's JSON serialized
-                const parsed = JSON.parse(allow.key);
-                return parsed.owner === owner && parsed.spender === spender;
-            } catch {
-                // If not JSON, it might be a different format
-                // For now, return false and the function will return null
-                return false;
-            }
-        });
-        return allowance ? allowance.value : null;
-    }, [allowances]);
+        if (!tokenId || !chainId) return null;
+        return storeGetAllowance(tokenId, chainId, owner, spender);
+    }, [tokenId, chainId, storeGetAllowance]);
 
     // Track if initial fetch is done
     const initialFetchDone = useRef(false);
@@ -269,17 +256,17 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
 
     // Auto-fetch on mount (only once, skip if syncing)
     useEffect(() => {
-        if (autoFetch && chainApp && !initialFetchDone.current && !isWalletSyncing) {
+        if (autoFetch && chainApp && tokenId && chainId && !initialFetchDone.current && !isWalletSyncing) {
             initialFetchDone.current = true;
             fetchAccountsRef.current();
             fetchAllowancesRef.current();
             fetchTokenInfoRef.current();
         }
-    }, [autoFetch, chainApp, isWalletSyncing]);
+    }, [autoFetch, chainApp, tokenId, chainId, isWalletSyncing]);
 
     // Smart polling with PollingManager (skip if syncing)
     useEffect(() => {
-        if (!pollingInterval || !chainApp || isWalletSyncing) {
+        if (!pollingInterval || !chainApp || !tokenId || !chainId || isWalletSyncing) {
             return;
         }
 
@@ -301,7 +288,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         return () => {
             unsubscribe();
         };
-    }, [pollingInterval, chainApp, appId, isWalletSyncing]);
+    }, [pollingInterval, chainApp, tokenId, chainId, appId, isWalletSyncing]);
 
     return {
         accounts,
