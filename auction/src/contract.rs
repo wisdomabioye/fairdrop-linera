@@ -172,21 +172,42 @@ impl Contract for AuctionContract {
             }
 
             AuctionOperation::Deposit { token_index, amount } => {
+                // Validate amount
+                if amount == Amount::ZERO {
+                    panic!("Deposit amount must be greater than zero");
+                }
+
+                // Get the token from supported_tokens by index
+                let token_app = self.get_token_by_index(token_index);
+
+                let depositor = self.runtime.authenticated_signer()
+                    .expect("Caller must be authenticated to deposit");
+
                 if current_chain == app_params.aac_chain {
-                    // Deposit should not be called directly on AAC
-                    panic!("Deposit must be called from user chain");
-                } else {
-                    // Validate amount
-                    if amount == Amount::ZERO {
-                        panic!("Deposit amount must be greater than zero");
+                    // Direct deposit on AAC chain (e.g., creator depositing auction tokens)
+                    // Transfer tokens directly from user → app escrow (same chain, cross-owner)
+                    let app_escrow_account = Account {
+                        chain_id: app_params.aac_chain,
+                        owner: self.runtime.application_id().into(),
+                    };
+
+                    let transfer_operation = FungibleOperation::Transfer {
+                        owner: depositor,
+                        amount,
+                        target_account: app_escrow_account,
+                    };
+
+                    match self.runtime.call_application(true, token_app, &transfer_operation) {
+                        FungibleResponse::Ok => {}
+                        _ => panic!("Token transfer failed. Ensure sufficient balance"),
                     }
 
-                    // Get the token from supported_tokens by index
-                    let token_app = self.get_token_by_index(token_index);
-
-                    let depositor = self.runtime.authenticated_signer()
-                        .expect("Caller must be authenticated to deposit");
-
+                    // Update internal balances directly
+                    match self.execute_deposit(depositor, token_app, amount).await {
+                        Ok(_) => AuctionResponse::Ok,
+                        Err(_) => panic!("Deposit failed"),
+                    }
+                } else {
                     // STEP 1 (User Chain): Transfer tokens from user → user's account on AAC chain
                     // This is a CROSS-CHAIN transfer with the SAME OWNER
                     let user_account_on_aac = Account {
@@ -220,6 +241,7 @@ impl Contract for AuctionContract {
                     AuctionResponse::Ok
                 }
             }
+
 
             AuctionOperation::Withdraw { token_index, amount, target_chain } => {
                 // Get the token from supported_tokens by index

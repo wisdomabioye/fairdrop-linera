@@ -18,6 +18,11 @@ thiserror.workspace = true
 shared = { path = "../shared" }
 fungible = { path = "../fungible" }
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+fungible = { path = "../fungible", features = ["test"] }
+linera-sdk = { workspace = true, features = ["test"] }
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

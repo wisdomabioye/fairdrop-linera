@@ -6,6 +6,9 @@ edition.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[features]
+test = []
+
 [dependencies]
 async-graphql.workspace = true
 async-trait.workspace = true

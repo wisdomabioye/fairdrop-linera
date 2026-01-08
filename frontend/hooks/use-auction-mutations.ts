@@ -146,7 +146,7 @@ export function useAuctionMutations(
     const trigger = useCallback(
         async (): Promise<void> => {
             try {
-                const result = await aacApp?.wallet?.mutate<string>(
+                const result = await aacApp?.public?.systemMutate<string>(
                     JSON.stringify(AAC_MUTATION.Trigger())
                 );
 
