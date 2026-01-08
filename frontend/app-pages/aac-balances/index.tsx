@@ -26,6 +26,7 @@ export default function AACBalances() {
   const {
     balances,
     loading,
+    status,
     error,
     refetch,
     isStale
@@ -35,6 +36,9 @@ export default function AACBalances() {
     aacApp: aacApp.app,
     skip: !address || !aacApp.app
   });
+
+  /** Not first load, i.e already loaded */
+  const isIdle = status === 'idle';
 
   // Dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
@@ -140,7 +144,7 @@ export default function AACBalances() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {loading && isIdle ? (
                   // Loading skeleton
                   tokens.map((token) => (
                     <tr key={token.appId} className="border-b last:border-0">
@@ -205,7 +209,7 @@ export default function AACBalances() {
 
           {/* Mobile Cards */}
           <div className="md:hidden space-y-4">
-            {loading ? (
+            {loading && isIdle ? (
               // Loading skeleton
               tokens.map((token) => (
                 <Card key={token.appId}>

@@ -30,7 +30,7 @@ const POLLING_INTERVAL = 30000;
 
 export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   const { isConnected, address } = useWalletConnection();
-  const { isClientSyncing } = useSyncStatus();
+  const { isWalletClientSyncing } = useSyncStatus();
   const tokens = getTokenList();
 
   const [selectedTokenId, setSelectedTokenId] = useState<string>(
@@ -58,7 +58,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
 
   // Polling callback for balance and token info
   const pollTokenData = useCallback(async () => {
-    if (!address || !selectedTokenId || !fungibleApp.app?.wallet || isClientSyncing) {
+    if (!address || !selectedTokenId || !fungibleApp.app?.wallet || isWalletClientSyncing) {
       return;
     }
 
@@ -90,7 +90,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     } catch (error) {
       console.error('[FaucetForm] Failed to fetch token data:', error);
     }
-  }, [address, selectedTokenId, fungibleApp.app, isClientSyncing, fetchBalance, fetchTokenInfo, isBalanceStale]);
+  }, [address, selectedTokenId, fungibleApp.app, isWalletClientSyncing, fetchBalance, fetchTokenInfo, isBalanceStale]);
 
   // Set up polling with usePolling hook (immediate: true for initial fetch)
   usePolling(pollTokenData, POLLING_INTERVAL, { immediate: true });
@@ -190,7 +190,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
       return;
     }
 
-    if (isClientSyncing) {
+    if (isWalletClientSyncing) {
       toast.warning('Client is syncing', {
         description: 'Please wait for client to finish syncing'
       });
@@ -205,7 +205,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     await mint(address, amount);
   };
 
-  const canSubmit = isConnected && !!fungibleApp.app && !!amount && Number(amount) > 0 && !isMinting && !isClientSyncing;
+  const canSubmit = isConnected && !!fungibleApp.app && !!amount && Number(amount) > 0 && !isMinting && !isWalletClientSyncing;
 
   // Wallet connection guard
   if (!isConnected) {
@@ -236,8 +236,8 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Unified Status Bar */}
             <UnifiedStatusBar
-              isWalletSyncing={isClientSyncing}
-              isLoading={accountsLoading}
+              isWalletSyncing={isWalletClientSyncing}
+              isLoading={!actualBalance && accountsLoading}
               isMinting={isMinting}
               error={mintError || accountsError}
             />
@@ -255,7 +255,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
               tokens={tokens}
               value={selectedTokenId}
               onValueChange={setSelectedTokenId}
-              disabled={isMinting || isClientSyncing}
+              disabled={isMinting || isWalletClientSyncing}
             />
 
             {/* Amount Input */}
@@ -267,7 +267,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
                 placeholder="Enter amount"
                 value={amount}
                 onChange={handleAmountChange}
-                disabled={isMinting || isClientSyncing}
+                disabled={isMinting || isWalletClientSyncing}
                 className="h-14 text-lg font-semibold"
               />
             </div>
@@ -276,7 +276,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
             <AmountPresets
               selectedAmount={amount}
               onSelectAmount={handleQuickAmount}
-              disabled={isMinting || isClientSyncing}
+              disabled={isMinting || isWalletClientSyncing}
             />
 
             {/* Submit Button */}

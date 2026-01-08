@@ -41,7 +41,7 @@ export function WithdrawDialog({
   const [targetChain, setTargetChain] = useState<string | null>(null);
   const { walletChainId } = useLineraClient();
 
-  const { withdraw, isWithdrawing, error } = useAuctionMutations({
+  const { withdraw, isWithdrawing, trigger, error } = useAuctionMutations({
     aacApp,
     onSuccess: (event) => {
       if (event.type === 'withdraw') {
@@ -63,6 +63,7 @@ export function WithdrawDialog({
     }
 
     await withdraw(tokenIndex, amount, targetChain);
+    await trigger();
   };
 
   const handleClose = () => {

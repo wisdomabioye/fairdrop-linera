@@ -35,7 +35,7 @@ export function DepositDialog({
 }: DepositDialogProps) {
   const [amount, setAmount] = useState('');
 
-  const { deposit, isDepositing, error } = useAuctionMutations({
+  const { deposit, isDepositing, trigger, error } = useAuctionMutations({
     aacApp,
     onSuccess: (event) => {
       if (event.type === 'deposit') {
@@ -56,6 +56,7 @@ export function DepositDialog({
     }
 
     await deposit(tokenIndex, amount);
+    await trigger();
   };
 
   const handleClose = () => {
