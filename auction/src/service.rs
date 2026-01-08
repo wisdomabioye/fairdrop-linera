@@ -412,7 +412,7 @@ impl QueryRoot {
     /// Users need this to know which token_index to use in Deposit/Withdraw operations
     async fn supported_tokens(&self) -> Result<Vec<TokenInfo>, String> {
         let params = self.runtime.application_parameters();
-        let supported_tokens = &params.supported_tokens;
+        let supported_tokens = params.supported_tokens;
 
         let token_list = supported_tokens
             .iter()

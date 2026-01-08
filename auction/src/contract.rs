@@ -1314,7 +1314,7 @@ impl AuctionContract {
     /// This ensures the token comes from parameters (registered at instantiation)
     /// and avoids dynamic application loading issues
     fn get_token_by_index(&mut self, token_index: u32) -> ApplicationId<FungibleTokenAbi> {
-        let supported_tokens = &self.runtime.application_parameters().supported_tokens;
+        let supported_tokens = self.runtime.application_parameters().supported_tokens;
 
         // Validate index is within bounds
         let index = token_index as usize;
@@ -1322,7 +1322,7 @@ impl AuctionContract {
             panic!(
                 "Invalid token index: {}. Supported tokens: 0-{}",
                 token_index,
-                supported_tokens.len().saturating_sub(1)
+                supported_tokens.len() - 1
             );
         }
 
