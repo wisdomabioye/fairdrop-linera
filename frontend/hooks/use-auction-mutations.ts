@@ -26,8 +26,9 @@
 import { useState, useCallback } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useSyncStatus } from '@/providers';
-import { AAC_MUTATION } from '@/lib/gql/queries';
 import { type ApplicationClient, useWalletConnection } from 'linera-react-client';
+import { getTokenList } from '@/config/app.token-store';
+import { AAC_MUTATION } from '@/lib/gql/queries';
 import type { AuctionParam } from '@/lib/gql/types';
 
 export type MutationType = 'create' | 'buy' | 'claim' | 'deposit' | 'withdraw' | 'cancel' | 'withdrawProceed' | 'withdrawUnsoldToken' | 'prune';
@@ -123,12 +124,13 @@ export function useAuctionMutations(
     // Get sync status
     const { isClientSyncing } = useSyncStatus();
 
-    // Get store actions for cache invalidation
+    // Get store actions for cache invalidation and refresh
     const {
         invalidateActiveAuctions,
         invalidateAuction,
-        invalidateBidHistory,
-        invalidateUserBalances
+        invalidateAndRefreshAuction,
+        invalidateAndRefreshBidHistory,
+        invalidateAndRefreshUserBalances
     } = useAuctionStore();
 
     // Loading states
@@ -259,13 +261,15 @@ export function useAuctionMutations(
                 );
 
                 console.log('[useAuctionMutations] Buy result:', result);
-                
+
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate affected caches
-                invalidateAuction(auctionId.toString());
-                invalidateBidHistory(auctionId.toString());
+                // Invalidate and force refresh affected caches
+                await Promise.all([
+                    invalidateAndRefreshAuction(auctionId.toString(), aacApp),
+                    invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp)
+                ]);
 
                 onSuccess?.({ type: 'buy', data: { auctionId, quantity } });
                 return true;
@@ -279,7 +283,7 @@ export function useAuctionMutations(
                 setIsBuying(false);
             }
         },
-        [aacApp, onSuccess, onError, invalidateAuction, invalidateBidHistory, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, invalidateAndRefreshAuction, invalidateAndRefreshBidHistory, trigger, isClientSyncing]
     );
 
     /**
@@ -362,8 +366,9 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate user balances cache
-                invalidateUserBalances(address);
+                // Invalidate and force refresh user balances
+                const tokenApps = getTokenList().map(token => token.appId);
+                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
 
                 onSuccess?.({ type: 'deposit', data: { tokenIndex, amount } });
                 return true;
@@ -377,7 +382,7 @@ export function useAuctionMutations(
                 setIsDepositing(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateAndRefreshUserBalances]
     );
 
     /**
@@ -420,8 +425,9 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate user balances cache
-                invalidateUserBalances(address);
+                // Invalidate and force refresh user balances
+                const tokenApps = getTokenList().map(token => token.appId);
+                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
 
                 onSuccess?.({ type: 'withdraw', data: { tokenIndex, amount, targetChain } });
                 return true;
@@ -435,7 +441,7 @@ export function useAuctionMutations(
                 setIsWithdrawing(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateAndRefreshUserBalances]
     );
 
     /**
@@ -523,8 +529,9 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate user balances (proceeds go to user's balance)
-                invalidateUserBalances(address);
+                // Invalidate and force refresh user balances (proceeds go to user's balance)
+                const tokenApps = getTokenList().map(token => token.appId);
+                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
 
                 onSuccess?.({ type: 'withdrawProceed', data: { auctionId } });
                 return true;
@@ -538,7 +545,7 @@ export function useAuctionMutations(
                 setIsWithdrawingProceed(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateAndRefreshUserBalances]
     );
 
     /**
@@ -574,8 +581,9 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate user balances (unsold tokens go to user's balance)
-                invalidateUserBalances(address);
+                // Invalidate and force refresh user balances (unsold tokens go to user's balance)
+                const tokenApps = getTokenList().map(token => token.appId);
+                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
 
                 onSuccess?.({ type: 'withdrawUnsoldToken', data: { auctionId } });
                 return true;
@@ -589,7 +597,7 @@ export function useAuctionMutations(
                 setIsWithdrawingUnsoldToken(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateUserBalances]
+        [aacApp, address, onSuccess, onError, trigger, isClientSyncing, invalidateAndRefreshUserBalances]
     );
 
     /**

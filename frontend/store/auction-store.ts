@@ -153,9 +153,9 @@ export interface AuctionStore {
     fetchActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchSettledAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
-    fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
-    fetchUserBids: (auctionId: string, address: string, aacApp: ApplicationClient) => Promise<void>;
-    fetchUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient) => Promise<void>;
+    fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
+    fetchUserBids: (auctionId: string, address: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
+    fetchUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient, force?: boolean) => Promise<void>;
 
     // ============ Internal Fetch Methods ============
     _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<string[]>;
@@ -169,6 +169,12 @@ export interface AuctionStore {
     invalidateUserBids: (auctionId: string, address?: string) => void;
     invalidateUserBalances: (address: string) => void;
     invalidateAll: () => void;
+
+    // ============ Combined Invalidate + Refetch Actions ============
+    invalidateAndRefreshAuction: (auctionId: string, aacApp: ApplicationClient) => Promise<void>;
+    invalidateAndRefreshBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
+    invalidateAndRefreshUserBids: (auctionId: string, address: string, aacApp: ApplicationClient) => Promise<void>;
+    invalidateAndRefreshUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient) => Promise<void>;
 
     // ============ Polling Actions ============
     // TEMPORARY: Using AAC app while indexer event streaming is fixed
@@ -724,13 +730,24 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchBidHistory: async (auctionId, offset, limit, aacApp) => {
+    fetchBidHistory: async (auctionId, offset, limit, aacApp, force = false) => {
         // TEMPORARY: Skip indexer check - using AAC directly
         // if (!get().indexerInitialized) {
         //     throw new Error('Indexer not initialized. Call initializeIndexer() first.');
         // }
 
         const key = `bid-history-${auctionId}-${offset}-${limit}`;
+
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().bidHistory.get(auctionId);
+            if (cached && cached.status === 'success' && cached.data) {
+                const age = Date.now() - cached.timestamp;
+                if (age < BID_HISTORY_TTL) {
+                    return; // Cache hit, no API call needed
+                }
+            }
+        }
 
         await queryDeduplicator.deduplicate(key, async () => {
             set((state) => {
@@ -789,7 +806,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchUserBids: async (auctionId, address, aacApp) => {
+    fetchUserBids: async (auctionId, address, aacApp, force = false) => {
         // Validate address to prevent undefined keys in cache
         if (!address) {
             console.warn('[fetchUserBids] address is required');
@@ -797,6 +814,18 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         }
 
         const key = `my-bid-${auctionId}-${address}`;
+
+        // Check cache first (skip if forced)
+        if (!force) {
+            const auctionMap = get().userBids.get(auctionId);
+            const cached = auctionMap?.get(address);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < USER_BID_TTL) {
+                    return; // Cache hit, no API call needed
+                }
+            }
+        }
 
         await queryDeduplicator.deduplicate(key, async () => {
             set((state) => {
@@ -869,7 +898,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
      * Fetch user balances for multiple tokens in a single batched request
      * Uses AAC_QUERY.UserBalances to reduce N requests → 1 request
      */
-    fetchUserBalances: async (address, tokenApps, aacApp) => {
+    fetchUserBalances: async (address, tokenApps, aacApp, force = false) => {
         // Validate inputs
         if (!address) {
             console.warn('[fetchUserBalances] address is required');
@@ -882,13 +911,15 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
         const key = `user-balances-${address}`;
 
-        // Check cache first
-        const cached = get().userBalances.get(address);
-        if (cached && cached.status === 'success') {
-            const age = Date.now() - cached.timestamp;
-            if (age < USER_BALANCES_TTL) {
-                // Cache hit - fresh data
-                return
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().userBalances.get(address);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < USER_BALANCES_TTL) {
+                    // Cache hit - fresh data
+                    return
+                }
             }
         }
 
@@ -1157,6 +1188,75 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 userBalances: newUserBalances,
             };
         });
+    },
+
+    // ============ Combined Invalidate + Refetch Actions ============
+    /**
+     * Invalidate and force refresh auction summary
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshAuction: async (auctionId, aacApp) => {
+        const key = `auction-summary-${String(auctionId)}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateAuction(auctionId);
+
+        // Force fresh fetch
+        await get().fetchAuctionSummary(auctionId, aacApp, true);
+    },
+
+    /**
+     * Invalidate and force refresh bid history
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshBidHistory: async (auctionId, offset, limit, aacApp) => {
+        const key = `bid-history-${auctionId}-${offset}-${limit}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateBidHistory(auctionId);
+
+        // Force fresh fetch
+        await get().fetchBidHistory(auctionId, offset, limit, aacApp, true);
+    },
+
+    /**
+     * Invalidate and force refresh user bids for a specific auction
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshUserBids: async (auctionId, address, aacApp) => {
+        const key = `my-bid-${auctionId}-${address}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateUserBids(auctionId, address);
+
+        // Force fresh fetch
+        await get().fetchUserBids(auctionId, address, aacApp, true);
+    },
+
+    /**
+     * Invalidate and force refresh user balances
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshUserBalances: async (address, tokenApps, aacApp) => {
+        const key = `user-balances-${address}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateUserBalances(address);
+
+        // Force fresh fetch
+        await get().fetchUserBalances(address, tokenApps, aacApp, true);
     },
 
     // ============ Polling Actions ============
