@@ -16,6 +16,7 @@ import {
     useCachedActiveAuctions,
     useCachedSettledAuctions,
     useCachedAuctionsByCreator,
+    useCachedUserBalances
 } from '@/hooks';
 import { useTokenStore } from '@/store/token-store';
 import { getTokenList } from '@/config/app.token-store';
@@ -120,6 +121,14 @@ export function EagerLoader({
         skip: !walletAddress || !loadTier3,
         enablePolling: !!walletAddress && loadTier3,
     });
+
+    // Load user's created auctions (wallet-gated)
+    useCachedUserBalances({
+        address: walletAddress ?? '',
+        tokenApps: getTokenList().map(t => t.appId),
+        aacApp: aacApp.app,
+        skip: !walletAddress || !loadTier3
+    })
 
     // ============ TIER 4: NICE-TO-HAVE (T=1500ms) - Background Updates ============
     // Load balances and token info for all supported tokens

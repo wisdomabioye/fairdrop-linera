@@ -61,7 +61,7 @@ importers:
         version: 4.1.0
       linera-react-client:
         specifier: file:/home/abioye/dev/linera-react-client/linera-react-client-1.2.10.tgz
-        version: file:../../../dev/linera-react-client/linera-react-client-1.2.10.tgz(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(webextension-polyfill@0.12.0)
+        version: file:../../dev/linera-react-client/linera-react-client-1.2.10.tgz(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(webextension-polyfill@0.12.0)
       lucide-react:
         specifier: ^0.556.0
         version: 0.556.0(react@19.2.1)
@@ -2481,8 +2481,8 @@ packages:
     resolution: {integrity: sha512-utfs7Pr5uJyyvDETitgsaqSyjCb2qNRAtuqUeWIAKztsOYdcACf2KtARYXg2pSvhkt+9NfoaNY7fxjl6nuMjIQ==}
     engines: {node: '>= 12.0.0'}
 
-  linera-react-client@file:../../../dev/linera-react-client/linera-react-client-1.2.10.tgz:
-    resolution: {integrity: sha512-23Sa3u1S4xAAYwcMII+h3ldSZAXRpuMz/B7TmAaV6NYIzONcgkTlyffzBiB7YVYpbl6HqFJnuShn+LD09R3BAg==, tarball: file:../../../dev/linera-react-client/linera-react-client-1.2.10.tgz}
+  linera-react-client@file:../../dev/linera-react-client/linera-react-client-1.2.10.tgz:
+    resolution: {integrity: sha512-2PHr23sSo7ltRxUqmIebYIibirNOKk/W4Gv3mVbsBlN/bHxv6kQHCgS1VE7qoe/Di8XdvRGhlMtRjSs01ad1Zg==, tarball: file:../../dev/linera-react-client/linera-react-client-1.2.10.tgz}
     version: 1.2.10
     peerDependencies:
       react: '>=18.0.0'
@@ -5589,7 +5589,7 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.30.2
       lightningcss-win32-x64-msvc: 1.30.2
 
-  linera-react-client@file:../../../dev/linera-react-client/linera-react-client-1.2.10.tgz(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(webextension-polyfill@0.12.0):
+  linera-react-client@file:../../dev/linera-react-client/linera-react-client-1.2.10.tgz(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(webextension-polyfill@0.12.0):
     dependencies:
       '@linera/client': 0.15.8
       '@metamask/providers': 22.1.1(webextension-polyfill@0.12.0)

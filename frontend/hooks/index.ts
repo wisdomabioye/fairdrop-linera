@@ -69,3 +69,10 @@ export type {
     UseFungibleMutationsOptions,
     UseFungibleMutationsResult
 } from './use-fungible-mutation';
+
+
+export { useCachedUserBalances } from './use-cached-user-balances';
+export type {
+    UseCachedUserBalancesOptions,
+    UseCachedUserBalancesResult
+} from './use-cached-user-balances'
