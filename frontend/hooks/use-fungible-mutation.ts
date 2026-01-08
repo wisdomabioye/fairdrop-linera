@@ -2,10 +2,15 @@ import { useState, useCallback } from 'react';
 import { FUNGIBLE_MUTATION } from '@/lib/gql/queries';
 import { type RecipientAccount } from '@/lib/gql/types';
 import { type ChainApp } from 'linera-react-client';
+import { useTokenStore } from '@/store/token-store';
 
 export interface UseFungibleMutationsOptions {
     /** The normalized fungible chain (wallet or public) */
     chainApp?: ChainApp | null;
+    /** Token application ID (optional - required for cache updates) */
+    tokenId?: string;
+    /** Chain ID where this token is being used (optional - required for cache updates) */
+    chainId?: string;
     /** Callback after successful mint */
     onMintSuccess?: () => void;
     /** Callback after successful transfer */
@@ -53,11 +58,18 @@ export interface UseFungibleMutationsResult {
 export function useFungibleMutations(options: UseFungibleMutationsOptions): UseFungibleMutationsResult {
     const {
         chainApp,
+        tokenId,
+        chainId,
         onMintSuccess,
         onTransferSuccess,
         onApproveSuccess,
         onError
     } = options;
+
+    // Get store actions for cache invalidation and refresh
+    const {
+        invalidateAndRefreshBalance,
+    } = useTokenStore();
 
     // Mint state
     const [isMinting, setIsMinting] = useState(false);
@@ -111,6 +123,11 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     throw new Error('Mint operation returned null');
                 }
 
+                // Invalidate and force refresh the owner's balance (only if tokenId and chainId are provided)
+                if (tokenId && chainId) {
+                    await invalidateAndRefreshBalance(tokenId, chainId, owner, chainApp);
+                }
+
                 onMintSuccess?.();
                 return true;
             } catch (error) {
@@ -123,7 +140,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsMinting(false);
             }
         },
-        [chainApp, onMintSuccess, onError]
+        [chainApp, tokenId, chainId, onMintSuccess, onError, invalidateAndRefreshBalance]
     );
 
     // Transfer operation
@@ -154,6 +171,13 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     throw new Error('Transfer operation returned null');
                 }
 
+                // Invalidate and force refresh sender's balance (only if tokenId and chainId are provided)
+                if (tokenId && chainId) {
+                    await invalidateAndRefreshBalance(tokenId, chainId, owner, chainApp);
+                    // Note: targetAccount could be on a different chain, so we only refresh sender
+                    // Receiver balance will be updated when they query their own chain
+                }
+
                 onTransferSuccess?.();
                 return true;
             } catch (error) {
@@ -166,7 +190,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsTransferring(false);
             }
         },
-        [chainApp, onTransferSuccess, onError]
+        [chainApp, tokenId, chainId, onTransferSuccess, onError, invalidateAndRefreshBalance]
     );
 
     // Approve operation
@@ -240,6 +264,11 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     throw new Error('TransferFrom operation returned null');
                 }
 
+                // Invalidate and force refresh owner's balance (only if tokenId and chainId are provided)
+                if (tokenId && chainId) {
+                    await invalidateAndRefreshBalance(tokenId, chainId, owner, chainApp);
+                }
+
                 return true;
             } catch (error) {
                 const err = error instanceof Error ? error : new Error('TransferFrom failed');
@@ -251,7 +280,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsTransferringFrom(false);
             }
         },
-        [chainApp, onError]
+        [chainApp, tokenId, chainId, onError, invalidateAndRefreshBalance]
     );
 
     // Claim operation
@@ -282,6 +311,11 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                     throw new Error('Claim operation returned null');
                 }
 
+                // Invalidate and force refresh source account's balance (only if tokenId and chainId are provided)
+                if (tokenId && chainId) {
+                    await invalidateAndRefreshBalance(tokenId, chainId, sourceAccount, chainApp);
+                }
+
                 return true;
             } catch (error) {
                 const err = error instanceof Error ? error : new Error('Claim failed');
@@ -293,7 +327,7 @@ export function useFungibleMutations(options: UseFungibleMutationsOptions): UseF
                 setIsClaiming(false);
             }
         },
-        [chainApp, onError]
+        [chainApp, tokenId, chainId, onError, invalidateAndRefreshBalance]
     );
 
     // Get balance (mutation-based query)

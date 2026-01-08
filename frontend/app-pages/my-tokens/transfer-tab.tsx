@@ -37,6 +37,8 @@ export const TransferTab = memo(function TransferTab({
   // Transfer mutation
   const { transfer, isTransferring, transferError } = useFungibleMutations({
     chainApp,
+    chainId,
+    tokenId,
     onError: (error) => {
       toast.error('Transfer failed', {
         description: error.message,

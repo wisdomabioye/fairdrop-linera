@@ -21,8 +21,8 @@ export interface AllowancesTabProps {
 }
 
 export const AllowancesTab = memo(function AllowancesTab({
-  // tokenId,
-  // chainId,
+  tokenId,
+  chainId,
   chainApp,
   canWrite,
   tokenSymbol,
@@ -33,6 +33,8 @@ export const AllowancesTab = memo(function AllowancesTab({
 
   // Approve mutation
   const { approve, isApproving, approveError } = useFungibleMutations({
+    chainId,
+    tokenId,
     chainApp,
     onApproveSuccess: () => {
       // Clear form

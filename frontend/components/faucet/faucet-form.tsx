@@ -101,6 +101,8 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     isMinting,
     mintError,
   } = useFungibleMutations({
+    tokenId: selectedTokenId,
+    chainId: walletChainId,
     chainApp: fungibleApp.app?.wallet,
     onMintSuccess: () => {
       // Add to mint history

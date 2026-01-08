@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { WalletConnectionPrompt } from '@/components/wallet';
 import { TokenSelector, ChainSelectorAdvanced } from '@/components/shared';
-import { useWalletConnection, useChainApplication, useLineraClient } from 'linera-react-client';
+import { useWalletConnection, useLineraClient, useLineraApplication } from 'linera-react-client';
 import { getTokenList } from '@/config/app.token-store';
 import { useSyncStatus } from '@/providers';
 import { TransferTab } from './transfer-tab';
@@ -24,24 +24,16 @@ export default function MyTokens() {
   const tokens = getTokenList();
   // Selected token and chain state
   const [selectedTokenId, setSelectedTokenId] = useState<string>(tokens[0]?.appId || '');
-  const [selectedChainId, setSelectedChainId] = useState<string | null>(null);
+  const [selectedChainId, setSelectedChainId] = useState<string | null>(walletChainId ?? null);
   const [canWriteToChain, setCanWriteToChain] = useState(false);
   const [activeTab, setActiveTab] = useState('transfer');
 
   // Mobile drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-
-  // Get the chain app for the selected chain and token
-  const fungibleApp = useChainApplication(
-    // use walletChainId as the default
-    walletChainId || selectedChainId || '',
-    selectedTokenId
-  );
+  const fungibleApp = useLineraApplication(selectedTokenId)
 
   // Check if the chain app is ready and matches the selected chain
-  const isChainAppReady = fungibleApp.isReady &&
-    !fungibleApp.isLoading && 
-    fungibleApp.chainId === selectedChainId;
+  const isChainAppReady = fungibleApp.isReady;
 
   // Get selected token info (memoized)
   const selectedToken = useMemo(
@@ -58,7 +50,6 @@ export default function MyTokens() {
   // Handle token change (memoized callback)
   const handleTokenChange = useCallback((tokenId: string) => {
     setSelectedTokenId(tokenId);
-    // Keep chain selection - tokens exist on all chains with different state
   }, []);
 
   // Wallet connection guard
@@ -86,7 +77,7 @@ export default function MyTokens() {
         <TransferTab
           tokenId={selectedTokenId}
           chainId={selectedChainId || ''}
-          chainApp={fungibleApp.app}
+          chainApp={fungibleApp.app?.wallet || null}
           canWrite={canWriteToChain}
           tokenSymbol={selectedToken?.symbol || ''}
           address={address || ''}
@@ -97,7 +88,7 @@ export default function MyTokens() {
         <AllowancesTab
           tokenId={selectedTokenId}
           chainId={selectedChainId || ''}
-          chainApp={fungibleApp.app}
+          chainApp={fungibleApp.app?.wallet || null}
           canWrite={canWriteToChain}
           tokenSymbol={selectedToken?.symbol || ''}
           address={address || ''}
@@ -108,7 +99,7 @@ export default function MyTokens() {
         <AdvancedTab
           tokenId={selectedTokenId}
           chainId={selectedChainId || ''}
-          chainApp={fungibleApp.app}
+          chainApp={fungibleApp.app?.wallet || null}
           canWrite={canWriteToChain}
           tokenSymbol={selectedToken?.symbol || ''}
           address={address || ''}
@@ -178,7 +169,7 @@ export default function MyTokens() {
                 tokenId={selectedTokenId}
                 chainId={selectedChainId}
                 address={address}
-                chainApp={fungibleApp.app}
+                chainApp={fungibleApp.app?.wallet || null}
                 tokenSymbol={selectedToken.symbol}
               />
             ) : (

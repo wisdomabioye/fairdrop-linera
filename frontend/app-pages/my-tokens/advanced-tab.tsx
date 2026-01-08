@@ -54,6 +54,8 @@ export const AdvancedTab = memo(function AdvancedTab({
     isTransferringFrom,
     transferFromError,
   } = useFungibleMutations({
+    chainId,
+    tokenId,
     chainApp,
     onError: (error) => {
       toast.error('Operation failed', {

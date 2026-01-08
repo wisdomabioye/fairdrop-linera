@@ -60,9 +60,9 @@ export interface TokenStore {
     tokenInfo: Map<string, TokenInfoCacheEntry>; // `${tokenId}:${chainId}` -> info
 
     // ============ Fetch Actions ============
-    fetchBalance: (tokenId: string, chainId: string, address: string, chainApp: ChainApp) => Promise<void>;
-    fetchTokenInfo: (tokenId: string, chainId: string, chainApp: ChainApp) => Promise<void>;
-    fetchAccounts: (tokenId: string, chainId: string, chainApp: ChainApp) => Promise<void>;
+    fetchBalance: (tokenId: string, chainId: string, address: string, chainApp: ChainApp, force?: boolean) => Promise<void>;
+    fetchTokenInfo: (tokenId: string, chainId: string, chainApp: ChainApp, force?: boolean) => Promise<void>;
+    fetchAccounts: (tokenId: string, chainId: string, chainApp: ChainApp, force?: boolean) => Promise<void>;
 
     // ============ Getters ============
     getBalance: (tokenId: string, chainId: string, address: string) => string | null;
@@ -75,6 +75,11 @@ export interface TokenStore {
     invalidateBalance: (tokenId: string, chainId: string, address?: string) => void;
     invalidateTokenInfo: (tokenId: string, chainId: string) => void;
     invalidateAll: () => void;
+
+    // ============ Combined Invalidate + Refetch Actions ============
+    invalidateAndRefreshBalance: (tokenId: string, chainId: string, address: string, chainApp: ChainApp) => Promise<void>;
+    invalidateAndRefreshAccounts: (tokenId: string, chainId: string, chainApp: ChainApp) => Promise<void>;
+    invalidateAndRefreshTokenInfo: (tokenId: string, chainId: string, chainApp: ChainApp) => Promise<void>;
 
     // ============ Utility Actions ============
     isBalanceStale: (tokenId: string, chainId: string, address: string) => boolean;
@@ -90,117 +95,43 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
     tokenInfo: new Map(),
 
     // ============ Fetch Actions ============
-    fetchBalance: async (tokenId, chainId, address, chainApp) => {
+    /**
+     * Fetch balance for a specific address
+     * Delegates to fetchAccounts for efficiency (caches all balances in one query)
+     */
+    fetchBalance: async (tokenId, chainId, address, chainApp, force = false) => {
         const key = `${tokenId}:${chainId}:${address}`;
-        const dedupeKey = `balance-${key}`;
 
-        // Check cache first
-        const cached = get().balances.get(key);
-        if (cached && cached.status === 'success') {
-            const age = Date.now() - cached.timestamp;
-            if (age < BALANCE_TTL) {
-                // Cache hit - fresh data
-                return;
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().balances.get(key);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < BALANCE_TTL) {
+                    // Cache hit - fresh data
+                    return;
+                }
             }
         }
 
-        await queryDeduplicator.deduplicate(dedupeKey, async () => {
-            // Set loading state
-            set((state) => {
-                const newBalances = new Map(state.balances);
-                const existing = newBalances.get(key);
-
-                newBalances.set(key, {
-                    tokenId,
-                    chainId,
-                    address,
-                    balance: existing?.balance ?? null,
-                    timestamp: existing?.timestamp ?? Date.now(),
-                    status: 'loading',
-                    error: null,
-                });
-
-                return { balances: newBalances };
-            });
-
-            try {
-                if (!chainApp) {
-                    throw new Error('Chain not found');
-                }
-
-                const result = await chainApp.query<string>(
-                    JSON.stringify(FUNGIBLE_QUERY.Accounts())
-                );
-
-                const parsed = JSON.parse(result) as {
-                    data: {
-                        accounts: {
-                            entries: Array<{ key: string; value: string }> | null;
-                        } | null;
-                    } | null;
-                };
-
-                // Find balance for this address (case-insensitive)
-                const entries = parsed?.data?.accounts?.entries || [];
-                const account = entries.find(
-                    (acc) => acc.key.toLowerCase() === address.toLowerCase()
-                );
-
-                const balance = account ? account.value : null;
-
-                // Update cache with success
-                set((state) => {
-                    const newBalances = new Map(state.balances);
-
-                    newBalances.set(key, {
-                        tokenId,
-                        chainId,
-                        address,
-                        balance,
-                        timestamp: Date.now(),
-                        status: 'success',
-                        error: null,
-                    });
-
-                    return { balances: newBalances };
-                });
-            } catch (err) {
-                const error = err instanceof Error ? err : new Error('Failed to fetch balance');
-
-                // Update cache with error
-                set((state) => {
-                    const newBalances = new Map(state.balances);
-                    const existing = newBalances.get(key);
-
-                    newBalances.set(key, {
-                        tokenId,
-                        chainId,
-                        address,
-                        balance: existing?.balance ?? null,
-                        timestamp: existing?.timestamp ?? Date.now(),
-                        status: 'error',
-                        error,
-                    });
-
-                    return { balances: newBalances };
-                });
-
-                throw error;
-            }
-        });
+        // Delegate to fetchAccounts which caches all balances efficiently
+        await get().fetchAccounts(tokenId, chainId, chainApp, force);
+        // The balance for 'address' is now in the cache
     },
 
-    fetchTokenInfo: async (tokenId, chainId, chainApp) => {
+    fetchTokenInfo: async (tokenId, chainId, chainApp, force = false) => {
         const key = `${tokenId}:${chainId}`;
         const dedupeKey = `token-info-${key}`;
 
-        // Check cache first
-        const cached = get().tokenInfo.get(key);
-        if (cached && cached.status === 'success') {
-            const age = Date.now() - cached.timestamp;
-            if (age < TOKEN_INFO_TTL) {
-                // Cache hit - fresh data
-                return;
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().tokenInfo.get(key);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < TOKEN_INFO_TTL) {
+                    // Cache hit - fresh data
+                    return;
+                }
             }
         }
 
@@ -458,6 +389,60 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                 tokenInfo: newTokenInfo,
             };
         });
+    },
+
+    // ============ Combined Invalidate + Refetch Actions ============
+    /**
+     * Invalidate and force refresh a specific balance
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshBalance: async (tokenId, chainId, address, chainApp) => {
+        const key = `${tokenId}:${chainId}:${address}`;
+        const dedupeKey = `balance-${key}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(dedupeKey);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateBalance(tokenId, chainId, address);
+
+        // Force fresh fetch
+        await get().fetchBalance(tokenId, chainId, address, chainApp, true);
+    },
+
+    /**
+     * Invalidate and force refresh all accounts for a token
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshAccounts: async (tokenId, chainId, chainApp) => {
+        const dedupeKey = `accounts-${tokenId}:${chainId}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(dedupeKey);
+
+        // Invalidate all balances for this token + chain combo
+        get().invalidateBalance(tokenId, chainId);
+
+        // Force fresh fetch
+        await get().fetchAccounts(tokenId, chainId, chainApp, true);
+    },
+
+    /**
+     * Invalidate and force refresh token info
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshTokenInfo: async (tokenId, chainId, chainApp) => {
+        const key = `${tokenId}:${chainId}`;
+        const dedupeKey = `token-info-${key}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(dedupeKey);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateTokenInfo(tokenId, chainId);
+
+        // Force fresh fetch
+        await get().fetchTokenInfo(tokenId, chainId, chainApp, true);
     },
 
     // ============ Utility Actions ============
