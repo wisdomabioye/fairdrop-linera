@@ -411,7 +411,7 @@ export function useAuctionMutations(
 
             try {
                 const result = await aacApp.wallet.mutate<string>(
-                    JSON.stringify(AAC_MUTATION.Withdraw(tokenIndex, amount, `"${targetChain}"`)),
+                    JSON.stringify(AAC_MUTATION.Withdraw(tokenIndex, amount, targetChain)),
                     { owner: address }
                 );
 
