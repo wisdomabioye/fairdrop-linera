@@ -12,6 +12,7 @@ import { TokenSelector, ChainSelectorAdvanced } from '@/components/shared';
 import { useWalletConnection, useLineraClient, useLineraApplication } from 'linera-react-client';
 import { getTokenList } from '@/config/app.token-store';
 import { useSyncStatus } from '@/providers';
+import { useFungibleQuery } from '@/hooks';
 import { TransferTab } from './transfer-tab';
 import { AllowancesTab } from './allowances-tab';
 import { AdvancedTab } from './advanced-tab';
@@ -34,6 +35,21 @@ export default function MyTokens() {
 
   // Check if the chain app is ready and matches the selected chain
   const isChainAppReady = fungibleApp.isReady;
+
+  // Unified token query hook for balance and token info
+  const { 
+    balance, 
+    balanceLoading, 
+    fetchBalance, 
+    tickerSymbol 
+  } = useFungibleQuery({
+    chainApp: fungibleApp.app?.wallet,
+    tokenId: selectedTokenId,
+    chainId: selectedChainId || '',
+    address: address || '',
+    autoFetch: true,
+    isWalletSyncing: isClientSyncing,
+  });
 
   // Get selected token info (memoized)
   const selectedToken = useMemo(
@@ -81,6 +97,7 @@ export default function MyTokens() {
           canWrite={canWriteToChain}
           tokenSymbol={selectedToken?.symbol || ''}
           address={address || ''}
+          fetchBalance={fetchBalance}
         />
       </TabsContent>
 
@@ -103,6 +120,7 @@ export default function MyTokens() {
           canWrite={canWriteToChain}
           tokenSymbol={selectedToken?.symbol || ''}
           address={address || ''}
+          fetchBalance={fetchBalance}
         />
       </TabsContent>
     </Tabs>
@@ -166,11 +184,9 @@ export default function MyTokens() {
             isChainAppReady ? (
               <BalanceDisplay
                 key={`balance-${selectedTokenId}-${selectedChainId}`}
-                tokenId={selectedTokenId}
-                chainId={selectedChainId}
-                address={address}
-                chainApp={fungibleApp.app?.wallet || null}
-                tokenSymbol={selectedToken.symbol}
+                balance={balance}
+                tokenSymbol={tickerSymbol || selectedToken.symbol}
+                isLoading={balanceLoading}
               />
             ) : (
               <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">

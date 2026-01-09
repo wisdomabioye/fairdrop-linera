@@ -9,7 +9,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useFungibleMutations } from '@/hooks';
-import { useTokenStore } from '@/store/token-store';
 import { toast } from 'sonner';
 import type { ChainApp } from 'linera-react-client';
 
@@ -20,6 +19,7 @@ export interface AdvancedTabProps {
   canWrite: boolean;
   tokenSymbol: string;
   address: string;
+  fetchBalance: (address: string) => Promise<void>;
 }
 
 export const AdvancedTab = memo(function AdvancedTab({
@@ -29,6 +29,7 @@ export const AdvancedTab = memo(function AdvancedTab({
   canWrite,
   tokenSymbol,
   address,
+  fetchBalance,
 }: AdvancedTabProps) {
   // Claim state
   const [claimSourceAddress, setClaimSourceAddress] = useState('');
@@ -42,8 +43,6 @@ export const AdvancedTab = memo(function AdvancedTab({
   const [transferFromRecipientChainId, setTransferFromRecipientChainId] = useState('');
   const [transferFromRecipientOwner, setTransferFromRecipientOwner] = useState('');
   const [transferFromAmount, setTransferFromAmount] = useState('');
-
-  const { invalidateBalance, fetchBalance } = useTokenStore();
 
   // Mutations
   const {
@@ -92,20 +91,25 @@ export const AdvancedTab = memo(function AdvancedTab({
         setClaimTargetOwner('');
         setClaimAmount('');
 
-        // Invalidate and refetch balance
-        invalidateBalance(tokenId, chainId, address);
-        setTimeout(() => {
-          if (chainApp) {
-            fetchBalance(tokenId, chainId, address, chainApp);
-          }
-        }, 500);
+        // Refresh balance
+        await fetchBalance(address);
 
         toast.success('Claim successful!', {
           description: `${claimAmount} ${tokenSymbol} claimed`,
         });
       }
     },
-    [claimSourceAddress, claimTargetChainId, claimTargetOwner, claimAmount, canWrite, claim, tokenId, chainId, address, chainApp, tokenSymbol, invalidateBalance, fetchBalance]
+    [
+      claimSourceAddress, 
+      claimTargetChainId, 
+      claimTargetOwner, 
+      claimAmount, 
+      canWrite, 
+      claim, 
+      address, 
+      tokenSymbol, 
+      fetchBalance
+    ]
   );
 
   const handleTransferFromSubmit = useCallback(
@@ -137,20 +141,26 @@ export const AdvancedTab = memo(function AdvancedTab({
         setTransferFromRecipientOwner('');
         setTransferFromAmount('');
 
-        // Invalidate and refetch balance
-        invalidateBalance(tokenId, chainId, address);
-        setTimeout(() => {
-          if (chainApp) {
-            fetchBalance(tokenId, chainId, address, chainApp);
-          }
-        }, 500);
+        // Refresh balance
+        await fetchBalance(address);
 
         toast.success('Transfer from successful!', {
           description: `${transferFromAmount} ${tokenSymbol} transferred`,
         });
       }
     },
-    [transferFromOwner, transferFromSpender, transferFromRecipientChainId, transferFromRecipientOwner, transferFromAmount, canWrite, transferFrom, tokenId, chainId, address, chainApp, tokenSymbol, invalidateBalance, fetchBalance]
+    [
+      transferFromOwner, 
+      transferFromSpender, 
+      transferFromRecipientChainId, 
+      transferFromRecipientOwner, 
+      transferFromAmount, 
+      canWrite, 
+      transferFrom, 
+      address, 
+      tokenSymbol, 
+      fetchBalance
+    ]
   );
 
   const handleAmountChange = useCallback((

@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useFungibleMutations } from '@/hooks';
-import { useTokenStore } from '@/store/token-store';
 import { toast } from 'sonner';
 import type { ChainApp } from 'linera-react-client';
 
@@ -18,6 +17,7 @@ export interface TransferTabProps {
   canWrite: boolean;
   tokenSymbol: string;
   address: string;
+  fetchBalance: (address: string) => Promise<void>;
 }
 
 export const TransferTab = memo(function TransferTab({
@@ -27,12 +27,11 @@ export const TransferTab = memo(function TransferTab({
   canWrite,
   tokenSymbol,
   address,
+  fetchBalance,
 }: TransferTabProps) {
   const [recipientChainId, setRecipientChainId] = useState('');
   const [recipientOwner, setRecipientOwner] = useState('');
   const [amount, setAmount] = useState('');
-
-  const { invalidateBalance, fetchBalance } = useTokenStore();
 
   // Transfer mutation
   const { transfer, isTransferring, transferError } = useFungibleMutations({
@@ -59,7 +58,7 @@ export const TransferTab = memo(function TransferTab({
 
       if (!canWrite) {
         toast.error('Read-only chain', {
-          description: 'You can only transfer on the wallet chain',
+          description: 'You can only transfer on this chain',
         });
         return;
       }
@@ -73,20 +72,24 @@ export const TransferTab = memo(function TransferTab({
         setRecipientOwner('');
         setAmount('');
 
-        // Invalidate and refetch balance
-        invalidateBalance(tokenId, chainId, address);
-        setTimeout(() => {
-          if (chainApp) {
-            fetchBalance(tokenId, chainId, address, chainApp);
-          }
-        }, 500);
+        // Refresh balance
+        await fetchBalance(address);
 
         toast.success('Transfer successful!', {
           description: `${amount} ${tokenSymbol} sent to recipient`,
         });
       }
     },
-    [recipientChainId, recipientOwner, amount, canWrite, transfer, address, tokenId, chainId, chainApp, tokenSymbol, invalidateBalance, fetchBalance]
+    [
+      recipientChainId, 
+      recipientOwner, 
+      amount, 
+      canWrite, 
+      transfer, 
+      address, 
+      tokenSymbol, 
+      fetchBalance
+    ]
   );
 
   const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

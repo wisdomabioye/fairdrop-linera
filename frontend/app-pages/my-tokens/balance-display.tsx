@@ -1,63 +1,23 @@
 'use client';
 
-import { useEffect, memo } from 'react';
+import { memo } from 'react';
 import { Wallet, TrendingUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { useTokenStore } from '@/store/token-store';
-import type { ChainApp } from 'linera-react-client';
 import { cn } from '@/lib/utils';
 
 export interface BalanceDisplayProps {
-  tokenId: string;
-  chainId: string;
-  address: string;
-  chainApp: ChainApp | null;
+  balance: string | null;
   tokenSymbol?: string;
+  isLoading?: boolean;
   className?: string;
 }
 
 export const BalanceDisplay = memo(function BalanceDisplay({
-  tokenId,
-  chainId,
-  address,
-  chainApp,
+  balance,
   tokenSymbol = '',
+  isLoading = false,
   className,
 }: BalanceDisplayProps) {
-  const {
-    getBalance,
-    getTokenSymbol,
-    getBalanceStatus,
-    fetchBalance,
-    fetchTokenInfo,
-    isBalanceStale,
-  } = useTokenStore();
-
-  // Fetch balance and token info on mount and when dependencies change
-  useEffect(() => {
-    if (!chainApp || !address) return;
-
-    const fetchData = async () => {
-      try {
-        // Fetch balance if stale
-        if (isBalanceStale(tokenId, chainId, address)) {
-          await fetchBalance(tokenId, chainId, address, chainApp);
-        }
-
-        // Fetch token info (has long TTL, won't refetch often)
-        await fetchTokenInfo(tokenId, chainId, chainApp);
-      } catch (error) {
-        console.error('[BalanceDisplay] Failed to fetch data:', error);
-      }
-    };
-
-    fetchData();
-  }, [tokenId, chainId, address, chainApp, fetchBalance, fetchTokenInfo, isBalanceStale]);
-
-  const balance = getBalance(tokenId, chainId, address);
-  const symbol = getTokenSymbol(tokenId, chainId) || tokenSymbol;
-  const status = getBalanceStatus(tokenId, chainId, address);
-  const isLoading = status === 'loading';
 
   return (
     <Card className={cn('bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20', className)}>
@@ -83,7 +43,7 @@ export const BalanceDisplay = memo(function BalanceDisplay({
                 {balance || '0'}
               </div>
               <div className="text-sm text-muted-foreground font-medium">
-                {symbol}
+                {tokenSymbol}
               </div>
             </>
           )}
