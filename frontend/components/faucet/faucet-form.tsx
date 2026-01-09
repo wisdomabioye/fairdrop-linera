@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Droplet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,9 @@ import { TokenSelector } from '@/components/shared';
 import { WalletConnectionPrompt } from '@/components/wallet';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useLineraApplication, useWalletConnection, useLineraClient } from 'linera-react-client';
-import { useFungibleMutations } from '@/hooks';
+import { useFungibleMutations, useFungibleQuery } from '@/hooks';
 import { useSyncStatus } from '@/providers';
 import { getTokenList, type TokenInfo } from '@/config/app.token-store';
-import { useTokenStore } from '@/store/token-store';
 import { UnifiedStatusBar } from './unified-status-bar';
 import { AmountPresets } from './amount-presets';
 import { BalanceCard } from './balance-card';
@@ -43,15 +42,18 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   const selectedToken = tokens.find(t => t.appId === selectedTokenId);
   const fungibleApp = useLineraApplication(selectedTokenId);
 
-  // Token store for centralized state management
-  const {
-    getBalance,
-    getBalanceStatus,
-    invalidateAndRefreshBalance
-  } = useTokenStore();
-
   // Guard: Don't proceed if no token selected
   const hasValidToken = selectedTokenId && selectedToken;
+
+  // Use fungible query hook for balance management
+  const { balance, balanceLoading, balanceError, fetchBalance } = useFungibleQuery({
+    chainApp: fungibleApp.app?.wallet,
+    tokenId: selectedTokenId,
+    chainId: walletChainId,
+    address: address,
+    autoFetch: true,
+    isWalletSyncing: isWalletClientSyncing,
+  });
 
   // Mutation hook for minting
   const {
@@ -63,13 +65,11 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     chainId: walletChainId,
     chainApp: fungibleApp.app?.wallet,
     onMintSuccess: async () => {
-      // refresh
-      await invalidateAndRefreshBalance(
-        selectedTokenId,
-        walletChainId as string,
-        address as string,
-        fungibleApp.app?.wallet!
-      )
+      // Refresh balance
+      if (address) {
+        await fetchBalance(address);
+      }
+
       // Add to mint history
       const newRecord: MintRecord = {
         id: `${Date.now()}-${amount}`,
@@ -104,42 +104,8 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     }
   });
 
-  // Track first mount to skip initial render
-  const isFirstRender = useRef(true);
-
-  // Force refresh balance when token changes (skip first render)
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-
-    // Only refresh if we have all required data including valid token
-    if (hasValidToken && walletChainId && address && fungibleApp.app?.wallet) {
-      invalidateAndRefreshBalance(
-        selectedTokenId,
-        walletChainId,
-        address,
-        fungibleApp.app.wallet
-      );
-    }
-  }, [hasValidToken, selectedTokenId, walletChainId, address, fungibleApp.app?.wallet, invalidateAndRefreshBalance]);
-
-  // Get user balance from token store (only if valid token selected)
-  const actualBalance = hasValidToken && address && walletChainId
-    ? getBalance(selectedTokenId, walletChainId, address)
-    : null;
-
-  // Get loading status from token store (only if valid token selected)
-  const balanceStatus = hasValidToken && address && walletChainId
-    ? getBalanceStatus(selectedTokenId, walletChainId, address)
-    : 'idle';
-
-  const accountsLoading = balanceStatus === 'loading';
-  const accountsError = balanceStatus === 'error' ? new Error('Failed to fetch balance') : null;
-
   // Use optimistic balance if available, otherwise actual balance
-  const displayBalance = optimisticBalance || actualBalance;
+  const displayBalance = optimisticBalance || balance;
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -171,7 +137,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     }
 
     // Set optimistic balance
-    const currentBalance = actualBalance ? Number(actualBalance) : 0;
+    const currentBalance = balance ? Number(balance) : 0;
     const newBalance = currentBalance + Number(amount);
     setOptimisticBalance(newBalance.toString());
 
@@ -210,16 +176,16 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
             {/* Unified Status Bar */}
             <UnifiedStatusBar
               isWalletSyncing={isWalletClientSyncing}
-              isLoading={!actualBalance && accountsLoading}
+              isLoading={!balance && balanceLoading}
               isMinting={isMinting}
-              error={mintError || accountsError}
+              error={mintError || balanceError}
             />
 
             {/* Balance Card with Animation */}
             <BalanceCard
               balance={displayBalance}
               tokenSymbol={selectedToken?.symbol}
-              isLoading={accountsLoading}
+              isLoading={balanceLoading}
               isOptimistic={!!optimisticBalance}
             />
 

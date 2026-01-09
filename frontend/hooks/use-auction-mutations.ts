@@ -27,7 +27,7 @@ import { useState, useCallback } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useTokenStore } from '@/store/token-store';
 import { useSyncStatus } from '@/providers';
-import { type ApplicationClient, useWalletConnection } from 'linera-react-client';
+import { type ApplicationClient, useWalletConnection, useLineraClient } from 'linera-react-client';
 import { getTokenList } from '@/config/app.token-store';
 import { AAC_MUTATION } from '@/lib/gql/queries';
 import type { AuctionParam } from '@/lib/gql/types';
@@ -122,6 +122,7 @@ export function useAuctionMutations(
         onError
     } = options;
     const { address } = useWalletConnection();
+    const { walletChainId } = useLineraClient();
     // Get sync status
     const { isClientSyncing } = useSyncStatus();
 
@@ -358,7 +359,7 @@ export function useAuctionMutations(
      */
     const deposit = useCallback(
         async (appTokenId: string, amount: string): Promise<boolean> => {
-            if (!aacApp?.wallet || !address) {
+            if (!aacApp?.wallet || !address || !walletChainId) {
                 const err = new Error('Wallet not connected');
                 setError(err);
                 onError?.({ type: 'deposit', error: err });
@@ -391,8 +392,8 @@ export function useAuctionMutations(
                 await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac-chain
                 await invalidateAndRefreshBalanceOnUic(
                     appTokenId, // tokenId
-                    aacApp.wallet.getChainId(), // UIC chain (User Chain)
-                    aacApp.wallet.getAddress(),
+                    walletChainId, // aacApp.wallet.getChainId(), // UIC chain (User Chain)
+                    address, // aacApp.wallet.getAddress(),
                     aacApp.wallet
                 ) // refresh user balance on user-chain 
 
@@ -416,7 +417,7 @@ export function useAuctionMutations(
      */
     const withdraw = useCallback(
         async (appTokenId: string, amount: string, targetChain: string): Promise<boolean> => {
-            if (!aacApp?.wallet || !address) {
+            if (!aacApp?.wallet || !address || !walletChainId) {
                 const err = new Error('Wallet not connected');
                 setError(err);
                 onError?.({ type: 'withdraw', error: err });
@@ -456,8 +457,8 @@ export function useAuctionMutations(
                 await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
                 await invalidateAndRefreshBalanceOnUic(
                     appTokenId, // tokenId
-                    aacApp.wallet.getChainId(), // UIC chain (User Chain)
-                    aacApp.wallet.getAddress(),
+                    walletChainId, // aacApp.wallet.getChainId(), // UIC chain (User Chain)
+                    address, // aacApp.wallet.getAddress(),
                     aacApp.wallet
                 ) // refresh user balance on user-chain 
 
