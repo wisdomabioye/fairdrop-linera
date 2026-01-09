@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Droplet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { TokenSelector } from '@/components/shared';
 import { WalletConnectionPrompt } from '@/components/wallet';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useLineraApplication, useWalletConnection } from 'linera-react-client';
-import { useFungibleMutations, usePolling } from '@/hooks';
+import { useLineraApplication, useWalletConnection, useLineraClient } from 'linera-react-client';
+import { useFungibleMutations } from '@/hooks';
 import { useSyncStatus } from '@/providers';
 import { getTokenList, type TokenInfo } from '@/config/app.token-store';
 import { useTokenStore } from '@/store/token-store';
@@ -25,11 +25,9 @@ export interface FaucetFormProps {
   onSuccess?: (token: TokenInfo, amount: string) => void;
 }
 
-// Polling interval: 30 seconds
-const POLLING_INTERVAL = 30000;
-
 export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
-  const { isConnected, address } = useWalletConnection();
+  const { walletChainId } = useLineraClient();
+  const { isConnected, address, } = useWalletConnection();
   const { isWalletClientSyncing } = useSyncStatus();
   const tokens = getTokenList();
 
@@ -44,56 +42,13 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
 
   const selectedToken = tokens.find(t => t.appId === selectedTokenId);
   const fungibleApp = useLineraApplication(selectedTokenId);
-  const walletChainId = fungibleApp.app?.wallet?.getChainId();
 
   // Token store for centralized state management
   const {
     getBalance,
     getBalanceStatus,
-    fetchBalance,
-    fetchTokenInfo,
-    invalidateBalance,
-    isBalanceStale,
+    invalidateAndRefreshBalance
   } = useTokenStore();
-
-  // Polling callback for balance and token info
-  const pollTokenData = useCallback(async () => {
-    if (!address || !selectedTokenId || !fungibleApp.app?.wallet || isWalletClientSyncing) {
-      return;
-    }
-
-    try {
-      // Only refetch balance if stale
-      if (
-        walletChainId
-        &&
-        isBalanceStale(
-          selectedTokenId, 
-          walletChainId, 
-          address
-        )
-      ) {
-        await fetchBalance(
-          selectedTokenId,
-          walletChainId,
-          address, 
-          fungibleApp.app.wallet
-        );
-      }
-
-      // Fetch token info on first load (it has 60s TTL so won't refetch often)
-      await fetchTokenInfo(
-        selectedTokenId, 
-        walletChainId as string,
-        fungibleApp.app.wallet,
-      );
-    } catch (error) {
-      console.error('[FaucetForm] Failed to fetch token data:', error);
-    }
-  }, [address, selectedTokenId, fungibleApp.app, isWalletClientSyncing, fetchBalance, fetchTokenInfo, isBalanceStale]);
-
-  // Set up polling with usePolling hook (immediate: true for initial fetch)
-  usePolling(pollTokenData, POLLING_INTERVAL, { immediate: true });
 
   // Mutation hook for minting
   const {
@@ -104,7 +59,14 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     tokenId: selectedTokenId,
     chainId: walletChainId,
     chainApp: fungibleApp.app?.wallet,
-    onMintSuccess: () => {
+    onMintSuccess: async () => {
+      // refresh
+      await invalidateAndRefreshBalance(
+        selectedTokenId,
+        walletChainId as string,
+        address as string,
+        fungibleApp.app?.wallet!
+      )
       // Add to mint history
       const newRecord: MintRecord = {
         id: `${Date.now()}-${amount}`,
@@ -120,21 +82,6 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
 
       // Clear optimistic state
       setOptimisticBalance(null);
-
-      // Invalidate balance to force immediate refresh
-      invalidateBalance(selectedTokenId, walletChainId as string, address);
-
-      // Trigger immediate refresh (bypass polling)
-      setTimeout(() => {
-        if (address && fungibleApp.app) {
-          fetchBalance(
-            selectedTokenId, 
-            walletChainId as string,
-            address, 
-            fungibleApp.app.wallet!
-          );
-        }
-      }, 500);
 
       toast.success('Tokens minted successfully!', {
         description: `${amount} ${selectedToken?.symbol} added to your balance`
@@ -153,6 +100,27 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
       });
     }
   });
+
+  // Track first mount to skip initial render
+  const isFirstRender = useRef(true);
+
+  // Force refresh balance when token changes (skip first render)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Only refresh if we have all required data
+    if (selectedTokenId && walletChainId && address && fungibleApp.app?.wallet) {
+      invalidateAndRefreshBalance(
+        selectedTokenId,
+        walletChainId,
+        address,
+        fungibleApp.app.wallet
+      );
+    }
+  }, [selectedTokenId, walletChainId, address, fungibleApp.app?.wallet, invalidateAndRefreshBalance]);
 
   // Get user balance from token store
   const actualBalance = address && selectedTokenId && walletChainId
