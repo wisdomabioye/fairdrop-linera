@@ -19,14 +19,6 @@ struct AuctionWithId {
     data: AuctionData,
 }
 
-#[derive(SimpleObject)]
-struct TokenInfo {
-    /// Index of the token in the supported_tokens list
-    index: u32,
-    /// The ApplicationId of the token
-    token_app: ApplicationId,
-}
-
 pub struct AuctionService {
     state: Arc<AuctionState>,
     runtime: Arc<ServiceRuntime<Self>>,
@@ -408,19 +400,15 @@ impl QueryRoot {
         })
     }
 
-    /// Get list of supported tokens with their indices
-    /// Users need this to know which token_index to use in Deposit/Withdraw operations
-    async fn supported_tokens(&self) -> Result<Vec<TokenInfo>, String> {
+    /// Get list of supported tokens
+    /// Users need this to know which app_token_id to use in Deposit/Withdraw operations
+    async fn supported_tokens(&self) -> Result<Vec<ApplicationId>, String> {
         let params = self.runtime.application_parameters();
         let supported_tokens = params.supported_tokens;
 
         let token_list = supported_tokens
             .iter()
-            .enumerate()
-            .map(|(index, token_app)| TokenInfo {
-                index: index as u32,
-                token_app: token_app.forget_abi(),
-            })
+            .map(|token_app| token_app.forget_abi())
             .collect();
 
         Ok(token_list)

@@ -171,14 +171,14 @@ impl Contract for AuctionContract {
                 }
             }
 
-            AuctionOperation::Deposit { token_index, amount } => {
+            AuctionOperation::Deposit { app_token_id, amount } => {
                 // Validate amount
                 if amount == Amount::ZERO {
                     panic!("Deposit amount must be greater than zero");
                 }
 
-                // Get the token from supported_tokens by index
-                let token_app = self.get_token_by_index(token_index);
+                // Validate token is supported
+                let token_app = self.validate_supported_token(app_token_id);
 
                 let depositor = self.runtime.authenticated_signer()
                     .expect("Caller must be authenticated to deposit");
@@ -229,7 +229,7 @@ impl Contract for AuctionContract {
 
                     // STEP 2: Send cross-chain message to AAC to complete the deposit
                     let message = AuctionMessage::Deposit {
-                        token_index,
+                        app_token_id,
                         amount
                     };
 
@@ -243,9 +243,9 @@ impl Contract for AuctionContract {
             }
 
 
-            AuctionOperation::Withdraw { token_index, amount, target_chain } => {
-                // Get the token from supported_tokens by index
-                let token_app = self.get_token_by_index(token_index);
+            AuctionOperation::Withdraw { app_token_id, amount, target_chain } => {
+                // Validate token is supported
+                let token_app = self.validate_supported_token(app_token_id);
 
                 if current_chain == app_params.aac_chain {
                     match self.execute_withdrawal(token_app, amount, target_chain).await {
@@ -255,9 +255,9 @@ impl Contract for AuctionContract {
                         }
                     }
                 } else {
-                    // Send token index in the message
+                    // Send token app ID in the message
                     let message = AuctionMessage::Withdraw {
-                        token_index,
+                        app_token_id,
                         amount,
                         target_chain
                     };
@@ -304,12 +304,12 @@ impl Contract for AuctionContract {
                 self.withdraw_auction_unsold_token(auction_id).await;
             }
 
-            AuctionMessage::Deposit { token_index, amount } => {
+            AuctionMessage::Deposit { app_token_id, amount } => {
                 let depositor = self.runtime.authenticated_signer()
                     .expect("Caller must be authenticated to deposit");
 
-                // Get the token from supported_tokens by index
-                let token_app = self.get_token_by_index(token_index);
+                // Validate token is supported
+                let token_app = self.validate_supported_token(app_token_id);
 
                 // STEP 2 (AAC Chain): Transfer tokens from user → app escrow
                 // This is a CROSS-OWNER transfer on the SAME CHAIN (AAC)
@@ -341,9 +341,9 @@ impl Contract for AuctionContract {
                 }
             }
 
-            AuctionMessage::Withdraw { token_index, amount, target_chain } => {
-                // Get the token from supported_tokens by index
-                let token_app = self.get_token_by_index(token_index);
+            AuctionMessage::Withdraw { app_token_id, amount, target_chain } => {
+                // Validate token is supported
+                let token_app = self.validate_supported_token(app_token_id);
 
                 match self.execute_withdrawal(token_app, amount, target_chain).await {
                     Ok(_remaining_balance) => {
@@ -1332,24 +1332,21 @@ impl AuctionContract {
     // Token Application Helpers
     // ═══════════════════════════════════════════════════════════
 
-    /// Get a token application by index from the supported_tokens list
-    /// This ensures the token comes from parameters (registered at instantiation)
-    /// and avoids dynamic application loading issues
-    fn get_token_by_index(&mut self, token_index: u32) -> ApplicationId<FungibleTokenAbi> {
+    /// Validate that a token application is supported
+    fn validate_supported_token(&mut self, app_token_id: ApplicationId) -> ApplicationId<FungibleTokenAbi> {
         let supported_tokens = self.runtime.application_parameters().supported_tokens;
 
-        // Validate index is within bounds
-        let index = token_index as usize;
-        if index >= supported_tokens.len() {
-            panic!(
-                "Invalid token index: {}. Supported tokens: 0-{}",
-                token_index,
-                supported_tokens.len() - 1
-            );
+        // Find the token in supported_tokens list
+        for token in supported_tokens {
+            if token.forget_abi() == app_token_id {
+                return token;
+            }
         }
 
-        // Get token from parameters (already typed with FungibleTokenAbi)
-        supported_tokens[index]
+        panic!(
+            "Token {:?} is not in the supported tokens list. Please use a supported token.",
+            app_token_id
+        );
     }
 
     // ═══════════════════════════════════════════════════════════

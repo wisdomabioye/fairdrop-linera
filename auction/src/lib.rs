@@ -1,5 +1,5 @@
 use async_graphql::{Request, Response};
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, Timestamp, ContractAbi, ServiceAbi};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp, ContractAbi, ServiceAbi};
 use linera_sdk::graphql::GraphQLMutationRoot;
 use serde::{Deserialize, Serialize};
 use shared::types::{ AuctionParamsInput, AuctionId };
@@ -82,15 +82,15 @@ pub enum AuctionOperation {
 
     /// Deposit tokens to internal balance
     Deposit {
-        /// Index of the token in supported_tokens list (from application parameters)
-        token_index: u32,
+        /// Application ID of the token to deposit (must be in supported_tokens)
+        app_token_id: ApplicationId,
         amount: Amount,
     },
 
     /// Withdraw tokens to specified chain
     Withdraw {
-        /// Index of the token in supported_tokens list (from application parameters)
-        token_index: u32,
+        /// Application ID of the token to withdraw (must be in supported_tokens)
+        app_token_id: ApplicationId,
         amount: Amount,
         target_chain: ChainId,
     },

@@ -119,13 +119,13 @@ pub struct AuctionSummary {
 }
 
 /// Application parameters
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AuctionParameters {
     /// The AAC chain ID (needed by chains other than AAC to send messages)
     pub aac_chain: ChainId,
     /// Supported fungible tokens for deposits, withdrawals, and payments
     /// These tokens must be registered at instantiation for call_application to work
-    pub supported_tokens: [ApplicationId<FungibleTokenAbi>; 2],
+    pub supported_tokens: Vec<ApplicationId<FungibleTokenAbi>>,
 }
 
 scalar!(AuctionParameters);
