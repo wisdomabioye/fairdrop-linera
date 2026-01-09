@@ -58,9 +58,20 @@ impl FungibleTokenService {
         &self.state.accounts
     }
 
+    /// Get balance for a single address
+    async fn balance(&self, owner: AccountOwner) -> Result<Amount, async_graphql::Error> {
+        Ok(self.state.accounts.get(&owner).await.unwrap_or(Some(Amount::ZERO)).expect("Error fetching balance"))
+    }
+
     /// Get all allowances
     async fn allowances(&self) -> &MapView<OwnerSpender, Amount> {
         &self.state.allowances
+    }
+
+    /// Get allowance for a specific owner-spender pair
+    async fn allowance(&self, owner: AccountOwner, spender: AccountOwner) -> Result<Amount, async_graphql::Error> {
+        let owner_spender = OwnerSpender { owner, spender };
+        Ok(self.state.allowances.get(&owner_spender).await.unwrap_or(Some(Amount::ZERO)).expect("Error fetching allowance"))
     }
 
     /// Get the ticker symbol
