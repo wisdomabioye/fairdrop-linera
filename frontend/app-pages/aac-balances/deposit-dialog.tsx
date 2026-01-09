@@ -21,7 +21,7 @@ import type { TokenInfo } from '@/config/app.token-store';
 export interface DepositDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tokenIndex: number;
+  appTokenId: string;
   tokenInfo: TokenInfo;
   aacApp: ApplicationClient | null;
 }
@@ -29,7 +29,7 @@ export interface DepositDialogProps {
 export function DepositDialog({
   open,
   onOpenChange,
-  tokenIndex,
+  appTokenId,
   tokenInfo,
   aacApp
 }: DepositDialogProps) {
@@ -55,7 +55,7 @@ export function DepositDialog({
       return;
     }
 
-    await deposit(tokenIndex, amount);
+    await deposit(appTokenId, amount);
     await trigger();
   };
 

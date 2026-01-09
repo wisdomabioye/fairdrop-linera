@@ -11,7 +11,7 @@ import { WalletConnectionPrompt } from '@/components/wallet';
 import { useWalletConnection, useLineraApplication } from 'linera-react-client';
 import { useCachedUserBalances } from '@/hooks/use-cached-user-balances';
 import { useSyncStatus } from '@/providers';
-import { getTokenList, getTokenByIndex } from '@/config/app.token-store';
+import { getTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { AAC_APP_ID } from '@/config/app.config';
 import { DepositDialog } from './deposit-dialog';
 import { WithdrawDialog } from './withdraw-dialog';
@@ -43,7 +43,7 @@ export default function AACBalances() {
   // Dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
-  const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
+  const [selectedToken, setSelectedToken] = useState<string | null>(null);
 
   // Calculate total number of tokens with balance
   const tokensWithBalance = useMemo(() => {
@@ -52,14 +52,14 @@ export default function AACBalances() {
   }, [balances]);
 
   // Handle deposit click
-  const handleDeposit = (tokenIndex: number) => {
-    setSelectedTokenIndex(tokenIndex);
+  const handleDeposit = (appTokenId: string) => {
+    setSelectedToken(appTokenId);
     setDepositDialogOpen(true);
   };
 
   // Handle withdraw click
-  const handleWithdraw = (tokenIndex: number) => {
-    setSelectedTokenIndex(tokenIndex);
+  const handleWithdraw = (appTokenId: string) => {
+    setSelectedToken(appTokenId);
     setWithdrawDialogOpen(true);
   };
 
@@ -182,7 +182,7 @@ export default function AACBalances() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleDeposit(token.id)}
+                              onClick={() => handleDeposit(token.appId)}
                               disabled={isPublicClientSyncing}
                             >
                               <ArrowDownToLine className="h-4 w-4 mr-1" />
@@ -191,7 +191,7 @@ export default function AACBalances() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleWithdraw(token.id)}
+                              onClick={() => handleWithdraw(token.appId)}
                               disabled={isPublicClientSyncing || balance === 0}
                             >
                               <ArrowUpFromLine className="h-4 w-4 mr-1" />
@@ -245,7 +245,7 @@ export default function AACBalances() {
                           size="sm"
                           variant="outline"
                           className="flex-1"
-                          onClick={() => handleDeposit(token.id)}
+                          onClick={() => handleDeposit(token.appId)}
                           disabled={isPublicClientSyncing}
                         >
                           <ArrowDownToLine className="h-4 w-4 mr-1" />
@@ -255,7 +255,7 @@ export default function AACBalances() {
                           size="sm"
                           variant="outline"
                           className="flex-1"
-                          onClick={() => handleWithdraw(token.id)}
+                          onClick={() => handleWithdraw(token.appId)}
                           disabled={isPublicClientSyncing || balance === 0}
                         >
                           <ArrowUpFromLine className="h-4 w-4 mr-1" />
@@ -282,25 +282,22 @@ export default function AACBalances() {
       </Card>
 
       {/* Dialogs */}
-      {selectedTokenIndex !== null && (() => {
-        const selectedToken = getTokenByIndex(selectedTokenIndex);
-        if (!selectedToken) return null;
-
+      {selectedToken !== null && (() => {
         return (
           <>
             <DepositDialog
               open={depositDialogOpen}
               onOpenChange={setDepositDialogOpen}
-              tokenIndex={selectedTokenIndex}
-              tokenInfo={selectedToken}
+              appTokenId={selectedToken}
+              tokenInfo={getTokenByAppId(selectedToken)}
               aacApp={aacApp.app}
             />
             <WithdrawDialog
               open={withdrawDialogOpen}
               onOpenChange={setWithdrawDialogOpen}
-              tokenIndex={selectedTokenIndex}
-              tokenInfo={selectedToken}
-              currentBalance={balances?.get(selectedToken.appId) ?? 0}
+              appTokenId={selectedToken}
+              tokenInfo={getTokenByAppId(selectedToken)}
+              currentBalance={balances?.get(selectedToken) ?? 0}
               aacApp={aacApp.app}
             />
           </>

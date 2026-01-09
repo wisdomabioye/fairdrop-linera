@@ -34,3 +34,7 @@ export const getTokenByIndex = (index: number): TokenInfo | undefined => {
     return Object.values(TOKEN_STORE).find(token => token.id === index);
 }
 
+export const getTokenByAppId = (appId: string): TokenInfo => {
+    return TOKEN_STORE[appId];
+}
+

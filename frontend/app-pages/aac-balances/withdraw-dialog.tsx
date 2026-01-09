@@ -23,7 +23,7 @@ import type { TokenInfo } from '@/config/app.token-store';
 export interface WithdrawDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tokenIndex: number;
+  appTokenId: string;
   tokenInfo: TokenInfo;
   currentBalance: number;
   aacApp: ApplicationClient | null;
@@ -32,7 +32,7 @@ export interface WithdrawDialogProps {
 export function WithdrawDialog({
   open,
   onOpenChange,
-  tokenIndex,
+  appTokenId,
   tokenInfo,
   currentBalance,
   aacApp
@@ -62,7 +62,7 @@ export function WithdrawDialog({
       return;
     }
 
-    await withdraw(tokenIndex, amount, targetChain);
+    await withdraw(appTokenId, amount, targetChain);
     await trigger();
   };
 

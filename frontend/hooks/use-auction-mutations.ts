@@ -46,8 +46,8 @@ export type MutationSuccessEvent =
     | { type: 'withdrawProceed'; data: { auctionId: number } }
     | { type: 'withdrawUnsoldToken'; data: { auctionId: number } }
     | { type: 'prune'; data: { auctionId: number } }
-    | { type: 'deposit'; data: { tokenIndex: number; amount: string } }
-    | { type: 'withdraw'; data: { tokenIndex: number; amount: string; targetChain: string } };
+    | { type: 'deposit'; data: { appTokenId: string; amount: string } }
+    | { type: 'withdraw'; data: { appTokenId: string; amount: string; targetChain: string } };
 
 /**
  * Discriminated union for mutation error events
@@ -83,9 +83,9 @@ export interface UseAuctionMutationsResult {
     /** Prune a settled auction */
     pruneSettledAuction: (auctionId: number) => Promise<boolean>;
     /** Deposit tokens to AAC */
-    deposit: (tokenIndex: number, amount: string) => Promise<boolean>;
+    deposit: (appTokenId: string, amount: string) => Promise<boolean>;
     /** Withdraw tokens from AAC */
-    withdraw: (tokenIndex: number, amount: string, targetChain: string) => Promise<boolean>;
+    withdraw: (appTokenId: string, amount: string, targetChain: string) => Promise<boolean>;
     /** Trigger changes on Public Client */
     trigger: () => Promise<void>;
     // Loading states
@@ -355,7 +355,7 @@ export function useAuctionMutations(
      * Deposit tokens to AAC
      */
     const deposit = useCallback(
-        async (tokenIndex: number, amount: string): Promise<boolean> => {
+        async (appTokenId: string, amount: string): Promise<boolean> => {
             if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
@@ -375,7 +375,7 @@ export function useAuctionMutations(
 
             try {
                 const result = await aacApp.wallet.mutate<string>(
-                    JSON.stringify(AAC_MUTATION.Deposit(tokenIndex, amount)),
+                    JSON.stringify(AAC_MUTATION.Deposit(appTokenId, amount)),
                     { owner: address }
                 );
 
@@ -388,13 +388,13 @@ export function useAuctionMutations(
                 const tokenApps = getTokenList().map(token => token.appId);
                 await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac-chain
                 await invalidateAndRefreshBalanceOnUic(
-                    tokenApps[Number(tokenIndex)], // tokenId
+                    appTokenId, // tokenId
                     aacApp.wallet.getChainId(), // UIC chain (User Chain)
                     aacApp.wallet.getAddress(),
                     aacApp.wallet
                 ) // refresh user balance on user-chain 
 
-                onSuccess?.({ type: 'deposit', data: { tokenIndex, amount } });
+                onSuccess?.({ type: 'deposit', data: { appTokenId, amount } });
                 return true;
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to deposit');
@@ -413,7 +413,7 @@ export function useAuctionMutations(
      * Withdraw tokens from AAC
      */
     const withdraw = useCallback(
-        async (tokenIndex: number, amount: string, targetChain: string): Promise<boolean> => {
+        async (appTokenId: string, amount: string, targetChain: string): Promise<boolean> => {
             if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
@@ -440,7 +440,7 @@ export function useAuctionMutations(
 
             try {
                 const result = await aacApp.wallet.mutate<string>(
-                    JSON.stringify(AAC_MUTATION.Withdraw(tokenIndex, amount, targetChain)),
+                    JSON.stringify(AAC_MUTATION.Withdraw(appTokenId, amount, targetChain)),
                     { owner: address }
                 );
 
@@ -453,13 +453,13 @@ export function useAuctionMutations(
                 const tokenApps = getTokenList().map(token => token.appId);
                 await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
                 await invalidateAndRefreshBalanceOnUic(
-                    tokenApps[Number(tokenIndex)], // tokenId
+                    appTokenId, // tokenId
                     aacApp.wallet.getChainId(), // UIC chain (User Chain)
                     aacApp.wallet.getAddress(),
                     aacApp.wallet
                 ) // refresh user balance on user-chain 
 
-                onSuccess?.({ type: 'withdraw', data: { tokenIndex, amount, targetChain } });
+                onSuccess?.({ type: 'withdraw', data: { appTokenId, amount, targetChain } });
                 return true;
             } catch (err) {
                 const error = err instanceof Error ? err : new Error('Failed to withdraw');
