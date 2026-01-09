@@ -38,10 +38,6 @@ export function EagerLoader({
     const tokens = getTokenList();
     const lusdApp = useLineraApplication(tokens[0]?.appId);
     const fusdApp = useLineraApplication(tokens[1]?.appId);
-    const tokenApps = [
-        { token: tokens[0], app: lusdApp.app },
-        { token: tokens[1], app: fusdApp.app },
-    ];
 
     // ============ Progressive Loading State ============
     const [loadTier2, setLoadTier2] = useState(false); // Settled auctions
@@ -125,7 +121,7 @@ export function EagerLoader({
     // Load user's created auctions (wallet-gated)
     useCachedUserBalances({
         address: walletAddress ?? '',
-        tokenApps: getTokenList().map(t => t.appId),
+        tokenApps: tokens.map(t => t.appId),
         aacApp: aacApp.app,
         skip: !walletAddress || !loadTier3
     })
@@ -135,6 +131,10 @@ export function EagerLoader({
     useEffect(() => {
         if (!isConnected || isClientSyncing || !walletAddress || !loadTier4) return;
 
+        const tokenApps = [
+            { token: tokens[0], app: lusdApp.app },
+            { token: tokens[1], app: fusdApp.app },
+        ];
         // Load token info and balances for each token
         tokenApps.forEach(({ token, app }) => {
             if (!token || !app) return;

@@ -124,7 +124,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
      * Delegates to fetchAccounts for efficiency (caches all balances in one query)
      */
     fetchBalance: async (tokenId, chainId, address, chainApp, force = false) => {
-        const key = `${tokenId}:${chainId}:${address}`;
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
 
         // Check cache first (skip if forced)
         if (!force) {
@@ -272,11 +272,11 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                     const newBalances = new Map(state.balances);
 
                     entries.forEach((account) => {
-                        const key = `${tokenId}:${chainId}:${account.key}`;
+                        const key = `${tokenId}:${chainId}:${account.key.toLowerCase()}`;
                         newBalances.set(key, {
                             tokenId,
                             chainId,
-                            address: account.key,
+                            address: account.key.toLowerCase(),
                             balance: account.value,
                             timestamp: Date.now(),
                             status: 'success',
@@ -348,13 +348,13 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                         try {
                             // Parse the OwnerSpender key (JSON format)
                             const ownerSpender = JSON.parse(allowanceEntry.key) as { owner: string; spender: string };
-                            const key = `${tokenId}:${chainId}:${ownerSpender.owner}:${ownerSpender.spender}`;
+                            const key = `${tokenId}:${chainId}:${ownerSpender.owner.toLowerCase()}:${ownerSpender.spender.toLowerCase()}`;
 
                             newAllowances.set(key, {
                                 tokenId,
                                 chainId,
-                                owner: ownerSpender.owner,
-                                spender: ownerSpender.spender,
+                                owner: ownerSpender.owner.toLowerCase(),
+                                spender: ownerSpender.spender.toLowerCase(),
                                 allowance: allowanceEntry.value,
                                 timestamp: Date.now(),
                                 status: 'success',
@@ -376,7 +376,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
     // ============ Getters ============
     getBalance: (tokenId, chainId, address) => {
-        const key = `${tokenId}:${chainId}:${address}`;
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const entry = get().balances.get(key);
 
         // Try case-insensitive match if exact match fails
@@ -410,7 +410,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
     },
 
     getBalanceStatus: (tokenId, chainId, address) => {
-        const key = `${tokenId}:${chainId}:${address}`;
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const entry = get().balances.get(key);
         return entry?.status ?? 'idle';
     },
@@ -422,7 +422,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
     },
 
     getAllowance: (tokenId, chainId, owner, spender) => {
-        const key = `${tokenId}:${chainId}:${owner}:${spender}`;
+        const key = `${tokenId}:${chainId}:${owner.toLowerCase()}:${spender.toLowerCase()}`;
         const entry = get().allowances.get(key);
 
         // Try case-insensitive match if exact match fails
@@ -446,7 +446,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
     },
 
     getAllowanceStatus: (tokenId, chainId, owner, spender) => {
-        const key = `${tokenId}:${chainId}:${owner}:${spender}`;
+        const key = `${tokenId}:${chainId}:${owner.toLowerCase()}:${spender.toLowerCase()}`;
         const entry = get().allowances.get(key);
         return entry?.status ?? 'idle';
     },
@@ -458,7 +458,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
             if (address) {
                 // Invalidate specific balance
-                const key = `${tokenId}:${chainId}:${address}`;
+                const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
                 const existing = newBalances.get(key);
                 if (existing) {
                     newBalances.set(key, {
@@ -505,7 +505,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
             if (owner && spender) {
                 // Invalidate specific allowance
-                const key = `${tokenId}:${chainId}:${owner}:${spender}`;
+                const key = `${tokenId}:${chainId}:${owner.toLowerCase()}:${spender.toLowerCase()}`;
                 const existing = newAllowances.get(key);
                 if (existing) {
                     newAllowances.set(key, {
@@ -516,7 +516,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
             } else if (owner) {
                 // Invalidate all allowances for this owner
                 newAllowances.forEach((value, key) => {
-                    if (key.startsWith(`${tokenId}:${chainId}:${owner}:`)) {
+                    if (key.startsWith(`${tokenId}:${chainId}:${owner.toLowerCase()}:`)) {
                         newAllowances.set(key, {
                             ...value,
                             timestamp: 0,
@@ -582,17 +582,17 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
      * Clears deduplicator, invalidates cache, and forces fresh fetch
      */
     invalidateAndRefreshBalance: async (tokenId, chainId, address, chainApp) => {
-        const key = `${tokenId}:${chainId}:${address}`;
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const dedupeKey = `balance-${key}`;
 
         // Clear any in-flight requests for this resource
         queryDeduplicator.clear(dedupeKey);
 
         // Invalidate cache (keeps existing data visible, marks as stale)
-        get().invalidateBalance(tokenId, chainId, address);
+        get().invalidateBalance(tokenId, chainId, address.toLowerCase());
 
         // Force fresh fetch
-        await get().fetchBalance(tokenId, chainId, address, chainApp, true);
+        await get().fetchBalance(tokenId, chainId, address.toLowerCase(), chainApp, true);
     },
 
     /**
@@ -649,7 +649,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
     // ============ Utility Actions ============
     isBalanceStale: (tokenId, chainId, address) => {
-        const key = `${tokenId}:${chainId}:${address}`;
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const entry = get().balances.get(key);
 
         if (!entry || entry.status === 'idle') return true;
@@ -669,7 +669,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
     },
 
     isAllowanceStale: (tokenId, chainId, owner, spender) => {
-        const key = `${tokenId}:${chainId}:${owner}:${spender}`;
+        const key = `${tokenId}:${chainId}:${owner.toLowerCase()}:${spender.toLowerCase()}`;
         const entry = get().allowances.get(key);
 
         if (!entry || entry.status === 'idle') return true;

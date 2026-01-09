@@ -32,7 +32,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   const tokens = getTokenList();
 
   const [selectedTokenId, setSelectedTokenId] = useState<string>(
-    defaultToken || tokens[0]?.appId || ''
+    defaultToken || ''
   );
   const [amount, setAmount] = useState('100');
   const [optimisticBalance, setOptimisticBalance] = useState<string | null>(null);
@@ -49,6 +49,9 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     getBalanceStatus,
     invalidateAndRefreshBalance
   } = useTokenStore();
+
+  // Guard: Don't proceed if no token selected
+  const hasValidToken = selectedTokenId && selectedToken;
 
   // Mutation hook for minting
   const {
@@ -111,8 +114,8 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
       return;
     }
 
-    // Only refresh if we have all required data
-    if (selectedTokenId && walletChainId && address && fungibleApp.app?.wallet) {
+    // Only refresh if we have all required data including valid token
+    if (hasValidToken && walletChainId && address && fungibleApp.app?.wallet) {
       invalidateAndRefreshBalance(
         selectedTokenId,
         walletChainId,
@@ -120,15 +123,15 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
         fungibleApp.app.wallet
       );
     }
-  }, [selectedTokenId, walletChainId, address, fungibleApp.app?.wallet, invalidateAndRefreshBalance]);
+  }, [hasValidToken, selectedTokenId, walletChainId, address, fungibleApp.app?.wallet, invalidateAndRefreshBalance]);
 
-  // Get user balance from token store
-  const actualBalance = address && selectedTokenId && walletChainId
+  // Get user balance from token store (only if valid token selected)
+  const actualBalance = hasValidToken && address && walletChainId
     ? getBalance(selectedTokenId, walletChainId, address)
     : null;
 
-  // Get loading status from token store
-  const balanceStatus = address && selectedTokenId && walletChainId
+  // Get loading status from token store (only if valid token selected)
+  const balanceStatus = hasValidToken && address && walletChainId
     ? getBalanceStatus(selectedTokenId, walletChainId, address)
     : 'idle';
 
@@ -175,7 +178,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     await mint(address, amount);
   };
 
-  const canSubmit = isConnected && !!fungibleApp.app && !!amount && Number(amount) > 0 && !isMinting && !isWalletClientSyncing;
+  const canSubmit = hasValidToken && isConnected && !!fungibleApp.app && !!amount && Number(amount) > 0 && !isMinting && !isWalletClientSyncing;
 
   // Wallet connection guard
   if (!isConnected) {
