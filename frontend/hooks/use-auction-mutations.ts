@@ -131,6 +131,7 @@ export function useAuctionMutations(
         invalidateAuction,
         invalidateAndRefreshAuction,
         invalidateAndRefreshBidHistory,
+        invalidateUserBids,
         invalidateAndRefreshUserBalances
     } = useAuctionStore();
 
@@ -280,6 +281,7 @@ export function useAuctionMutations(
                 // Invalidate and force refresh affected caches
                 await Promise.all([
                     invalidateAndRefreshAuction(auctionId.toString(), aacApp),
+                    invalidateUserBids(auctionId.toString(), address),
                     invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp),
                     invalidateAndRefreshUserBalances(address, tokenApps, aacApp) // on aac hain
                 ]);

@@ -788,6 +788,22 @@ export const FUNGIBLE_MUTATION = {
 }
 
 export const FUNGIBLE_QUERY = {
+    Balance (owner: string) {
+        return {
+            query: `query {
+                balance(owner: ${formatGraphQLValue(owner)})
+            }`
+        }
+    },
+
+    Allowance (owner: string, spender: string) {
+        return {
+            query: `query {
+                allowance(owner: ${formatGraphQLValue(owner)}, spender: ${formatGraphQLValue(spender)})
+            }`
+        }
+    },
+
     Accounts () {
         return {
             query: `query {

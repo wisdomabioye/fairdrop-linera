@@ -1,9 +1,4 @@
-import { useCallback, useEffect, useRef, useMemo } from 'react';
-import { pollingManager } from '@/lib/utils/polling-manager';
-import type {
-    AccountBalance,
-    Allowance
-} from '@/lib/gql/types';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTokenStore } from '@/store/token-store';
 import { ChainApp } from 'linera-react-client';
 
@@ -25,17 +20,11 @@ export interface UseFungibleQueryOptions {
 }
 
 export interface UseFungibleQueryResult {
-    // Accounts data
-    accounts: AccountBalance[];
-    accountsLoading: boolean;
-    accountsError: Error | null;
-    fetchAccounts: () => Promise<void>;
-
-    // Allowances data
-    allowances: Allowance[];
-    allowancesLoading: boolean;
-    allowancesError: Error | null;
-    fetchAllowances: () => Promise<void>;
+    // Balance data for specific address
+    balance: string | null;
+    balanceLoading: boolean;
+    balanceError: Error | null;
+    fetchBalance: (address: string) => Promise<void>;
 
     // Token info
     tickerSymbol: string | null;
@@ -45,10 +34,7 @@ export interface UseFungibleQueryResult {
     fetchTokenInfo: () => Promise<void>;
 
     // Helper to get balance for specific account
-    getAccountBalance: (owner: string) => string | null;
-
-    // Helper to get allowance for specific owner-spender pair
-    getAllowance: (owner: string, spender: string) => string | null;
+    getAccountBalance: (address: string) => string | null;
 }
 
 export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQueryResult {
@@ -56,168 +42,70 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         chainApp,
         tokenId,
         chainId,
+        address,
         autoFetch = false,
-        pollingInterval,
         isWalletSyncing = false
     } = options;
 
-    const appId = `${tokenId}-${chainId}`;
-
     // Get store state and methods
     const {
-        balances,
-        allowances: allowancesMap,
-        tokenInfo,
-        fetchAccounts: storeFetchAccounts,
-        fetchAllowances: storeFetchAllowances,
+        fetchBalance: storeFetchBalance,
         fetchTokenInfo: storeFetchTokenInfo,
         getBalance,
-        getAllowance: storeGetAllowance,
+        getBalanceStatus,
         getTokenSymbol,
         getTokenName,
+        getTokenInfoStatus,
     } = useTokenStore();
 
-    // Derive accounts array from store's balances Map
-    const accounts = useMemo(() => {
-        if (!tokenId || !chainId) return [];
+    // Get balance for the specified address
+    const balance = useMemo(() => {
+        if (!tokenId || !chainId || !address) return null;
+        return getBalance(tokenId, chainId, address);
+    }, [tokenId, chainId, address, getBalance]);
 
-        const result: AccountBalance[] = [];
-        const prefix = `${tokenId}:${chainId}:`;
+    // Get loading/error states for the specific address
+    const balanceLoading = useMemo(() => {
+        if (!tokenId || !chainId || !address) return false;
+        return getBalanceStatus(tokenId, chainId, address) === 'loading';
+    }, [tokenId, chainId, address, getBalanceStatus]);
 
-        for (const [key, entry] of balances.entries()) {
-            if (key.startsWith(prefix) && entry.status === 'success' && entry.balance) {
-                const owner = key.substring(prefix.length);
-                result.push({
-                    key: owner,
-                    value: entry.balance
-                });
-            }
-        }
-
-        return result;
-    }, [balances, tokenId, chainId]);
-
-    // Derive allowances array from store's allowances Map
-    const allowances = useMemo(() => {
-        if (!tokenId || !chainId) return [];
-
-        const result: Allowance[] = [];
-        const prefix = `${tokenId}:${chainId}:`;
-
-        for (const [key, entry] of allowancesMap.entries()) {
-            if (key.startsWith(prefix) && entry.status === 'success' && entry.allowance) {
-                // Extract owner:spender from key (format: tokenId:chainId:owner:spender)
-                const ownerSpenderPart = key.substring(prefix.length);
-                const [owner, spender] = ownerSpenderPart.split(':');
-
-                if (owner && spender) {
-                    // Create the OwnerSpender serialized key format
-                    const ownerSpenderKey = JSON.stringify({ owner, spender });
-                    result.push({
-                        key: ownerSpenderKey,
-                        value: entry.allowance
-                    });
-                }
-            }
-        }
-
-        return result;
-    }, [allowancesMap, tokenId, chainId]);
-
-    // Get loading/error states from store cache entries
-    const accountsLoading = useMemo(() => {
-        if (!tokenId || !chainId) return false;
-
-        // Check if any account entry is loading
-        const prefix = `${tokenId}:${chainId}:`;
-        for (const [key, entry] of balances.entries()) {
-            if (key.startsWith(prefix) && entry.status === 'loading') {
-                return true;
-            }
-        }
-        return false;
-    }, [balances, tokenId, chainId]);
-
-    const accountsError = useMemo(() => {
-        if (!tokenId || !chainId) return null;
-
-        // Return first error found
-        const prefix = `${tokenId}:${chainId}:`;
-        for (const [key, entry] of balances.entries()) {
-            if (key.startsWith(prefix) && entry.status === 'error') {
-                return entry.error || new Error('Failed to fetch accounts');
-            }
-        }
-        return null;
-    }, [balances, tokenId, chainId]);
-
-    const allowancesLoading = useMemo(() => {
-        if (!tokenId || !chainId) return false;
-
-        const prefix = `${tokenId}:${chainId}:`;
-        for (const [key, entry] of allowancesMap.entries()) {
-            if (key.startsWith(prefix) && entry.status === 'loading') {
-                return true;
-            }
-        }
-        return false;
-    }, [allowancesMap, tokenId, chainId]);
-
-    const allowancesError = useMemo(() => {
-        if (!tokenId || !chainId) return null;
-
-        const prefix = `${tokenId}:${chainId}:`;
-        for (const [key, entry] of allowancesMap.entries()) {
-            if (key.startsWith(prefix) && entry.status === 'error') {
-                return entry.error || new Error('Failed to fetch allowances');
-            }
-        }
-        return null;
-    }, [allowancesMap, tokenId, chainId]);
+    const balanceError = useMemo(() => {
+        if (!tokenId || !chainId || !address) return null;
+        const status = getBalanceStatus(tokenId, chainId, address);
+        return status === 'error' ? new Error('Failed to fetch balance') : null;
+    }, [tokenId, chainId, address, getBalanceStatus]);
 
     // Get token info from store
     const tickerSymbol = useMemo(() => {
         if (!tokenId || !chainId) return null;
         return getTokenSymbol(tokenId, chainId);
-    }, [tokenId, chainId, getTokenSymbol, tokenInfo]);
+    }, [tokenId, chainId, getTokenSymbol]);
 
     const tokenName = useMemo(() => {
         if (!tokenId || !chainId) return null;
         return getTokenName(tokenId, chainId);
-    }, [tokenId, chainId, getTokenName, tokenInfo]);
+    }, [tokenId, chainId, getTokenName]);
 
     const tokenInfoLoading = useMemo(() => {
         if (!tokenId || !chainId) return false;
-
-        const key = `${tokenId}:${chainId}`;
-        const entry = tokenInfo.get(key);
-        return entry?.status === 'loading';
-    }, [tokenInfo, tokenId, chainId]);
+        return getTokenInfoStatus(tokenId, chainId) === 'loading';
+    }, [tokenId, chainId, getTokenInfoStatus]);
 
     const tokenInfoError = useMemo(() => {
         if (!tokenId || !chainId) return null;
-
-        const key = `${tokenId}:${chainId}`;
-        const entry = tokenInfo.get(key);
-        return entry?.status === 'error' ? (entry.error || new Error('Failed to fetch token info')) : null;
-    }, [tokenInfo, tokenId, chainId]);
+        const status = getTokenInfoStatus(tokenId, chainId);
+        return status === 'error' ? new Error('Failed to fetch token info') : null;
+    }, [tokenId, chainId, getTokenInfoStatus]);
 
     // Fetch methods - delegate to store
-    const fetchAccounts = useCallback(async () => {
+    const fetchBalance = useCallback(async (targetAddress: string) => {
         if (isWalletSyncing || !tokenId || !chainId || !chainApp) {
             return;
         }
 
-        await storeFetchAccounts(tokenId, chainId, chainApp);
-    }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchAccounts]);
-
-    const fetchAllowances = useCallback(async () => {
-        if (isWalletSyncing || !tokenId || !chainId || !chainApp) {
-            return;
-        }
-
-        await storeFetchAllowances(tokenId, chainId, chainApp);
-    }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchAllowances]);
+        await storeFetchBalance(tokenId, chainId, targetAddress, chainApp);
+    }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchBalance]);
 
     const fetchTokenInfo = useCallback(async () => {
         if (isWalletSyncing || !tokenId || !chainId || !chainApp) {
@@ -228,86 +116,38 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
     }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchTokenInfo]);
 
     // Helper to get balance for a specific account
-    const getAccountBalance = useCallback((owner: string): string | null => {
+    const getAccountBalance = useCallback((targetAddress: string): string | null => {
         if (!tokenId || !chainId) return null;
-        return getBalance(tokenId, chainId, owner);
+        return getBalance(tokenId, chainId, targetAddress);
     }, [tokenId, chainId, getBalance]);
 
-    // Helper to get allowance for a specific owner-spender pair
-    const getAllowance = useCallback((owner: string, spender: string): string | null => {
-        if (!tokenId || !chainId) return null;
-        return storeGetAllowance(tokenId, chainId, owner, spender);
-    }, [tokenId, chainId, storeGetAllowance]);
-
-    // Track if initial fetch is done
-    const initialFetchDone = useRef(false);
-
-    // Store fetch functions in refs to avoid dependency issues
-    const fetchAccountsRef = useRef(fetchAccounts);
-    const fetchAllowancesRef = useRef(fetchAllowances);
-    const fetchTokenInfoRef = useRef(fetchTokenInfo);
-
-    // Update refs when functions change
+    // Auto-fetch on mount (only once, skip if syncing or no address)
     useEffect(() => {
-        fetchAccountsRef.current = fetchAccounts;
-        fetchAllowancesRef.current = fetchAllowances;
-        fetchTokenInfoRef.current = fetchTokenInfo;
-    });
-
-    // Auto-fetch on mount (only once, skip if syncing)
-    useEffect(() => {
-        if (autoFetch && chainApp && tokenId && chainId && !initialFetchDone.current && !isWalletSyncing) {
-            initialFetchDone.current = true;
-            fetchAccountsRef.current();
-            fetchAllowancesRef.current();
-            fetchTokenInfoRef.current();
+        if (autoFetch && chainApp && tokenId && chainId && address && !isWalletSyncing) {
+            fetchBalance(address);
+            fetchTokenInfo();
         }
-    }, [autoFetch, chainApp, tokenId, chainId, isWalletSyncing]);
-
-    // Smart polling with PollingManager (skip if syncing)
-    useEffect(() => {
-        if (!pollingInterval || !chainApp || !tokenId || !chainId || isWalletSyncing) {
-            return;
-        }
-
-        const pollingKey = `fungible-${appId}`;
-
-        // Subscribe to polling
-        const unsubscribe = pollingManager.subscribe(
-            pollingKey,
-            async () => {
-                // Use refs to avoid stale closures
-                await Promise.all([
-                    fetchAccountsRef.current(),
-                    fetchAllowancesRef.current(),
-                ]);
-            },
-            pollingInterval
-        );
-
-        return () => {
-            unsubscribe();
-        };
-    }, [pollingInterval, chainApp, tokenId, chainId, appId, isWalletSyncing]);
+    }, [
+        autoFetch, 
+        chainApp, 
+        tokenId, 
+        chainId, 
+        address, 
+        isWalletSyncing, 
+        fetchBalance, 
+        fetchTokenInfo
+    ]);
 
     return {
-        accounts,
-        accountsLoading,
-        accountsError,
-        fetchAccounts,
-
-        allowances,
-        allowancesLoading,
-        allowancesError,
-        fetchAllowances,
-
+        balance,
+        balanceLoading,
+        balanceError,
+        fetchBalance,
         tickerSymbol,
         tokenName,
         tokenInfoLoading,
         tokenInfoError,
         fetchTokenInfo,
-
         getAccountBalance,
-        getAllowance,
     };
 }

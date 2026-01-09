@@ -11,14 +11,12 @@
  */
 import { useEffect, useState } from 'react';
 import { useLineraClient, useLineraApplication } from 'linera-react-client';
-import { useSyncStatus } from './sync-provider';
 import {
     useCachedActiveAuctions,
     useCachedSettledAuctions,
     useCachedAuctionsByCreator,
     useCachedUserBalances
 } from '@/hooks';
-import { useTokenStore } from '@/store/token-store';
 import { getTokenList } from '@/config/app.token-store';
 import { AAC_APP_ID } from '@/config/app.config';
 
@@ -29,15 +27,9 @@ export function EagerLoader({
 }) {
     const { isConnected, walletAddress } = useLineraClient();
     const aacApp = useLineraApplication(AAC_APP_ID); // Same as uicApp
-    const { isClientSyncing } = useSyncStatus();
-
-    // ============ Token Store Actions ============
-    const { fetchAccounts, fetchTokenInfo } = useTokenStore();
 
     // ============ Get Token Applications ============
     const tokens = getTokenList();
-    const lusdApp = useLineraApplication(tokens[0]?.appId);
-    const fusdApp = useLineraApplication(tokens[1]?.appId);
 
     // ============ Progressive Loading State ============
     const [loadTier2, setLoadTier2] = useState(false); // Settled auctions
@@ -128,37 +120,7 @@ export function EagerLoader({
 
     // ============ TIER 4: NICE-TO-HAVE (T=1500ms) - Background Updates ============
     // Load balances and token info for all supported tokens
-    useEffect(() => {
-        if (!isConnected || isClientSyncing || !walletAddress || !loadTier4) return;
-
-        const tokenApps = [
-            { token: tokens[0], app: lusdApp.app },
-            { token: tokens[1], app: fusdApp.app },
-        ];
-        // Load token info and balances for each token
-        tokenApps.forEach(({ token, app }) => {
-            if (!token || !app) return;
-
-            // Fetch token info (name, symbol) - cached for 100 minutes
-            fetchTokenInfo(
-                token.appId, 
-                app.wallet?.getChainId() as string, 
-                app.wallet!
-            ).catch((err) => {
-                console.error(`[EagerLoader] Failed to fetch token info for ${token.symbol}:`, err);
-            });
-
-            // Fetch all accounts (balances) for this user
-            fetchAccounts(
-                token.appId, 
-                app.wallet?.getChainId() as string,
-                app.wallet!
-            ).catch((err) => {
-                console.error(`[EagerLoader] Failed to fetch accounts for ${token.symbol}:`, err);
-            });
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isConnected, isClientSyncing, walletAddress, loadTier4, fetchAccounts, fetchTokenInfo]);
+    // todo: add other non-critical fetches
 
     return (
         children
