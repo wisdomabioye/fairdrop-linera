@@ -98,6 +98,12 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
      * Uses FUNGIBLE_QUERY.Balance(owner) for single-address fetch
      */
     fetchBalance: async (tokenId, chainId, address, chainApp, force = false) => {
+        // Guard: Abort if chainApp is invalid to prevent querying wrong token
+        if (!chainApp) {
+            console.warn('[TokenStore] fetchBalance: chainApp is null/undefined, aborting to prevent cache corruption');
+            return;
+        }
+
         const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const dedupeKey = `balance-${key}`;
 
@@ -142,6 +148,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                     JSON.stringify(FUNGIBLE_QUERY.Balance(address))
                 );
 
+                console.log('fetchBalance', result)
                 const parsed = JSON.parse(result) as {
                     data: { balance: string } | null;
                 };
@@ -191,6 +198,12 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
     },
 
     fetchTokenInfo: async (tokenId, chainId, chainApp, force = false) => {
+        // Guard: Abort if chainApp is invalid to prevent querying wrong token
+        if (!chainApp) {
+            console.warn('[TokenStore] fetchTokenInfo: chainApp is null/undefined, aborting to prevent cache corruption');
+            return;
+        }
+
         const key = `${tokenId}:${chainId}`;
         const dedupeKey = `token-info-${key}`;
 

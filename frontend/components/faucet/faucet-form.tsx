@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useLineraApplication, useWalletConnection, useLineraClient } from 'linera-react-client';
 import { useFungibleMutations, useFungibleQuery } from '@/hooks';
 import { useSyncStatus } from '@/providers';
-import { getTokenList, type TokenInfo } from '@/config/app.token-store';
+import { getPaymentTokenList, type TokenInfo } from '@/config/app.token-store';
 import { UnifiedStatusBar } from './unified-status-bar';
 import { AmountPresets } from './amount-presets';
 import { BalanceCard } from './balance-card';
@@ -28,7 +28,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   const { walletChainId } = useLineraClient();
   const { isConnected, address, } = useWalletConnection();
   const { isWalletClientSyncing } = useSyncStatus();
-  const tokens = getTokenList();
+  const tokens = getPaymentTokenList();
 
   const [selectedTokenId, setSelectedTokenId] = useState<string>(
     defaultToken || ''
@@ -46,7 +46,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   const hasValidToken = selectedTokenId && selectedToken;
 
   // Use fungible query hook for balance management
-  const { balance, balanceLoading, balanceError, fetchBalance } = useFungibleQuery({
+  const { getAccountBalance, balanceLoading, balanceError, fetchBalance } = useFungibleQuery({
     chainApp: fungibleApp.app?.wallet,
     tokenId: selectedTokenId,
     chainId: walletChainId,
@@ -104,9 +104,6 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     }
   });
 
-  // Use optimistic balance if available, otherwise actual balance
-  const displayBalance = optimisticBalance || balance;
-
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Allow only positive numbers
@@ -137,13 +134,15 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
     }
 
     // Set optimistic balance
-    const currentBalance = balance ? Number(balance) : 0;
+    const currentBalance = address ? Number(getAccountBalance(address)) : 0;
     const newBalance = currentBalance + Number(amount);
     setOptimisticBalance(newBalance.toString());
 
     await mint(address, amount);
   };
 
+  // Use optimistic balance if available, otherwise actual balance
+  const displayBalance = optimisticBalance ?? (address ? getAccountBalance(address) : null);
   const canSubmit = hasValidToken && isConnected && !!fungibleApp.app && !!amount && Number(amount) > 0 && !isMinting && !isWalletClientSyncing;
 
   // Wallet connection guard
@@ -176,7 +175,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
             {/* Unified Status Bar */}
             <UnifiedStatusBar
               isWalletSyncing={isWalletClientSyncing}
-              isLoading={!balance && balanceLoading}
+              isLoading={balanceLoading}
               isMinting={isMinting}
               error={mintError || balanceError}
             />

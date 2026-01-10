@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTokenStore } from '@/store/token-store';
 import { ChainApp } from 'linera-react-client';
 
@@ -20,8 +20,6 @@ export interface UseFungibleQueryOptions {
 }
 
 export interface UseFungibleQueryResult {
-    // Balance data for specific address
-    balance: string | null;
     balanceLoading: boolean;
     balanceError: Error | null;
     fetchBalance: (address: string) => Promise<void>;
@@ -56,13 +54,8 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         getTokenSymbol,
         getTokenName,
         getTokenInfoStatus,
+        invalidateBalance,
     } = useTokenStore();
-
-    // Get balance for the specified address
-    const balance = useMemo(() => {
-        if (!tokenId || !chainId || !address) return null;
-        return getBalance(tokenId, chainId, address);
-    }, [tokenId, chainId, address, getBalance]);
 
     // Get loading/error states for the specific address
     const balanceLoading = useMemo(() => {
@@ -121,25 +114,36 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         return getBalance(tokenId, chainId, targetAddress);
     }, [tokenId, chainId, getBalance]);
 
-    // Auto-fetch on mount (only once, skip if syncing or no address)
+    // Track chainApp to detect changes and invalidate stale cache
+    const prevChainAppRef = useRef(chainApp);
+
+    // Invalidate cache when chainApp changes (indicates token switch completed)
+    useEffect(() => {
+        const chainAppChanged = prevChainAppRef.current !== chainApp;
+
+        if (chainAppChanged && chainApp && tokenId && chainId && address) {
+            console.log('[useFungibleQuery] chainApp changed, invalidating and refetching for token:', tokenId);
+            // Invalidate the cached balance to clear any stale data
+            invalidateBalance(tokenId, chainId, address);
+
+            // Force refetch with new chainApp
+            fetchBalance(address);
+            // fetchTokenInfo();
+        }
+
+        prevChainAppRef.current = chainApp;
+    }, [chainApp, tokenId, chainId, address, invalidateBalance, fetchBalance, fetchTokenInfo]);
+
+    // Auto-fetch on mount only (not on subsequent renders)
     useEffect(() => {
         if (autoFetch && chainApp && tokenId && chainId && address && !isWalletSyncing) {
             fetchBalance(address);
             fetchTokenInfo();
         }
-    }, [
-        autoFetch, 
-        chainApp, 
-        tokenId, 
-        chainId, 
-        address, 
-        isWalletSyncing, 
-        fetchBalance, 
-        fetchTokenInfo
-    ]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoFetch]); // Only run when autoFetch changes (typically just on mount)
 
     return {
-        balance,
         balanceLoading,
         balanceError,
         fetchBalance,
