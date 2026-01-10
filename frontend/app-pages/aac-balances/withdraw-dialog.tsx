@@ -27,6 +27,7 @@ export interface WithdrawDialogProps {
   tokenInfo: TokenInfo;
   currentBalance: number;
   aacApp: ApplicationClient | null;
+  onWithdrawSuccess?: () => Promise<void>;
 }
 
 export function WithdrawDialog({
@@ -35,7 +36,8 @@ export function WithdrawDialog({
   appTokenId,
   tokenInfo,
   currentBalance,
-  aacApp
+  aacApp,
+  onWithdrawSuccess
 }: WithdrawDialogProps) {
   const [amount, setAmount] = useState('');
   const [targetChain, setTargetChain] = useState<string | null>(null);
@@ -43,10 +45,14 @@ export function WithdrawDialog({
 
   const { withdraw, isWithdrawing, trigger, error } = useAuctionMutations({
     aacApp,
-    onSuccess: (event) => {
+    onSuccess: async (event) => {
       if (event.type === 'withdraw') {
         setAmount('');
         setTargetChain(null);
+        // Force refetch AAC balance
+        if (onWithdrawSuccess) {
+          await onWithdrawSuccess();
+        }
         onOpenChange(false);
       }
     },

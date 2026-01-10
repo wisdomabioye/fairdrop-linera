@@ -5,6 +5,7 @@ import { AppLineraProvider } from '@/providers';
 import { ThemeProvider } from '@/components/theme';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import { SyncStatusIndicator } from '@/components/layout/sync-status-indicator';
 import { APP_INFO } from '@/config/app.config';
 
 import './globals.css';
@@ -59,6 +60,9 @@ export default function RootLayout({
                 {children}
               </main>
               <Footer />
+
+              {/* Global Sync Status Indicator */}
+              <SyncStatusIndicator />
           </AppLineraProvider>
 
           {/* Toast Notifications */}

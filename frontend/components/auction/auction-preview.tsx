@@ -47,6 +47,7 @@ export function AuctionPreview({ data }: AuctionPreviewProps) {
                   src={data.image}
                   alt={data.itemName}
                   className="w-full h-full object-cover"
+                  crossOrigin="anonymous" 
                 />
               </div>
             )}

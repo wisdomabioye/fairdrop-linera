@@ -28,6 +28,7 @@ export interface DepositDialogProps {
   tokenInfo: TokenInfo;
   aacApp: ApplicationClient | null;
   currentAACBalance: number;
+  onDepositSuccess?: () => Promise<void>;
 }
 
 export function DepositDialog({
@@ -36,7 +37,8 @@ export function DepositDialog({
   appTokenId,
   tokenInfo,
   aacApp,
-  currentAACBalance
+  currentAACBalance,
+  onDepositSuccess
 }: DepositDialogProps) {
   const { address } = useWalletConnection();
   const { walletChainId } = useLineraClient();
@@ -72,9 +74,13 @@ export function DepositDialog({
 
   const { deposit, isDepositing, trigger, error } = useAuctionMutations({
     aacApp,
-    onSuccess: (event) => {
+    onSuccess: async (event) => {
       if (event.type === 'deposit') {
         setAmount('');
+        // Force refetch AAC balance
+        if (onDepositSuccess) {
+          await onDepositSuccess();
+        }
         onOpenChange(false);
       }
     },

@@ -162,6 +162,7 @@ export function ImageUpload({
               src={value}
               alt="Preview"
               className="h-full w-full object-contain"
+              crossOrigin="anonymous" 
             />
           </div>
           {!disabled && !isUploading && (

@@ -639,10 +639,10 @@ export const AAC_MUTATION = {
                 params: {
                     itemName: ${formatGraphQLValue(itemName)},
                     image: ${formatGraphQLValue(image)},
-                    maxBidAmount: ${formatGraphQLValue(maxBidAmount)},
+                    maxBidAmount: ${formatGraphQLValue(String(maxBidAmount))},
                     paymentTokenApp: ${formatGraphQLValue(paymentTokenApp)},
                     auctionTokenApp: ${formatGraphQLValue(auctionTokenApp)},
-                    totalSupply: ${totalSupply},
+                    totalSupply: ${formatGraphQLValue(String(totalSupply))},
                     startPrice: ${formatGraphQLValue(startPrice)},
                     floorPrice: ${formatGraphQLValue(floorPrice)},
                     priceDecayInterval: ${priceDecayInterval},
@@ -676,7 +676,7 @@ export const AAC_MUTATION = {
     
     Buy (auction_id: string, quantity: string) {
         return {
-            query: `mutation { buy(auctionId: ${auction_id}, quantity: ${quantity}) }`
+            query: `mutation { buy(auctionId: ${auction_id}, quantity: ${formatGraphQLValue(quantity)}) }`
         }
     },
 

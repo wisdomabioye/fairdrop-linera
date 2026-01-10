@@ -233,7 +233,7 @@ export function CreateAuctionFormMultistep({
       </CardHeader>
 
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form className="space-y-6">
           {/* Step 1: Basic Info */}
           {currentStep === 0 && (
             <div className="space-y-6">
@@ -544,7 +544,8 @@ export function CreateAuctionFormMultistep({
               </Button>
             ) : isConnected ? (
               <Button
-                type="submit"
+                type="button"
+                onClick={handleSubmit}
                 disabled={isCreating || !aacApp.app || isClientSyncing}
                 className="ml-auto gap-2"
               >

@@ -15,6 +15,7 @@ function escapeGraphQLString(value: string): string {
  */
 export function formatGraphQLValue(value: unknown): string {
     if (typeof value === 'string') {
+        // GraphQL requires double quotes for string literals, not single quotes
         return `"${escapeGraphQLString(value)}"`;
     }
     if (typeof value === 'number' || typeof value === 'boolean') {

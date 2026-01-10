@@ -292,6 +292,7 @@ export default function AACBalances() {
               tokenInfo={getTokenByAppId(selectedToken)}
               aacApp={aacApp.app}
               currentAACBalance={balances?.get(selectedToken) ?? 0}
+              onDepositSuccess={refetch}
             />
             <WithdrawDialog
               open={withdrawDialogOpen}
@@ -300,6 +301,7 @@ export default function AACBalances() {
               tokenInfo={getTokenByAppId(selectedToken)}
               currentBalance={balances?.get(selectedToken) ?? 0}
               aacApp={aacApp.app}
+              onWithdrawSuccess={refetch}
             />
           </>
         );
