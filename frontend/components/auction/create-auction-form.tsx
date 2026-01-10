@@ -12,14 +12,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuctionMutations } from '@/hooks';
+import { useCachedUserBalances } from '@/hooks/use-cached-user-balances';
 import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import { TokenSelector } from '@/components/shared';
 import { ImageUpload } from '@/components/shared';
 import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
+import { CreatorBalanceCheck } from './creator-balance-check';
+import { DepositDialog } from '@/app-pages/aac-balances/deposit-dialog';
 import { AAC_APP_ID } from '@/config/app.config';
 import { APP_ROUTES } from '@/config/app.route';
-import { getAuctionTokenList, getPaymentTokenList } from '@/config/app.token-store';
+import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { useSyncStatus } from '@/providers';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
@@ -68,12 +71,27 @@ export function CreateAuctionFormMultistep({
   const [endDate, setEndDate] = useState<Date>();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Balance validation state
+  const [hasValidBalance, setHasValidBalance] = useState(false);
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
   // Get available tokens
   const paymentTokenList = getPaymentTokenList();
   const auctionTokenList = getAuctionTokenList();
 
   const paymentToken = paymentTokenList.find(t => t.appId === formData.paymentTokenApp);
   const auctionToken = auctionTokenList.find(t => t.appId === formData.auctionTokenApp);
+
+  // Fetch current AAC balance for deposit dialog
+  const { balances: aacBalances } = useCachedUserBalances({
+    address: address || '',
+    tokenApps: formData.auctionTokenApp ? [formData.auctionTokenApp] : [],
+    aacApp: aacApp.app,
+    skip: !address || !aacApp.app || !formData.auctionTokenApp
+  });
+
+  const currentAACBalance = aacBalances?.get(formData.auctionTokenApp) ?? 0;
 
   // Mutation hook
   const { createAuction, isCreating } = useAuctionMutations({
@@ -82,11 +100,18 @@ export function CreateAuctionFormMultistep({
       if (event.type === 'create') {
         const { auctionId } = event.data;
         toast.success('Auction created successfully!');
-        if (onSuccess) {
-          onSuccess(auctionId);
-        } else {
-          router.push(APP_ROUTES.myAuctions);
-        }
+
+        // Set redirecting state to update button
+        setIsRedirecting(true);
+
+        // Wait 1 second to show success message, then redirect
+        setTimeout(() => {
+          if (onSuccess) {
+            onSuccess(auctionId);
+          } else {
+            router.push(APP_ROUTES.myAuctions);
+          }
+        }, 1000);
       }
     },
     onError: (event) => {
@@ -94,6 +119,7 @@ export function CreateAuctionFormMultistep({
         toast.error('Failed to create auction', {
           description: event.error.message
         });
+        setIsRedirecting(false);
       }
     }
   });
@@ -487,6 +513,18 @@ export function CreateAuctionFormMultistep({
           {currentStep === 3 && startDate && endDate && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold">Review Your Auction</h3>
+
+              {/* Balance Validation Check */}
+              {formData.auctionTokenApp && (
+                <CreatorBalanceCheck
+                  auctionTokenId={formData.auctionTokenApp}
+                  requiredAmount={Number(formData.totalSupply)}
+                  onBalanceValidated={setHasValidBalance}
+                  onDepositClick={() => setDepositDialogOpen(true)}
+                />
+              )}
+
+              {/* Auction Preview */}
               <AuctionPreview
                 data={{
                   itemName: formData.itemName,
@@ -546,10 +584,15 @@ export function CreateAuctionFormMultistep({
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isCreating || !aacApp.app || isClientSyncing}
+                disabled={isCreating || isRedirecting || !aacApp.app || isClientSyncing || !hasValidBalance}
                 className="ml-auto gap-2"
               >
-                {isCreating ? (
+                {isRedirecting ? (
+                  <>
+                    <Spinner className="h-4 w-4" />
+                    Redirecting to your auctions...
+                  </>
+                ) : isCreating ? (
                   <>
                     <Spinner className="h-4 w-4" />
                     Creating Auction...
@@ -582,6 +625,21 @@ export function CreateAuctionFormMultistep({
           </div>
         </form>
       </CardContent>
+
+      {/* Deposit Dialog */}
+      {formData.auctionTokenApp && auctionToken && (
+        <DepositDialog
+          open={depositDialogOpen}
+          onOpenChange={setDepositDialogOpen}
+          appTokenId={formData.auctionTokenApp}
+          tokenInfo={getTokenByAppId(formData.auctionTokenApp)}
+          aacApp={aacApp.app}
+          currentAACBalance={currentAACBalance}
+          onDepositSuccess={async () => {
+            // Balance check component will automatically refetch after deposit
+          }}
+        />
+      )}
     </Card>
   );
 }
