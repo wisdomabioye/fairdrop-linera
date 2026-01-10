@@ -151,56 +151,31 @@ export function WithdrawDialog({
             </p>
           </div>
 
-          {/* Withdrawal Preview */}
-          {amountValue > 0 && (
-            <div className="rounded-lg border bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 p-4">
-              <p className="text-xs font-medium text-muted-foreground mb-3">Preview</p>
-
-              {/* Before/After Comparison */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Current Balance */}
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Current AAC Balance</p>
-                  <p className="text-lg font-semibold">
-                    {currentBalance.toLocaleString()}
-                    <span className="text-xs font-normal text-muted-foreground ml-1">
-                      {tokenInfo.symbol}
-                    </span>
-                  </p>
-                </div>
-
-                {/* Arrow */}
-                <div className="flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xl">→</span>
-                    <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                      -{amountValue.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Remaining Balance (emphasized) */}
-              <div className="mt-3 pt-3 border-t border-orange-200/50 dark:border-orange-800/50">
-                <p className="text-xs text-muted-foreground mb-1">Remaining AAC Balance</p>
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {(currentBalance - amountValue).toLocaleString()}
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    {tokenInfo.symbol}
-                  </span>
-                </p>
-              </div>
+          {/* Withdrawal Summary */}
+          <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Token</span>
+              <span className="font-medium">{tokenInfo.symbol}</span>
             </div>
-          )}
-
-          {/* Empty State (when no amount entered) */}
-          {amountValue === 0 && (
-            <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                Enter an amount to see withdrawal preview
-              </p>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Current AAC Balance</span>
+              <span className="font-medium">
+                {currentBalance.toLocaleString()}
+              </span>
             </div>
-          )}
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Withdraw Amount</span>
+              <span className="font-medium">
+                {amountValue > 0 ? amountValue.toLocaleString() : '0'}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold pt-1 border-t">
+              <span>Remaining Balance</span>
+              <span className="text-orange-600">
+                {(currentBalance - amountValue).toLocaleString()}
+              </span>
+            </div>
+          </div>
 
           {/* Error Alert */}
           {error && (
