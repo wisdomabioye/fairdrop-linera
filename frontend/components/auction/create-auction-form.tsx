@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
-import { ArrowLeft, ArrowRight, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Info, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuctionMutations } from '@/hooks';
 import { useCachedUserBalances } from '@/hooks/use-cached-user-balances';
+import { usePersistedAuctionForm } from '@/hooks/use-persisted-auction-form';
 import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import { TokenSelector } from '@/components/shared';
 import { ImageUpload } from '@/components/shared';
@@ -33,6 +34,11 @@ export interface CreateAuctionFormProps {
   onCancel?: () => void;
 }
 
+export interface AuctionFormData extends Omit<AuctionParam, 'startTime' | 'endTime'> {
+  startDate?: Date;
+  endDate?: Date;
+}
+
 const STEPS: Step[] = [
   { id: 'basic', name: 'Basic Info', description: 'Item details' },
   { id: 'pricing', name: 'Pricing', description: 'Price settings' },
@@ -48,6 +54,7 @@ export function CreateAuctionFormMultistep({
   const aacApp = useLineraApplication(AAC_APP_ID);
   const { isConnected, isConnecting, connect, address } = useWalletConnection();
   const { isClientSyncing } = useSyncStatus();
+  const { loadDraft, saveDraft, clearDraft } = usePersistedAuctionForm();
 
   // Current step
   const [currentStep, setCurrentStep] = useState(0);
@@ -76,6 +83,27 @@ export function CreateAuctionFormMultistep({
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // Load draft on mount
+  useEffect(() => {
+    const draft = loadDraft();
+    if (draft) {
+      setFormData(draft.formData);
+      if (draft.startDate) setStartDate(new Date(draft.startDate));
+      if (draft.endDate) setEndDate(new Date(draft.endDate));
+      if (draft.currentStep) setCurrentStep(draft.currentStep);
+    }
+  }, [loadDraft]);
+
+  // Auto-save on changes
+  useEffect(() => {
+    saveDraft({
+      formData,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      currentStep
+    });
+  }, [formData, startDate, endDate, currentStep, saveDraft]);
+
   // Get available tokens
   const paymentTokenList = getPaymentTokenList();
   const auctionTokenList = getAuctionTokenList();
@@ -100,6 +128,7 @@ export function CreateAuctionFormMultistep({
       if (event.type === 'create') {
         const { auctionId } = event.data;
         toast.success('Auction created successfully!');
+        clearDraft();
 
         // Set redirecting state to update button
         setIsRedirecting(true);
@@ -249,10 +278,20 @@ export function CreateAuctionFormMultistep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create New Auction</CardTitle>
-        <CardDescription>
-          Set up a descending-price auction with uniform clearing
-        </CardDescription>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <CardTitle>Create New Auction</CardTitle>
+            <CardDescription>
+              Set up a descending-price auction with uniform clearing
+            </CardDescription>
+          </div>
+          {loadDraft() && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-md">
+              <Save className="h-3 w-3" />
+              <span>Draft saved</span>
+            </div>
+          )}
+        </div>
         <div className="mt-6">
           <StepIndicator steps={STEPS} currentStep={currentStep} />
         </div>

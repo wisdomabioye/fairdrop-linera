@@ -1,100 +1,54 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { AuctionFormData } from '@/components/auction/create-auction-form';
+import type { AuctionParam } from '@/lib/gql/types';
 
 const STORAGE_KEY = 'auction_form_draft';
-const AUTO_SAVE_DELAY = 500; // ms
+const AUTO_SAVE_DELAY = 500;
 
-export interface PersistedFormState {
-  formData: AuctionFormData | null;
-  savedAt: number | null;
+export interface FormDraft {
+  formData: Omit<AuctionParam, 'startTime' | 'endTime'>;
+  startDate?: string;
+  endDate?: string;
+  currentStep: number;
 }
 
-/**
- * Hook to persist auction form data to localStorage with auto-save
- *
- * Features:
- * - Auto-saves form data with debouncing (500ms)
- * - Restores saved draft on mount
- * - Provides hasDraft flag to show draft indicator
- * - Clear method to remove saved data
- */
 export function usePersistedAuctionForm() {
-  const saveTimerRef = useRef<NodeJS.Timeout>();
+  const saveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
-  /**
-   * Load saved form data from localStorage
-   */
-  const loadDraft = useCallback((): PersistedFormState => {
+  const loadDraft = useCallback((): FormDraft | null => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) {
-        return { formData: null, savedAt: null };
-      }
-
-      const parsed = JSON.parse(saved) as PersistedFormState;
-
-      // Validate that the data has the expected structure
-      if (!parsed.formData || typeof parsed.savedAt !== 'number') {
-        return { formData: null, savedAt: null };
-      }
-
-      return parsed;
-    } catch (error) {
-      console.warn('[PersistedForm] Failed to load draft:', error);
-      return { formData: null, savedAt: null };
+      if (!saved) return null;
+      return JSON.parse(saved) as FormDraft;
+    } catch {
+      return null;
     }
   }, []);
 
-  /**
-   * Save form data to localStorage (debounced)
-   */
-  const saveDraft = useCallback((formData: AuctionFormData) => {
-    // Clear existing timer
+  const saveDraft = useCallback((draft: FormDraft) => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
 
-    // Schedule save
     saveTimerRef.current = setTimeout(() => {
       try {
-        const state: PersistedFormState = {
-          formData,
-          savedAt: Date.now()
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
       } catch (error) {
-        console.warn('[PersistedForm] Failed to save draft:', error);
+        console.warn('Failed to save draft:', error);
       }
     }, AUTO_SAVE_DELAY);
   }, []);
 
-  /**
-   * Clear saved form data from localStorage
-   */
   const clearDraft = useCallback(() => {
     try {
       localStorage.removeItem(STORAGE_KEY);
-
-      // Clear pending save timer
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
     } catch (error) {
-      console.warn('[PersistedForm] Failed to clear draft:', error);
+      console.warn('Failed to clear draft:', error);
     }
   }, []);
 
-  /**
-   * Check if there's a saved draft
-   */
-  const hasDraft = useCallback((): boolean => {
-    const { formData } = loadDraft();
-    return formData !== null;
-  }, [loadDraft]);
-
-  /**
-   * Cleanup timer on unmount
-   */
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
@@ -106,7 +60,6 @@ export function usePersistedAuctionForm() {
   return {
     loadDraft,
     saveDraft,
-    clearDraft,
-    hasDraft
+    clearDraft
   };
 }
