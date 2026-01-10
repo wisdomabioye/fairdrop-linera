@@ -7,13 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useWalletConnection } from 'linera-react-client';
 import { useSyncStatus } from '@/providers';
 import { useAuctionMutations, useCachedMyCommitment, useAacApp } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import { getTokenByAppId } from '@/config/app.token-store';
 import {
-  calculateCurrentPrice,
   formatTimeRemaining,
   calculateBidCost,
   formatTokenAmount,
@@ -39,7 +38,6 @@ export function BidForm({
   const { isConnected, isConnecting, connect } = useWalletConnection();
   const { isClientSyncing } = useSyncStatus();
   const [quantity, setQuantity] = useState(1);
-  const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
 
   // Fetch user's current commitment
   const { totalQuantity, loading: loadingCommitment } = useCachedMyCommitment({
@@ -76,19 +74,10 @@ export function BidForm({
     }
   });
 
-  // Update current price every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentPrice(calculateCurrentPrice(auction));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [auction]);
-
   const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Calculate values
   const availableSupply = auction.maxBidAmount;
-  const totalCost = calculateBidCost(quantity, currentPrice);
+  const totalCost = calculateBidCost(quantity, auction.currentPrice);
   const currentCommitment = totalQuantity || 0;
   const totalCommitmentAfterBid = currentCommitment + quantity;
 
@@ -224,7 +213,7 @@ export function BidForm({
                 <span>Current Price</span>
               </div>
               <div className="text-2xl font-bold text-primary">
-                {formatTokenAmount(currentPrice, 18, 4)} {paymentToken.symbol}
+                {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol}
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -286,7 +275,7 @@ export function BidForm({
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {quantity} × {formatTokenAmount(currentPrice, 18, 4)} {paymentToken.symbol} = {formatTokenAmount(totalCost, 18, 4)} {paymentToken.symbol}
+              {quantity} × {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol} = {formatTokenAmount(totalCost, 18, 4)} {paymentToken.symbol}
             </p>
           </div>
 

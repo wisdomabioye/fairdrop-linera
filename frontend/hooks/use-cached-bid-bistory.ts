@@ -87,6 +87,9 @@ export function useCachedBidHistory(
 
     // Local state for managing polling subscription
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
+    
+    // Track if we've ever successfully loaded bid history for this auction
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     // Get cached entry
     const entry = bidHistory.get(auctionId);
@@ -98,11 +101,20 @@ export function useCachedBidHistory(
     const error = entry?.error ?? null;
     const isStale = checkIsStale('bidHistory', auctionId);
 
-    // CRITICAL: Distinguish initial load vs unavailable data
+    // Update hasLoadedOnce when we get successful data
+    useEffect(() => {
+        if ((status === 'success' || bids) && !hasLoadedOnce) {
+            setHasLoadedOnce(true);
+        }
+    }, [status, bids, hasLoadedOnce]);
+
+    // CRITICAL: Only show loading on first load (before any data has been loaded)
+    // Once data has been fetched once, never show full loading skeleton again
+    // - First load: show skeleton
+    // - Refetching with cached data: show data with isFetching indicator
     const loading = (
-        status === 'loading' ||
-        isPublicClientSyncing ||
-        (status === 'idle' && !skip && !!aacApp)
+        (status === 'loading' || isPublicClientSyncing || (status === 'idle' && !skip && !!aacApp))
+        && !hasLoadedOnce
     );
 
     /**

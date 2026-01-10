@@ -20,7 +20,7 @@
  * ```
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
@@ -73,6 +73,9 @@ export function useCachedUserBalances(
         isStale: checkIsStale
     } = useAuctionStore();
 
+    // Track if we've ever successfully loaded balances for this user
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
     // Get cached entry
     const entry = userBalances.get(address);
 
@@ -83,14 +86,20 @@ export function useCachedUserBalances(
     const error = entry?.error ?? null;
     const isStale = checkIsStale('userBalances', address);
 
-    // CRITICAL: Distinguish initial load vs unavailable data
-    // status === 'idle' && balances === null → Initial load (show loading)
-    // status === 'success' && balances === null → Fetched but no data (show empty state)
-    // status === 'error' → Failed (show error)
+    // Update hasLoadedOnce when we get successful data
+    useEffect(() => {
+        if ((status === 'success' || balances) && !hasLoadedOnce) {
+            setHasLoadedOnce(true);
+        }
+    }, [status, balances, hasLoadedOnce]);
+
+    // CRITICAL: Only show loading on first load (before any data has been loaded)
+    // Once data has been fetched once, never show full loading skeleton again
+    // - First load: show skeleton
+    // - Refetching with cached data: show data with isFetching indicator
     const loading = (
-        status === 'loading' ||
-        isPublicClientSyncing ||
-        (status === 'idle' && !skip && !!aacApp && tokenApps.length > 0)
+        (status === 'loading' || isPublicClientSyncing || (status === 'idle' && !skip && !!aacApp && tokenApps.length > 0))
+        && !hasLoadedOnce
     );
 
     /**

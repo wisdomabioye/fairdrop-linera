@@ -100,6 +100,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         await storeFetchBalance(tokenId, chainId, targetAddress, chainApp);
     }, [tokenId, chainId, chainApp, isWalletSyncing, storeFetchBalance]);
 
+    
     const fetchTokenInfo = useCallback(async () => {
         if (isWalletSyncing || !tokenId || !chainId || !chainApp) {
             return;
@@ -128,7 +129,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
 
             // Force refetch with new chainApp
             fetchBalance(address);
-            // fetchTokenInfo();
+            fetchTokenInfo(); // This never changes
         }
 
         prevChainAppRef.current = chainApp;
@@ -141,7 +142,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
             fetchTokenInfo();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoFetch]); // Only run when autoFetch changes (typically just on mount)
+    }, [autoFetch, tokenId, address, isWalletSyncing, chainApp]); // Only run when autoFetch changes (typically just on mount)
 
     return {
         balanceLoading,

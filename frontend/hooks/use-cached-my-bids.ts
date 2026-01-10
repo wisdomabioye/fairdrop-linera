@@ -18,7 +18,7 @@
  * ```
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useSyncStatus } from '@/providers';
 import { type ApplicationClient, useWalletConnection } from 'linera-react-client';
@@ -72,6 +72,10 @@ export function useCachedMyCommitment(
         fetchUserBids,
         isStale: checkIsStale
     } = useAuctionStore();
+    
+    // Track if we've ever successfully loaded user bids for this auction
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+    
     // Get cached entry
     const auctionMap = userBids.get(auctionId);
     const entry = auctionMap?.get(address);
@@ -83,11 +87,20 @@ export function useCachedMyCommitment(
     const error = entry?.error ?? null;
     const isStale = checkIsStale('userBids', `${auctionId}:${address}`);
 
-    // CRITICAL: Distinguish initial load vs unavailable data
+    // Update hasLoadedOnce when we get successful data
+    useEffect(() => {
+        if ((status === 'success' || commitment) && !hasLoadedOnce) {
+            setHasLoadedOnce(true);
+        }
+    }, [status, commitment, hasLoadedOnce]);
+
+    // CRITICAL: Only show loading on first load (before any data has been loaded)
+    // Once data has been fetched once, never show full loading skeleton again
+    // - First load: show skeleton
+    // - Refetching with cached data: show data with isFetching indicator
     const loading = (
-        status === 'loading' ||
-        isClientSyncing ||
-        (status === 'idle' && !skip && !!aacApp && !!address)
+        (status === 'loading' || isClientSyncing || (status === 'idle' && !skip && !!aacApp && !!address))
+        && !hasLoadedOnce
     );
 
     /**

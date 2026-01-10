@@ -82,6 +82,9 @@ export function useCachedAuctionSummary(
 
     // Local state for managing polling subscription
     const [_pollingUnsubscribe, setPollingUnsubscribe] = useState<(() => void) | null>(null);
+    
+    // Track if we've ever successfully loaded this auction
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     // Derived state
     const auction = entry?.data ?? null;
@@ -90,14 +93,20 @@ export function useCachedAuctionSummary(
     const error = entry?.error ?? null;
     const isStale = checkIsStale('auction', auctionId);
 
-    // CRITICAL: Distinguish initial load vs unavailable data
-    // status === 'idle' && auction === null → Initial load (show loading)
-    // status === 'success' && auction === null → Fetched but no data (show empty state)
-    // status === 'error' → Failed (show error)
+    // Update hasLoadedOnce when we get successful data
+    useEffect(() => {
+        if ((status === 'success' || auction) && !hasLoadedOnce) {
+            setHasLoadedOnce(true);
+        }
+    }, [status, auction, hasLoadedOnce]);
+
+    // CRITICAL: Only show loading on first load (before any data has been loaded)
+    // Once data has been fetched once, never show full loading skeleton again
+    // - First load: show skeleton
+    // - Refetching with cached data: show data with isFetching indicator
     const loading = (
-        status === 'loading' ||
-        isPublicClientSyncing ||
-        (status === 'idle' && !skip && !!aacApp)
+        (status === 'loading' || isPublicClientSyncing || (status === 'idle' && !skip && !!aacApp))
+        && !hasLoadedOnce
     );
 
     /**

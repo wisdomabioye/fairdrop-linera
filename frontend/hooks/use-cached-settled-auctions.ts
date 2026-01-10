@@ -78,6 +78,9 @@ export function useCachedSettledAuctions(
 
     // Local state for polling interval
     const [_pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+    
+    // Track if we've ever successfully loaded settled auctions
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     // Derived state - map IDs to full auction data from normalized cache
     const auctions = settledAuctions?.auctionIds
@@ -90,10 +93,20 @@ export function useCachedSettledAuctions(
     const error = settledAuctions?.error ?? null;
     const isStale = checkIsStale('settledAuctions');
 
-    // CRITICAL: Distinguish initial load vs unavailable data
+    // Update hasLoadedOnce when we get successful data
+    useEffect(() => {
+        if ((status === 'success' || auctions) && !hasLoadedOnce) {
+            setHasLoadedOnce(true);
+        }
+    }, [status, auctions, hasLoadedOnce]);
+
+    // CRITICAL: Only show loading on first load (before any data has been loaded)
+    // Once data has been fetched once, never show full loading skeleton again
+    // - First load: show skeleton
+    // - Refetching with cached data: show data with isFetching indicator
     const loading = (
-        status === 'loading' ||
-        (status === 'idle' && !skip && !!aacApp)
+        (status === 'loading' || (status === 'idle' && !skip && !!aacApp))
+        && !hasLoadedOnce
     );
 
     /**

@@ -86,6 +86,9 @@ export function useCachedAuctionsByCreator(
 
     // Local state for polling interval
     const [_pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+    
+    // Track if we've ever successfully loaded auctions for this creator
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     // Get auctions for this specific creator
     const creatorAuctions = creator ? auctionsByCreator.get(creator) ?? null : null;
@@ -101,10 +104,20 @@ export function useCachedAuctionsByCreator(
     const error = creatorAuctions?.error ?? null;
     const isStale = checkIsStale('auctionsByCreator', creator);
 
-    // CRITICAL: Distinguish initial load vs unavailable data
+    // Update hasLoadedOnce when we get successful data
+    useEffect(() => {
+        if ((status === 'success' || auctions) && !hasLoadedOnce) {
+            setHasLoadedOnce(true);
+        }
+    }, [status, auctions, hasLoadedOnce]);
+
+    // CRITICAL: Only show loading on first load (before any data has been loaded)
+    // Once data has been fetched once, never show full loading skeleton again
+    // - First load: show skeleton
+    // - Refetching with cached data: show data with isFetching indicator
     const loading = (
-        status === 'loading' ||
-        (status === 'idle' && !skip && !!aacApp && !!creator)
+        (status === 'loading' || (status === 'idle' && !skip && !!aacApp && !!creator))
+        && !hasLoadedOnce
     );
 
     /**

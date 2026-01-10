@@ -38,7 +38,6 @@ export default function AACBalances() {
 
   /** Not first load, i.e already loaded */
   const isIdle = status === 'idle';
-
   // Dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
@@ -172,7 +171,7 @@ export default function AACBalances() {
                         </td>
                         <td className="py-4 px-4 text-right">
                           <div className="font-mono text-lg font-semibold">
-                            {Number(balance.toLocaleString())}
+                            {balance.toLocaleString()}
                           </div>
                           <div className="text-xs text-muted-foreground">{token.symbol}</div>
                         </td>
@@ -235,7 +234,7 @@ export default function AACBalances() {
                       </div>
                       <div className="mb-4">
                         <div className="font-mono text-2xl font-bold">
-                          {Number(balance.toLocaleString())}
+                          {balance.toLocaleString()}
                         </div>
                         <div className="text-xs text-muted-foreground">{token.symbol}</div>
                       </div>

@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Package, Share2 } from 'lucide-react';
-import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useWalletConnection } from 'linera-react-client';
 import { useCachedAuctionSummary, useCachedMyCommitment, useAacApp } from '@/hooks';
 import { BidHistory } from '@/components/auction/bid-history';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,6 @@ import { DetailCountdown } from './components/detail-countdown';
 import { DetailSidebarActions } from './components/detail-sidebar-actions';
 import { AuctionStatus } from '@/lib/gql/types';
 import {
-  calculateCurrentPrice,
   getAuctionStatusBadge,
   calculateSupplyPercentage,
   formatTokenAmount,
@@ -34,12 +32,10 @@ export default function AuctionDetailPage() {
 
   const aacApp = useAacApp();
   const { address } = useWalletConnection();
-  const [currentPrice, setCurrentPrice] = useState(0);
 
   // Fetch auction details
   const {
     auction,
-    isFetching,
     loading,
     error,
     refetch
@@ -56,20 +52,6 @@ export default function AuctionDetailPage() {
     aacApp: aacApp.app,
     skip: !auctionId || !aacApp.app
   });
-
-  // Update price only for active auctions
-  useEffect(() => {
-    if (!auction || auction.status !== AuctionStatus.Active) return;
-
-    const updatePrice = () => {
-      setCurrentPrice(calculateCurrentPrice(auction));
-    };
-
-    updatePrice();
-    const interval = setInterval(updatePrice, 1000);
-
-    return () => clearInterval(interval);
-  }, [auction]);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -88,7 +70,7 @@ export default function AuctionDetailPage() {
   };
 
   // Loading state
-  if (loading || (isFetching && !auction)) {
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <Skeleton className="h-10 w-32 mb-8" />
@@ -177,7 +159,7 @@ export default function AuctionDetailPage() {
                 {/* Status-aware price display */}
                 <DetailPriceDisplay
                   auction={auction}
-                  currentPrice={currentPrice}
+                  currentPrice={auction.currentPrice}
                   isEndingNow={isEndingVerySoon(auction.endTime)}
                 />
 
@@ -267,7 +249,7 @@ export default function AuctionDetailPage() {
           />
 
           {/* User's Commitment (for active auctions) */}
-          {auction.status === AuctionStatus.Active && commitment && totalQuantity && totalQuantity > 0 && (
+          {auction.status === AuctionStatus.Active && commitment && !!totalQuantity && totalQuantity > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Your Bids</CardTitle>

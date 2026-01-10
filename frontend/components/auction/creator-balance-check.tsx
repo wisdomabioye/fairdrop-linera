@@ -138,16 +138,16 @@ export function CreatorBalanceCheck({
         {/* Status Message */}
         <div>
           <p className="font-semibold">
-            {hasEnoughBalance ? 'Balance Check Passed' : 'Insufficient AAC Balance'}
+            {hasEnoughBalance ? `${tokenInfo.symbol} Balance on Auction Chain (AAC) Check Passed` : `Insufficient ${tokenInfo.symbol} Balance on Auction Chain (AAC)`}
           </p>
           <AlertDescription className="mt-1">
             {hasEnoughBalance ? (
               <>
-                You have enough {tokenInfo.symbol} deposited in your AAC balance to create this auction.
+                You have enough {tokenInfo.symbol} deposited in your Auction Chain balance for {tokenInfo.symbol} to create this auction.
               </>
             ) : (
               <>
-                You need to deposit at least {shortfall.toLocaleString()} more {tokenInfo.symbol} to your AAC balance before creating this auction.
+                You need to deposit at least {shortfall.toLocaleString()} more {tokenInfo.symbol} to your Auction Chain balance before creating this auction.
               </>
             )}
           </AlertDescription>
