@@ -24,10 +24,15 @@ export default function MyTokens() {
   const { isClientSyncing } = useSyncStatus();
   const tokens = getTokenList();
   // Selected token and chain state
-  const [selectedTokenId, setSelectedTokenId] = useState<string>(tokens[0]?.appId || '');
+  const [selectedTokenId, setSelectedTokenId] = useState<string>('');
   const [selectedChainId, setSelectedChainId] = useState<string | null>(walletChainId ?? null);
-  const [canWriteToChain, setCanWriteToChain] = useState(false);
   const [activeTab, setActiveTab] = useState('transfer');
+
+  // Derive write access: can only write to wallet chain
+  const canWriteToChain = useMemo(
+    () => selectedChainId === walletChainId && !!walletChainId,
+    [selectedChainId, walletChainId]
+  );
 
   // Mobile drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -37,11 +42,11 @@ export default function MyTokens() {
   const isChainAppReady = fungibleApp.isReady;
 
   // Unified token query hook for balance and token info
-  const { 
-    balance, 
-    balanceLoading, 
-    fetchBalance, 
-    tickerSymbol 
+  const {
+    getAccountBalance,
+    balanceLoading,
+    fetchBalance,
+    tickerSymbol
   } = useFungibleQuery({
     chainApp: fungibleApp.app?.wallet,
     tokenId: selectedTokenId,
@@ -51,6 +56,9 @@ export default function MyTokens() {
     isWalletSyncing: isClientSyncing,
   });
 
+  // Get balance for current address
+  const balance = address ? getAccountBalance(address) : null;
+
   // Get selected token info (memoized)
   const selectedToken = useMemo(
     () => tokens.find(t => t.appId === selectedTokenId),
@@ -58,9 +66,9 @@ export default function MyTokens() {
   );
 
   // Handle chain change (memoized callback)
-  const handleChainChange = useCallback((chainId: string, canWrite: boolean) => {
+  // Second parameter (canWrite) is accepted for compatibility but ignored since we derive it from selectedChainId === walletChainId
+  const handleChainChange = useCallback((chainId: string, _canWrite?: boolean) => {
     setSelectedChainId(chainId);
-    setCanWriteToChain(canWrite);
   }, []);
 
   // Handle token change (memoized callback)
@@ -180,7 +188,16 @@ export default function MyTokens() {
           </Card>
 
           {/* Balance Display */}
-          {selectedChainId && address && selectedToken && (
+          {!selectedTokenId ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Coins className="h-12 w-12 mx-auto mb-4 opacity-30 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Select a token to view your balance
+                </p>
+              </CardContent>
+            </Card>
+          ) : selectedChainId && address && selectedToken ? (
             isChainAppReady ? (
               <BalanceDisplay
                 key={`balance-${selectedTokenId}-${selectedChainId}`}
@@ -198,7 +215,7 @@ export default function MyTokens() {
                 </CardContent>
               </Card>
             )
-          )}
+          ) : null}
 
           {/* Token Details */}
           {selectedChainId && selectedToken && (
@@ -247,7 +264,16 @@ export default function MyTokens() {
 
         {/* Right Panel - Actions (68% on desktop, hidden on mobile) */}
         <div className="hidden lg:block lg:col-span-8">
-          {selectedChainId && isChainAppReady ? (
+          {!selectedTokenId ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Coins className="h-12 w-12 mx-auto mb-4 opacity-30 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Select a token to start managing your tokens
+                </p>
+              </CardContent>
+            </Card>
+          ) : selectedChainId && isChainAppReady ? (
             <Card>
               <CardContent className="pt-6">
                 {/* Read-only warning */}
@@ -286,7 +312,7 @@ export default function MyTokens() {
       </div>
 
       {/* Mobile Actions Button (floating) */}
-      {selectedChainId && isChainAppReady && (
+      {selectedTokenId && selectedChainId && isChainAppReady && (
         <div className="lg:hidden fixed bottom-6 right-6 z-40">
           <Button
             size="lg"
