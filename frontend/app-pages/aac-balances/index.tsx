@@ -291,6 +291,7 @@ export default function AACBalances() {
               appTokenId={selectedToken}
               tokenInfo={getTokenByAppId(selectedToken)}
               aacApp={aacApp.app}
+              currentAACBalance={balances?.get(selectedToken) ?? 0}
             />
             <WithdrawDialog
               open={withdrawDialogOpen}
