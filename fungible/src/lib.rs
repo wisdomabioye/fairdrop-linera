@@ -138,8 +138,8 @@ impl OwnerSpender {
 use {
     async_graphql::InputType,
     linera_sdk::{
-        linera_base_types::ApplicationId,
-        test::{ActiveChain, QueryOutcome},
+        linera_base_types::{ApplicationId, ChainId},
+        test::{QueryOutcome},
     },
 };
 
@@ -147,7 +147,7 @@ use {
 #[cfg(all(any(test, feature = "test"), not(target_arch = "wasm32")))]
 pub async fn query_account(
     application_id: ApplicationId<FungibleTokenAbi>,
-    chain: &ActiveChain,
+    chain: &ChainId,
     account_owner: AccountOwner,
 ) -> Option<Amount> {
     let query = format!(

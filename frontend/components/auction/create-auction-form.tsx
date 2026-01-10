@@ -19,7 +19,7 @@ import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
 import { AAC_APP_ID } from '@/config/app.config';
 import { APP_ROUTES } from '@/config/app.route';
-import { getTokenList } from '@/config/app.token-store';
+import { getAuctionTokenList, getPaymentTokenList } from '@/config/app.token-store';
 import { useSyncStatus } from '@/providers';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
@@ -69,9 +69,11 @@ export function CreateAuctionFormMultistep({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Get available tokens
-  const tokens = getTokenList();
-  const paymentToken = tokens.find(t => t.appId === formData.paymentTokenApp);
-  const auctionToken = tokens.find(t => t.appId === formData.auctionTokenApp);
+  const paymentTokenList = getPaymentTokenList();
+  const auctionTokenList = getAuctionTokenList();
+
+  const paymentToken = paymentTokenList.find(t => t.appId === formData.paymentTokenApp);
+  const auctionToken = auctionTokenList.find(t => t.appId === formData.auctionTokenApp);
 
   // Mutation hook
   const { createAuction, isCreating } = useAuctionMutations({
@@ -386,7 +388,7 @@ export function CreateAuctionFormMultistep({
                 <div className="space-y-2">
                   <Label>Payment Token *</Label>
                   <TokenSelector
-                    tokens={tokens}
+                    tokens={paymentTokenList}
                     value={formData.paymentTokenApp}
                     onValueChange={(value) => {
                       setFormData(prev => ({ ...prev, paymentTokenApp: value }));
@@ -410,7 +412,7 @@ export function CreateAuctionFormMultistep({
                 <div className="space-y-2">
                   <Label>Auction Token *</Label>
                   <TokenSelector
-                    tokens={tokens}
+                    tokens={auctionTokenList}
                     value={formData.auctionTokenApp}
                     onValueChange={(value) => {
                       setFormData(prev => ({ ...prev, auctionTokenApp: value }));

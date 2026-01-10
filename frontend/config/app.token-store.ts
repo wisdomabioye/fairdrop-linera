@@ -62,6 +62,14 @@ export const getTokenList = (): TokenInfo[] => {
     return Object.values(TOKEN_STORE);
 }
 
+export const getPaymentTokenList = (): TokenInfo[] => {
+    return Object.values(PAYMENT_TOKEN);
+}
+
+export const getAuctionTokenList = (): TokenInfo[] => {
+    return Object.values(AUCTION_TOKEN);
+}
+
 export const getTokenByIndex = (index: number): TokenInfo | undefined => {
     return Object.values(TOKEN_STORE)[index];
 }
