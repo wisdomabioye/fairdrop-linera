@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { useCachedUserBalances } from '@/hooks/use-cached-user-balances';
-import { useWalletConnection, useLineraApplication } from 'linera-react-client';
+import { useFungibleQuery } from '@/hooks';
+import { useCachedUserBalances, useAacApp } from '@/hooks';
+import { useWalletConnection, useLineraApplication, useLineraClient } from 'linera-react-client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { WalletConnectButton } from '@/components/wallet';
 import { AlertCircle, CheckCircle, Wallet } from 'lucide-react';
 import { getTokenByAppId } from '@/config/app.token-store';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useSyncStatus } from '@/providers';
 
 export interface CreatorBalanceCheckProps {
   /** The auction token application ID to check balance for */
@@ -35,37 +37,61 @@ export function CreatorBalanceCheck({
   onDepositClick
 }: CreatorBalanceCheckProps) {
   const { address } = useWalletConnection();
-  const aacApp = useLineraApplication(AAC_APP_ID);
+  const { walletChainId } = useLineraClient();
+  const { isClientSyncing } = useSyncStatus();
+  const aacApp = useAacApp();
+  const tokenApp = useLineraApplication(auctionTokenId);
 
-  // Fetch AAC balance for the auction token
-  const { balances, loading, error, refetch } = useCachedUserBalances({
+  // Fetch AAC balance (deposited tokens)
+  const { balances: aacBalances, loading: aacLoading, error: aacError, refetch: refetchAACBalance } = useCachedUserBalances({
     address: address || '',
     tokenApps: [auctionTokenId],
     aacApp: aacApp.app,
-    skip: !address || !aacApp.app || !auctionTokenId
+    skip: !address || !aacApp.app || !auctionTokenId || isClientSyncing
   });
 
-  // Get current balance and token info
-  const currentBalance = useMemo(() => {
-    return balances?.get(auctionTokenId) ?? 0;
-  }, [balances, auctionTokenId]);
+  // Fetch wallet balance (available to deposit)
+  const { getAccountBalance, balanceLoading: walletLoading, fetchBalance: fetchUICBalance } = useFungibleQuery({
+    tokenId: auctionTokenId,
+    chainId: walletChainId,
+    chainApp: tokenApp.app?.wallet,
+    autoFetch: !address || !tokenApp.app || !auctionTokenId || isClientSyncing
+  });
+
+  // Fetch balances when dependencies change
+  useEffect(() => {
+    if (address && aacApp.app && tokenApp.app && auctionTokenId) {
+      refetchAACBalance();
+      fetchUICBalance(address);
+    }
+  }, [address, aacApp.app, tokenApp.app, auctionTokenId, refetchAACBalance, fetchUICBalance]);
+
+  // Get balances and token info
+  const aacBalance = useMemo(() => {
+    return aacBalances?.get(auctionTokenId) ?? 0;
+  }, [aacBalances, auctionTokenId]);
+
+  const walletBalance = useMemo(() => {
+    const balance = address ? getAccountBalance(address) : null;
+    return balance ?? 0;
+  }, [address, getAccountBalance]);
 
   const tokenInfo = useMemo(() => {
     return getTokenByAppId(auctionTokenId);
   }, [auctionTokenId]);
 
-  const hasEnoughBalance = currentBalance >= requiredAmount;
-  const shortfall = Math.max(0, requiredAmount - currentBalance);
+  const hasEnoughBalance = aacBalance >= requiredAmount;
+  const shortfall = Math.max(0, requiredAmount - aacBalance);
 
   // Notify parent component about validation state
   useEffect(() => {
-    if (!loading && !error) {
+    if (!aacLoading && !aacError) {
       onBalanceValidated(hasEnoughBalance);
     }
-  }, [hasEnoughBalance, loading, error, onBalanceValidated]);
+  }, [hasEnoughBalance, aacLoading, aacError, onBalanceValidated]);
 
   // Handle loading state
-  if (loading) {
+  if (aacLoading || walletLoading) {
     return (
       <div className="space-y-2">
         <Skeleton className="h-4 w-48" />
@@ -75,7 +101,7 @@ export function CreatorBalanceCheck({
   }
 
   // Handle error state
-  if (error) {
+  if (aacError) {
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
@@ -130,12 +156,18 @@ export function CreatorBalanceCheck({
         {/* Balance Summary */}
         <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
           <div className="flex justify-between items-center text-sm gap-2">
-            <span className="text-muted-foreground">Your AAC Balance</span>
+            <span className="text-muted-foreground">AAC Balance (Deposited)</span>
             <span className="font-medium">
-              {currentBalance.toLocaleString()} {tokenInfo.symbol}
+              {aacBalance.toLocaleString()} {tokenInfo.symbol}
             </span>
           </div>
           <div className="flex justify-between items-center text-sm gap-2">
+            <span className="text-muted-foreground">Wallet Balance (Available)</span>
+            <span className="font-medium">
+              {walletBalance.toLocaleString()} {tokenInfo.symbol}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-sm gap-2 pt-1.5 border-t">
             <span className="text-muted-foreground">Required for Auction</span>
             <span className="font-medium">
               {requiredAmount.toLocaleString()} {tokenInfo.symbol}
@@ -152,16 +184,23 @@ export function CreatorBalanceCheck({
         </div>
 
         {/* Deposit Button */}
-        {!hasEnoughBalance && (
-          <Button
-            onClick={onDepositClick}
-            className="w-full"
-            variant="default"
-          >
-            <Wallet className="h-4 w-4 mr-2" />
-            Deposit {tokenInfo.symbol} to AAC
-          </Button>
-        )}
+        {
+        
+          !hasEnoughBalance && address ? (
+            <Button
+              type="button"
+              onClick={onDepositClick}
+              className="w-full"
+              variant="default"
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              Deposit {tokenInfo.symbol} to AAC
+            </Button>
+          )
+          :
+          <WalletConnectButton />
+      
+        }
       </div>
     </Alert>
   );

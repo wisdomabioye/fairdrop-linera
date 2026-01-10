@@ -163,7 +163,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                         tokenId,
                         chainId,
                         address: address.toLowerCase(),
-                        balance,
+                        balance: Number(balance).toString(), // Balance is returned in Amount type like "10."
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,

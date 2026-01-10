@@ -4,25 +4,12 @@ import { Calendar, Clock, Coins, TrendingDown, Users, Package } from 'lucide-rea
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { formatAbsoluteTime, microsecondsToMilliseconds } from '@/lib/utils/auction-utils';
+import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
 import type { TokenInfo } from '@/config/app.token-store';
-
-export interface AuctionPreviewData {
-  itemName: string;
-  image: string;
-  totalSupply: number;
-  startPrice: string;
-  floorPrice: string;
-  priceDecayAmount: string;
-  priceDecayInterval: number;
-  maxBidAmount: number;
-  startTime: number; // microseconds
-  endTime: number; // microseconds
-  paymentToken?: TokenInfo;
-  auctionToken?: TokenInfo;
-}
+import type { AuctionParam } from '@/lib/gql/types';
 
 export interface AuctionPreviewProps {
-  data: AuctionPreviewData;
+  data: AuctionParam;
 }
 
 export function AuctionPreview({ data }: AuctionPreviewProps) {
@@ -33,6 +20,9 @@ export function AuctionPreview({ data }: AuctionPreviewProps) {
       return price.toString();
     }
   };
+
+  const paymentToken = getTokenByAppId(data.paymentTokenApp);
+  const auctionToken = getTokenByAppId(data.auctionTokenApp);
 
   return (
     <div className="space-y-6">
@@ -96,14 +86,14 @@ export function AuctionPreview({ data }: AuctionPreviewProps) {
             <div>
               <p className="text-sm text-muted-foreground">Start Price</p>
               <p className="text-lg font-bold text-primary">
-                {formatPrice(data.startPrice)} {data.paymentToken?.symbol || 'tokens'}
+                {formatPrice(data.startPrice)} {paymentToken?.symbol || 'tokens'}
               </p>
               <p className="text-xs text-muted-foreground">per unit</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Floor Price</p>
               <p className="text-lg font-bold">
-                {formatPrice(data.floorPrice)} {data.paymentToken?.symbol || 'tokens'}
+                {formatPrice(data.floorPrice)} {paymentToken?.symbol || 'tokens'}
               </p>
               <p className="text-xs text-muted-foreground">per unit</p>
             </div>
@@ -113,7 +103,7 @@ export function AuctionPreview({ data }: AuctionPreviewProps) {
                 Price Decay Amount
               </p>
               <p className="text-base font-semibold">
-                {formatPrice(data.priceDecayAmount)} {data.paymentToken?.symbol || 'tokens'}
+                {formatPrice(data.priceDecayAmount)} {paymentToken?.symbol || 'tokens'}
               </p>
             </div>
             <div>
@@ -153,38 +143,38 @@ export function AuctionPreview({ data }: AuctionPreviewProps) {
       </Card>
 
       {/* Tokens */}
-      {(data.paymentToken || data.auctionToken) && (
+      {(paymentToken || auctionToken) && (
         <Card>
           <CardContent className="p-6 space-y-4">
             <h4 className="font-semibold">Token Configuration</h4>
             <Separator />
             <div className="space-y-4">
-              {data.paymentToken && (
+              {paymentToken && (
                 <div className="flex items-start gap-3">
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold flex-shrink-0">
-                    {data.paymentToken.symbol.charAt(0)}
+                    {paymentToken.symbol.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-muted-foreground">Payment Token</p>
-                    <p className="text-sm font-semibold">{data.paymentToken.name}</p>
-                    <p className="text-xs text-muted-foreground">{data.paymentToken.symbol}</p>
+                    <p className="text-sm font-semibold">{paymentToken.name}</p>
+                    <p className="text-xs text-muted-foreground">{paymentToken.symbol}</p>
                     <p className="text-xs text-muted-foreground/70 font-mono truncate">
-                      {data.paymentToken.appId}
+                      {paymentToken.appId}
                     </p>
                   </div>
                 </div>
               )}
-              {data.auctionToken && (
+              {auctionToken && (
                 <div className="flex items-start gap-3">
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold flex-shrink-0">
-                    {data.auctionToken.symbol.charAt(0)}
+                    {auctionToken.symbol.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-muted-foreground">Auction Token</p>
-                    <p className="text-sm font-semibold">{data.auctionToken.name}</p>
-                    <p className="text-xs text-muted-foreground">{data.auctionToken.symbol}</p>
+                    <p className="text-sm font-semibold">{auctionToken.name}</p>
+                    <p className="text-xs text-muted-foreground">{auctionToken.symbol}</p>
                     <p className="text-xs text-muted-foreground/70 font-mono truncate">
-                      {data.auctionToken.appId}
+                      {auctionToken.appId}
                     </p>
                   </div>
                 </div>

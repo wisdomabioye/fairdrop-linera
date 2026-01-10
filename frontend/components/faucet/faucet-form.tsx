@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useLineraApplication, useWalletConnection, useLineraClient } from 'linera-react-client';
 import { useFungibleMutations, useFungibleQuery } from '@/hooks';
 import { useSyncStatus } from '@/providers';
-import { getPaymentTokenList, type TokenInfo } from '@/config/app.token-store';
+import { getTokenList, type TokenInfo } from '@/config/app.token-store';
 import { UnifiedStatusBar } from './unified-status-bar';
 import { AmountPresets } from './amount-presets';
 import { BalanceCard } from './balance-card';
@@ -28,7 +28,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   const { walletChainId } = useLineraClient();
   const { isConnected, address, } = useWalletConnection();
   const { isWalletClientSyncing } = useSyncStatus();
-  const tokens = getPaymentTokenList();
+  const tokens = getTokenList();
 
   const [selectedTokenId, setSelectedTokenId] = useState<string>(
     defaultToken || ''

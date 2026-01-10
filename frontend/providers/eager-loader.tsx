@@ -15,10 +15,10 @@ import {
     useCachedActiveAuctions,
     useCachedSettledAuctions,
     useCachedAuctionsByCreator,
-    useCachedUserBalances
+    useCachedUserBalances,
+    useAacApp
 } from '@/hooks';
 import { getTokenList } from '@/config/app.token-store';
-import { AAC_APP_ID } from '@/config/app.config';
 
 export function EagerLoader({
     children
@@ -26,7 +26,7 @@ export function EagerLoader({
     children: React.ReactNode;
 }) {
     const { isConnected, walletAddress } = useLineraClient();
-    const aacApp = useLineraApplication(AAC_APP_ID); // Same as uicApp
+    const aacApp = useAacApp();
 
     // ============ Get Token Applications ============
     const tokens = getTokenList();

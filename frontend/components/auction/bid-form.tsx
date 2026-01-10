@@ -9,9 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Spinner } from '@/components/ui/spinner';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
 import { useSyncStatus } from '@/providers';
-import { useAuctionMutations, useCachedMyCommitment } from '@/hooks';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useAuctionMutations, useCachedMyCommitment, useAacApp } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
+import { getTokenByAppId } from '@/config/app.token-store';
 import {
   calculateCurrentPrice,
   formatTimeRemaining,
@@ -35,7 +35,7 @@ export function BidForm({
   onCancel,
   compact = false
 }: BidFormProps) {
-  const aacApp = useLineraApplication(AAC_APP_ID);
+  const aacApp = useAacApp();
   const { isConnected, isConnecting, connect } = useWalletConnection();
   const { isClientSyncing } = useSyncStatus();
   const [quantity, setQuantity] = useState(1);
@@ -85,6 +85,7 @@ export function BidForm({
     return () => clearInterval(interval);
   }, [auction]);
 
+  const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Calculate values
   const availableSupply = auction.maxBidAmount;
   const totalCost = calculateBidCost(quantity, currentPrice);
@@ -223,7 +224,7 @@ export function BidForm({
                 <span>Current Price</span>
               </div>
               <div className="text-2xl font-bold text-primary">
-                {formatTokenAmount(currentPrice, 18, 4)} fUSD
+                {formatTokenAmount(currentPrice, 18, 4)} {paymentToken.symbol}
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -285,7 +286,7 @@ export function BidForm({
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {quantity} × {formatTokenAmount(currentPrice, 18, 4)} fUSD = {formatTokenAmount(totalCost, 18, 4)} fUSD
+              {quantity} × {formatTokenAmount(currentPrice, 18, 4)} {paymentToken.symbol} = {formatTokenAmount(totalCost, 18, 4)} {paymentToken.symbol}
             </p>
           </div>
 

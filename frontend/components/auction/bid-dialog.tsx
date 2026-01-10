@@ -2,8 +2,9 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { BidForm } from './bid-form';
-import type { AuctionSummary } from '@/lib/gql/types';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
+import { getTokenByAppId } from '@/config/app.token-store';
+import type { AuctionSummary } from '@/lib/gql/types';
 
 export interface BidDialogProps {
   auction: AuctionSummary | null;
@@ -18,6 +19,7 @@ export function BidDialog({
   onOpenChange,
   onSuccess
 }: BidDialogProps) {
+
   const handleSuccess = (auctionId: number, quantity: number) => {
     // Close dialog after successful bid
     onOpenChange(false);
@@ -34,13 +36,15 @@ export function BidDialog({
     return null;
   }
 
+  const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{auction.itemName}</DialogTitle>
           <DialogDescription>
-            Current Price: {formatTokenAmount(auction.currentPrice, 18, 4)} fUSD •{' '}
+            Current Price: {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol} •{' '}
             {auction.totalSupply - auction.sold} / {auction.totalSupply} remaining
           </DialogDescription>
         </DialogHeader>

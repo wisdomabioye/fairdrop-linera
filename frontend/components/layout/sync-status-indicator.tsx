@@ -29,9 +29,9 @@ export function SyncStatusIndicator() {
           {isWalletClientSyncing && isPublicClientSyncing ? (
             <span className="font-medium text-foreground">Syncing wallet & public</span>
           ) : isWalletClientSyncing ? (
-            <span className="font-medium text-foreground">Syncing wallet</span>
+            <span className="font-medium text-foreground">Syncing Wallet Chain</span>
           ) : (
-            <span className="font-medium text-foreground">Syncing public</span>
+            <span className="font-medium text-foreground">Syncing Public Chain</span>
           )}
         </div>
 

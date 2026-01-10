@@ -3,9 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Hammer, TrendingDown, Plus } from 'lucide-react';
-import { useLineraApplication, useWalletConnection } from 'linera-react-client';
-import { useCachedAuctionsByCreator } from '@/hooks';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useWalletConnection } from 'linera-react-client';
+import { useCachedAuctionsByCreator, useAacApp } from '@/hooks';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
@@ -19,7 +18,7 @@ import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 
 export default function MyAuctionsPage() {
     const router = useRouter();
-    const aacApp = useLineraApplication(AAC_APP_ID);
+    const aacApp = useAacApp();
     const { isConnected, address } = useWalletConnection();
 
     const [bidDialog, setBidDialog] = useState<{

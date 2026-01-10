@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useLineraApplication } from 'linera-react-client';
 import { Trophy, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCachedBidHistory } from '@/hooks';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useCachedBidHistory, useAacApp } from '@/hooks';
 // import type { BidRecord } from '@/lib/gql/types';
 import {
   truncateAddress,
@@ -30,7 +28,7 @@ export function BidHistory({
   compact = false,
   currentUserWalletAddress
 }: BidHistoryProps) {
-  const aacApp = useLineraApplication(AAC_APP_ID);
+  const aacApp = useAacApp();
   const [offset, setOffset] = useState(0);
 
   const {

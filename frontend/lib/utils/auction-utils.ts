@@ -52,7 +52,7 @@ export function normalizeBidTimestamp(timestamp: number): number {
 export function calculateCurrentPrice(
   auction: AuctionSummary,
   timestamp: number = Date.now()
-): string {
+): number {
   const {
     startPrice,
     floorPrice,
@@ -88,7 +88,7 @@ export function calculateCurrentPrice(
   // Price cannot go below floor price
   return currentPrice < parseAmountSafe(floorPrice)
     ? floorPrice
-    : currentPrice.toString();
+    : Number(currentPrice.toString());
 }
 
 // ============ TIME FORMATTING ============
@@ -240,7 +240,7 @@ export function truncateAddress(
  * Converts from wei-like values to human-readable format
  */
 export function formatTokenAmount(
-  amount: string,
+  amount: string | number,
   decimals: number = 0,
   maxDecimals: number = 0
 ): string {
@@ -279,13 +279,13 @@ export function formatTokenAmount(
  * Handles trailing dots, empty strings, and invalid values
  * Returns 0n for invalid inputs
  */
-export function parseAmountSafe(amount: string | null | undefined): bigint {
-  if (!amount || amount.trim() === '') {
+export function parseAmountSafe(amount: number | string | null | undefined): bigint {
+  if (!amount || !Number(amount)) {
     return BigInt(0);
   }
 
   try {
-    const parsed = parseInt(amount, 10);
+    const parsed = parseFloat(String(amount));
     if (isNaN(parsed) || parsed < 0) {
       console.warn(`Invalid amount parsed: "${amount}" -> NaN or negative`);
       return BigInt(0);
@@ -360,7 +360,7 @@ export const formatTimeSince = formatRelativeTime;
  * Calculate total cost for a bid
  * quantity × currentPrice
  */
-export function calculateBidCost(quantity: number, currentPrice: string): string {
+export function calculateBidCost(quantity: number, currentPrice: number): string {
   const price = parseAmountSafe(currentPrice);
   const total = price * BigInt(quantity);
   return total.toString();

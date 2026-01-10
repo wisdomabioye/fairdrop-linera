@@ -2,7 +2,7 @@
 
 import { Gift, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useWalletConnection } from 'linera-react-client';
+import { useWalletConnection, type ApplicationClient } from 'linera-react-client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -13,10 +13,12 @@ import { useSyncStatus } from '@/providers';
 import { useCachedMyCommitment } from '@/hooks/use-cached-my-bids';
 import { useAuctionMutations } from '@/hooks/use-auction-mutations';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
-import type { ApplicationClient } from 'linera-react-client';
+import { getTokenByAppId } from '@/config/app.token-store';
+import { type AuctionSummary } from '@/lib/gql/types';
+
 
 export interface ClaimFormProps {
-  auctionId: string;
+  auction: AuctionSummary;
   aacApp: ApplicationClient | null;
   onSuccess?: () => void;
 }
@@ -27,13 +29,13 @@ export interface ClaimFormProps {
  * Allows users to claim their allocated items and refunds
  */
 export function ClaimForm({
-  auctionId,
+  auction,
   aacApp,
   onSuccess
 }: ClaimFormProps) {
   const { isConnected, isConnecting } = useWalletConnection();
   const { isClientSyncing } = useSyncStatus();
-
+  const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Fetch user's commitment
   const {
     commitment,
@@ -43,9 +45,9 @@ export function ClaimForm({
     error: fetchError,
     isFetching
   } = useCachedMyCommitment({
-    auctionId,
+    auctionId: auction.auctionId.toString(),
     aacApp,
-    skip: !auctionId || !aacApp
+    skip: !auction || !aacApp
   });
 
   const { claimSettlement, isClaiming, error: claimError } = useAuctionMutations({
@@ -64,7 +66,7 @@ export function ClaimForm({
   });
 
   const handleClaim = async () => {
-    const success = await claimSettlement(Number(auctionId));
+    const success = await claimSettlement(auction.auctionId);
     if (!success && claimError) {
       console.error('[ClaimForm] Claim failed:', claimError);
     }
@@ -213,7 +215,7 @@ export function ClaimForm({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Refund Claimed</span>
               <span className="font-semibold font-mono">
-                {formatTokenAmount('0', 18, 4)} fUSD
+                {formatTokenAmount('0', 18, 4)} {paymentToken.symbol}
               </span>
             </div>
           )}
@@ -257,14 +259,14 @@ export function ClaimForm({
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Clearing Price</span>
                   <span className="font-mono">
-                    {formatTokenAmount(pricePerItem.toString(), 18, 4)} fUSD
+                    {formatTokenAmount(pricePerItem.toString(), 18, 4)} {paymentToken.symbol}
                   </span>
                 </div>
 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total Cost</span>
                   <span className="font-mono">
-                    {formatTokenAmount((totalPaid || 0).toString(), 18, 4)} fUSD
+                    {formatTokenAmount((totalPaid || 0).toString(), 18, 4)} {paymentToken.symbol}
                   </span>
                 </div>
 
@@ -272,7 +274,7 @@ export function ClaimForm({
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Refund</span>
                     <span className="font-mono text-green-600">
-                      +{formatTokenAmount((pricePerItem || 0).toString(), 18, 4)} fUSD
+                      +{formatTokenAmount((pricePerItem || 0).toString(), 18, 4)} {paymentToken.symbol}
                     </span>
                   </div>
                 )}

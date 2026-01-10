@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
 import { ArrowLeft, ArrowRight, Info, Save } from 'lucide-react';
@@ -11,9 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Spinner } from '@/components/ui/spinner';
-import { useAuctionMutations } from '@/hooks';
-import { useCachedUserBalances } from '@/hooks/use-cached-user-balances';
-import { usePersistedAuctionForm } from '@/hooks/use-persisted-auction-form';
+import { 
+  useAuctionMutations, 
+  useAacApp, 
+  useCachedUserBalances, 
+  usePersistedAuctionForm 
+} from '@/hooks';
 import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import { TokenSelector } from '@/components/shared';
 import { ImageUpload } from '@/components/shared';
@@ -21,9 +24,8 @@ import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
 import { CreatorBalanceCheck } from './creator-balance-check';
 import { DepositDialog } from '@/app-pages/aac-balances/deposit-dialog';
-import { AAC_APP_ID } from '@/config/app.config';
-import { APP_ROUTES } from '@/config/app.route';
 import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
+import { APP_ROUTES } from '@/config/app.route';
 import { useSyncStatus } from '@/providers';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
@@ -51,7 +53,7 @@ export function CreateAuctionFormMultistep({
   onCancel
 }: CreateAuctionFormProps) {
   const router = useRouter();
-  const aacApp = useLineraApplication(AAC_APP_ID);
+  const aacApp = useAacApp();
   const { isConnected, isConnecting, connect, address } = useWalletConnection();
   const { isClientSyncing } = useSyncStatus();
   const { loadDraft, saveDraft, clearDraft } = usePersistedAuctionForm();
@@ -67,9 +69,9 @@ export function CreateAuctionFormMultistep({
     auctionTokenApp: '',
     paymentTokenApp: '',
     totalSupply: 0,
-    startPrice: '',
-    floorPrice: '',
-    priceDecayAmount: '',
+    startPrice: 0,
+    floorPrice: 0,
+    priceDecayAmount: 0,
     priceDecayInterval: 0,
     creator: ''
   });
@@ -108,8 +110,8 @@ export function CreateAuctionFormMultistep({
   const paymentTokenList = getPaymentTokenList();
   const auctionTokenList = getAuctionTokenList();
 
-  const paymentToken = paymentTokenList.find(t => t.appId === formData.paymentTokenApp);
-  const auctionToken = auctionTokenList.find(t => t.appId === formData.auctionTokenApp);
+  // const paymentTokenApp = paymentTokenList.find(t => t.appId === formData.paymentTokenApp);
+  // const auctionTokenApp = auctionTokenList.find(t => t.appId === formData.auctionTokenApp);
 
   // Fetch current AAC balance for deposit dialog
   const { balances: aacBalances } = useCachedUserBalances({
@@ -566,6 +568,7 @@ export function CreateAuctionFormMultistep({
               {/* Auction Preview */}
               <AuctionPreview
                 data={{
+                  creator: address as string,
                   itemName: formData.itemName,
                   image: formData.image,
                   totalSupply: Number(formData.totalSupply),
@@ -576,8 +579,8 @@ export function CreateAuctionFormMultistep({
                   maxBidAmount: Number(formData.maxBidAmount),
                   startTime: millisecondsToMicroseconds(startDate.getTime()),
                   endTime: millisecondsToMicroseconds(endDate.getTime()),
-                  paymentToken,
-                  auctionToken,
+                  paymentTokenApp: formData.paymentTokenApp,
+                  auctionTokenApp: formData.auctionTokenApp,
                 }}
               />
             </div>
@@ -666,7 +669,7 @@ export function CreateAuctionFormMultistep({
       </CardContent>
 
       {/* Deposit Dialog */}
-      {formData.auctionTokenApp && auctionToken && (
+      {formData.auctionTokenApp && (
         <DepositDialog
           open={depositDialogOpen}
           onOpenChange={setDepositDialogOpen}

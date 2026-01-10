@@ -21,10 +21,10 @@ export interface AuctionParam {
     maxBidAmount: number;
     paymentTokenApp: string;
     auctionTokenApp: string;
-    startPrice: string;
-    floorPrice: string;
+    startPrice: number;
+    floorPrice: number;
     priceDecayInterval: number;
-    priceDecayAmount: string;
+    priceDecayAmount: number;
     startTime: number;
     endTime: number;
     creator: string;
@@ -32,9 +32,9 @@ export interface AuctionParam {
 
 export interface AuctionSummary extends AuctionParam {
     auctionId: number;
-    currentPrice: string;
+    currentPrice: number;
     sold: number;
-    clearingPrice: string | null;
+    clearingPrice: number | null;
     lastPriceUpdate: number | null;
     settledAt: number | null;
     status: AuctionStatus;
@@ -125,23 +125,23 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
         auctionId: auction.auctionId,
         itemName: auction.params.itemName,
         image: auction.params.image,
-        maxBidAmount: auction.params.maxBidAmount,
+        maxBidAmount: Number(auction.params.maxBidAmount),
         paymentTokenApp: auction.params.paymentTokenApp,
         auctionTokenApp: auction.params.auctionTokenApp,
-        totalSupply: auction.params.totalSupply,
-        startPrice: auction.params.startPrice,
-        floorPrice: auction.params.floorPrice,
+        totalSupply: Number(auction.params.totalSupply),
+        startPrice: Number(auction.params.startPrice),
+        floorPrice: Number(auction.params.floorPrice),
         priceDecayInterval: auction.params.priceDecayInterval,
-        priceDecayAmount: auction.params.priceDecayAmount,
+        priceDecayAmount: Number(auction.params.priceDecayAmount),
         // Convert timestamps from microseconds (backend) to milliseconds (JavaScript)
         startTime: microsecondsToMilliseconds(auction.params.startTime),
         endTime: microsecondsToMilliseconds(auction.params.endTime),
         creator: auction.params.creator,
-        currentPrice: auction.currentPrice,
+        currentPrice: Number(auction.currentPrice),
         settledAt: auction.settledAt,
         lastPriceUpdate: auction.lastPriceUpdate,
-        sold: auction.sold,
-        clearingPrice: auction.clearingPrice,
+        sold: Number(auction.sold),
+        clearingPrice: Number(auction.clearingPrice),
         status: transformAuctionStatus(auction),
         totalBids: auction.totalBids,
         totalBidders: auction.totalBidders,

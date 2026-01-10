@@ -6,8 +6,7 @@ import { toast } from 'sonner';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Package, Share2 } from 'lucide-react';
 import { useLineraApplication, useWalletConnection } from 'linera-react-client';
-import { useCachedAuctionSummary, useCachedMyCommitment } from '@/hooks';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useCachedAuctionSummary, useCachedMyCommitment, useAacApp } from '@/hooks';
 import { BidHistory } from '@/components/auction/bid-history';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -33,9 +32,9 @@ export default function AuctionDetailPage() {
   const searchParams = useSearchParams();
   const auctionId = searchParams?.get('id') || '';
 
-  const aacApp = useLineraApplication(AAC_APP_ID);
+  const aacApp = useAacApp();
   const { address } = useWalletConnection();
-  const [currentPrice, setCurrentPrice] = useState('0');
+  const [currentPrice, setCurrentPrice] = useState(0);
 
   // Fetch auction details
   const {

@@ -8,11 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { WalletConnectionPrompt } from '@/components/wallet';
-import { useWalletConnection, useLineraApplication } from 'linera-react-client';
-import { useCachedUserBalances } from '@/hooks/use-cached-user-balances';
+import { useWalletConnection } from 'linera-react-client';
+import { useAacApp, useCachedUserBalances } from '@/hooks';
 import { useSyncStatus } from '@/providers';
 import { getTokenList, getTokenByAppId } from '@/config/app.token-store';
-import { AAC_APP_ID } from '@/config/app.config';
 import { DepositDialog } from './deposit-dialog';
 import { WithdrawDialog } from './withdraw-dialog';
 
@@ -20,7 +19,7 @@ export default function AACBalances() {
   const { isConnected, address } = useWalletConnection();
   const { isPublicClientSyncing } = useSyncStatus();
   const tokens = getTokenList();
-  const aacApp = useLineraApplication(AAC_APP_ID);
+  const aacApp = useAacApp();
   
   // Fetch balances for all tokens
   const {
