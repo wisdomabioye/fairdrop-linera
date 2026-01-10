@@ -78,7 +78,7 @@ export function WithdrawDialog({
     setAmount(currentBalance.toString());
   };
 
-  const handleChainChange = (chainId: string) => {
+  const handleChainChange = (chainId: string, _canWrite?: boolean) => {
     setTargetChain(chainId);
   };
 

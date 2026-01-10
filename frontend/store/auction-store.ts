@@ -952,13 +952,17 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 // console.log('UserBalances (batched):', JSON.parse(result));
 
                 const { data } = JSON.parse(result) as {
-                    data: { userBalances: Array<{ tokenApp: string; amount: number }> | null }
+                    data: { userBalances: Array<{ tokenApp: string; amount: string | number }> | null }
                 };
 
                 // Convert array to Map for efficient lookups
                 const balancesMap = new Map<string, number>();
                 (data.userBalances || []).forEach(item => {
-                    balancesMap.set(item.tokenApp, item.amount);
+                    // Parse amount: handle both string ("10.") and number formats
+                    const parsedAmount = typeof item.amount === 'string'
+                        ? parseFloat(item.amount) || 0
+                        : item.amount;
+                    balancesMap.set(item.tokenApp, parsedAmount);
                 });
 
                 // Ensure all requested tokens are in the map (default to 0 if not found)
