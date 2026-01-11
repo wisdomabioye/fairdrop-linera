@@ -16,7 +16,7 @@ export function usePersistedAuctionForm() {
 
   const loadDraft = useCallback((): FormDraft | null => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = sessionStorage.getItem(STORAGE_KEY);
       if (!saved) return null;
       return JSON.parse(saved) as FormDraft;
     } catch {
@@ -31,7 +31,7 @@ export function usePersistedAuctionForm() {
 
     saveTimerRef.current = setTimeout(() => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
       } catch (error) {
         console.warn('Failed to save draft:', error);
       }
@@ -40,7 +40,7 @@ export function usePersistedAuctionForm() {
 
   const clearDraft = useCallback(() => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(STORAGE_KEY);
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
