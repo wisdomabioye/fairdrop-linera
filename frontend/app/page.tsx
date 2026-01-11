@@ -1,8 +1,8 @@
-import DashboardOverview from '@/app-pages/dashboard/overview';
+import ActiveAuctions from '@/app-pages/active-auction';
 
 export const dynamic = 'force-static';
 export const revalidate = false;
 
-export default function HomePage() {
-  return <DashboardOverview />;
+export default function ActiveAuctionsPage() {
+  return <ActiveAuctions />;
 }

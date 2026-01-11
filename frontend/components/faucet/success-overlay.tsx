@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export interface SuccessOverlayProps {
   show: boolean;

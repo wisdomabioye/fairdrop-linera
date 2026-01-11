@@ -7,13 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useWalletConnection } from 'linera-react-client';
 import { useSyncStatus } from '@/providers';
-import { useAuctionMutations, useCachedMyCommitment } from '@/hooks';
-import { UIC_APP_ID } from '@/config/app.config';
+import { useAuctionMutations, useCachedMyCommitment, useAacApp } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
+import { getTokenByAppId } from '@/config/app.token-store';
 import {
-  calculateCurrentPrice,
   formatTimeRemaining,
   calculateBidCost,
   formatTokenAmount,
@@ -35,17 +34,16 @@ export function BidForm({
   onCancel,
   compact = false
 }: BidFormProps) {
-  const uicApp = useLineraApplication(UIC_APP_ID);
+  const aacApp = useAacApp();
   const { isConnected, isConnecting, connect } = useWalletConnection();
-  const { isWalletClientSyncing } = useSyncStatus();
+  const { isClientSyncing } = useSyncStatus();
   const [quantity, setQuantity] = useState(1);
-  const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
 
   // Fetch user's current commitment
-  const { commitment, loading: loadingCommitment } = useCachedMyCommitment({
+  const { totalQuantity, loading: loadingCommitment } = useCachedMyCommitment({
     auctionId: auction.auctionId.toString(),
-    uicApp: uicApp.app,
-    skip: !uicApp.app
+    aacApp: aacApp.app,
+    skip: !aacApp.app
   });
 
   // Mutation hook for placing bids
@@ -54,41 +52,39 @@ export function BidForm({
     isBuying,
     error: mutationError
   } = useAuctionMutations({
-    uicApp: uicApp.app,
-    onBuySuccess: (auctionId, qty) => {
-      toast.success('Bid placed successfully!', {
-        description: `You bid ${qty} unit(s) on ${auction.itemName}`
-      });
-      if (onSuccess) {
-        onSuccess(auctionId, qty);
+    aacApp: aacApp.app,
+    onSuccess: (event) => {
+      if (event.type === 'buy') {
+        const { quantity, auctionId } = event.data;
+        toast.success('Bid placed successfully!', {
+          description: `You bid ${quantity} unit(s) on ${auction.itemName}`
+        });
+
+        if (onSuccess) {
+          onSuccess(auctionId, quantity);
+        }
       }
     },
-    onError: (error) => {
-      toast.error('Bid failed', {
-        description: error.message
-      });
+    onError: (event) => {
+      if (event.type === 'buy') {
+        toast.error('Bid failed', {
+          description: event.error.message
+        });
+      }
     }
   });
 
-  // Update current price every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentPrice(calculateCurrentPrice(auction));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [auction]);
-
+  const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Calculate values
-  const availableSupply = auction.totalSupply - auction.sold;
-  const totalCost = calculateBidCost(quantity, currentPrice);
-  const currentCommitment = commitment?.totalQuantity || 0;
+  const availableSupply = auction.maxBidAmount;
+  const totalCost = calculateBidCost(quantity, auction.currentPrice);
+  const currentCommitment = totalQuantity || 0;
   const totalCommitmentAfterBid = currentCommitment + quantity;
 
   // Validation
   const isAuctionActive = auction.status === AuctionStatus.Active; // AuctionStatus.Active
   const isQuantityValid = quantity >= 1 && quantity <= availableSupply;
-  const canSubmit = isAuctionActive && isQuantityValid && uicApp.app && !isBuying;
+  const canSubmit = isAuctionActive && isQuantityValid && aacApp.app && !isBuying;
 
   const handleIncrement = () => {
     if (quantity < availableSupply) {
@@ -165,15 +161,11 @@ export function BidForm({
         message = 'Auction Not Started';
         description = `Bidding opens ${formatAbsoluteTime(auction.startTime)}`;
         break;
-      case AuctionStatus.Ended:
-        message = 'Auction Ended';
-        description = 'Bidding is closed. Waiting for settlement.';
-        break;
       case AuctionStatus.Settled:
         message = 'Auction Settled';
         description = auction.clearingPrice
           ? `Final clearing price: ${formatTokenAmount(auction.clearingPrice, 18, 4)}`
-          : 'Settlement complete';
+          : 'Settlement in progress';
         break;
       case AuctionStatus.Cancelled:
         message = 'Auction Cancelled';
@@ -221,7 +213,7 @@ export function BidForm({
                 <span>Current Price</span>
               </div>
               <div className="text-2xl font-bold text-primary">
-                {formatTokenAmount(currentPrice, 18, 4)} fUSD
+                {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol}
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -267,7 +259,7 @@ export function BidForm({
                 variant="outline"
                 size="icon"
                 onClick={handleIncrement}
-                disabled={quantity >= availableSupply || isBuying || isWalletClientSyncing}
+                disabled={quantity >= availableSupply || isBuying || isClientSyncing}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -283,7 +275,7 @@ export function BidForm({
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {quantity} × {formatTokenAmount(currentPrice, 18, 4)} fUSD = {formatTokenAmount(totalCost, 18, 4)} fUSD
+              {quantity} × {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol} = {formatTokenAmount(totalCost, 18, 4)} {paymentToken.symbol}
             </p>
           </div>
 
@@ -309,7 +301,14 @@ export function BidForm({
           {/* Error Message */}
           {mutationError && (
             <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-              <p className="text-sm text-destructive">{mutationError.message}</p>
+              <p className="text-sm text-destructive">
+                {
+                  mutationError.message.indexOf(':') > -1 ?
+                  mutationError.message?.substring(0, mutationError.message.indexOf(':'))
+                  :
+                  mutationError.message
+                }
+              </p>
             </div>
           )}
 
@@ -328,15 +327,15 @@ export function BidForm({
             )}
             <Button
               type="submit"
-              disabled={!canSubmit || isWalletClientSyncing}
+              disabled={!canSubmit || isClientSyncing}
               className={cn('gap-2', onCancel ? 'flex-1' : 'w-full')}
             >
               {
-              isWalletClientSyncing ?
+              isClientSyncing ?
               (
                 <>
                   <Spinner className="h-4 w-4" />
-                  Wallet is Syncing...
+                  Client is Syncing...
                 </>
               )
               :

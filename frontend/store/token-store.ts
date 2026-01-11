@@ -5,17 +5,17 @@
  * Provides normalized caching, request deduplication, and efficient polling.
  *
  * Features:
- * - Normalized state: one entry per (tokenId, address) pair
+ * - Normalized state: one entry per (tokenId, chainId, address) triple
  * - Request deduplication: prevents duplicate in-flight requests
  * - TTL-based caching: automatic stale detection
  * - Persists across navigation: balances remain when switching pages
- * - Token switching: clean transitions without data mixing
+ * - Chain-aware: different chains have separate cached balances
  */
 
 import { create } from 'zustand';
 import { queryDeduplicator } from '@/lib/utils/query-deduplicator';
 import { FUNGIBLE_QUERY } from '@/lib/gql/queries';
-import type { ApplicationClient } from 'linera-react-client';
+import type { ChainApp } from 'linera-react-client';
 
 // TTL constants (in milliseconds)
 const BALANCE_TTL = 10000; // 10 seconds - balances can change frequently
@@ -25,10 +25,11 @@ export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
 
 /**
  * Token balance cache entry
- * Key: `${tokenId}:${address}`
+ * Key: `${tokenId}:${chainId}:${address}`
  */
 export interface TokenBalanceCacheEntry {
     tokenId: string;
+    chainId: string;
     address: string;
     balance: string | null;
     timestamp: number;
@@ -38,10 +39,11 @@ export interface TokenBalanceCacheEntry {
 
 /**
  * Token info cache entry (symbol, name)
- * Key: `${tokenId}`
+ * Key: `${tokenId}:${chainId}`
  */
 export interface TokenInfoCacheEntry {
     tokenId: string;
+    chainId: string;
     symbol: string | null;
     name: string | null;
     timestamp: number;
@@ -54,29 +56,32 @@ export interface TokenInfoCacheEntry {
  */
 export interface TokenStore {
     // ============ Normalized Caches ============
-    balances: Map<string, TokenBalanceCacheEntry>; // `${tokenId}:${address}` -> balance
-    tokenInfo: Map<string, TokenInfoCacheEntry>; // `${tokenId}` -> info
+    balances: Map<string, TokenBalanceCacheEntry>; // `${tokenId}:${chainId}:${address}` -> balance
+    tokenInfo: Map<string, TokenInfoCacheEntry>; // `${tokenId}:${chainId}` -> info
 
     // ============ Fetch Actions ============
-    fetchBalance: (tokenId: string, address: string, fungibleApp: ApplicationClient) => Promise<void>;
-    fetchTokenInfo: (tokenId: string, fungibleApp: ApplicationClient) => Promise<void>;
-    fetchAccounts: (tokenId: string, fungibleApp: ApplicationClient) => Promise<void>;
+    fetchBalance: (tokenId: string, chainId: string, address: string, chainApp: ChainApp, force?: boolean) => Promise<void>;
+    fetchTokenInfo: (tokenId: string, chainId: string, chainApp: ChainApp, force?: boolean) => Promise<void>;
 
     // ============ Getters ============
-    getBalance: (tokenId: string, address: string) => string | null;
-    getTokenSymbol: (tokenId: string) => string | null;
-    getTokenName: (tokenId: string) => string | null;
-    getBalanceStatus: (tokenId: string, address: string) => FetchStatus;
-    getTokenInfoStatus: (tokenId: string) => FetchStatus;
+    getBalance: (tokenId: string, chainId: string, address: string) => string | null;
+    getTokenSymbol: (tokenId: string, chainId: string) => string | null;
+    getTokenName: (tokenId: string, chainId: string) => string | null;
+    getBalanceStatus: (tokenId: string, chainId: string, address: string) => FetchStatus;
+    getTokenInfoStatus: (tokenId: string, chainId: string) => FetchStatus;
 
     // ============ Invalidation Actions ============
-    invalidateBalance: (tokenId: string, address?: string) => void;
-    invalidateTokenInfo: (tokenId: string) => void;
+    invalidateBalance: (tokenId: string, chainId: string, address?: string) => void;
+    invalidateTokenInfo: (tokenId: string, chainId: string) => void;
     invalidateAll: () => void;
 
+    // ============ Combined Invalidate + Refetch Actions ============
+    invalidateAndRefreshBalance: (tokenId: string, chainId: string, address: string, chainApp: ChainApp) => Promise<void>;
+    invalidateAndRefreshTokenInfo: (tokenId: string, chainId: string, chainApp: ChainApp) => Promise<void>;
+
     // ============ Utility Actions ============
-    isBalanceStale: (tokenId: string, address: string) => boolean;
-    isTokenInfoStale: (tokenId: string) => boolean;
+    isBalanceStale: (tokenId: string, chainId: string, address: string) => boolean;
+    isTokenInfoStale: (tokenId: string, chainId: string) => boolean;
 }
 
 /**
@@ -88,17 +93,29 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
     tokenInfo: new Map(),
 
     // ============ Fetch Actions ============
-    fetchBalance: async (tokenId, address, fungibleApp) => {
-        const key = `${tokenId}:${address}`;
+    /**
+     * Fetch balance for a specific address
+     * Uses FUNGIBLE_QUERY.Balance(owner) for single-address fetch
+     */
+    fetchBalance: async (tokenId, chainId, address, chainApp, force = false) => {
+        // Guard: Abort if chainApp is invalid to prevent querying wrong token
+        if (!chainApp) {
+            console.warn('[TokenStore] fetchBalance: chainApp is null/undefined, aborting to prevent cache corruption');
+            return;
+        }
+
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const dedupeKey = `balance-${key}`;
 
-        // Check cache first
-        const cached = get().balances.get(key);
-        if (cached && cached.status === 'success') {
-            const age = Date.now() - cached.timestamp;
-            if (age < BALANCE_TTL) {
-                // Cache hit - fresh data
-                return;
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().balances.get(key);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < BALANCE_TTL) {
+                    // Cache hit - fresh data
+                    return;
+                }
             }
         }
 
@@ -110,7 +127,8 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
                 newBalances.set(key, {
                     tokenId,
-                    address,
+                    chainId,
+                    address: address.toLowerCase(),
                     balance: existing?.balance ?? null,
                     timestamp: existing?.timestamp ?? Date.now(),
                     status: 'loading',
@@ -121,29 +139,21 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
             });
 
             try {
-                if (!fungibleApp?.walletClient) {
-                    throw new Error('Wallet not connected');
+                if (!chainApp) {
+                    throw new Error('Chain is invalid');
                 }
 
-                const result = await fungibleApp.walletClient.query<string>(
-                    JSON.stringify(FUNGIBLE_QUERY.Accounts())
+                // Fetch balance for specific address
+                const result = await chainApp.query<string>(
+                    JSON.stringify(FUNGIBLE_QUERY.Balance(address))
                 );
 
+                console.log('fetchBalance', result)
                 const parsed = JSON.parse(result) as {
-                    data: {
-                        accounts: {
-                            entries: Array<{ key: string; value: string }> | null;
-                        } | null;
-                    } | null;
+                    data: { balance: string } | null;
                 };
 
-                // Find balance for this address (case-insensitive)
-                const entries = parsed?.data?.accounts?.entries || [];
-                const account = entries.find(
-                    (acc) => acc.key.toLowerCase() === address.toLowerCase()
-                );
-
-                const balance = account ? account.value : null;
+                const balance = parsed?.data?.balance || null;
 
                 // Update cache with success
                 set((state) => {
@@ -151,8 +161,9 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
                     newBalances.set(key, {
                         tokenId,
-                        address,
-                        balance,
+                        chainId,
+                        address: address.toLowerCase(),
+                        balance: Number(balance).toString(), // Balance is returned in Amount type like "10."
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,
@@ -170,7 +181,8 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
                     newBalances.set(key, {
                         tokenId,
-                        address,
+                        chainId,
+                        address: address.toLowerCase(),
                         balance: existing?.balance ?? null,
                         timestamp: existing?.timestamp ?? Date.now(),
                         status: 'error',
@@ -185,16 +197,25 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
         });
     },
 
-    fetchTokenInfo: async (tokenId, fungibleApp) => {
-        const dedupeKey = `token-info-${tokenId}`;
+    fetchTokenInfo: async (tokenId, chainId, chainApp, force = false) => {
+        // Guard: Abort if chainApp is invalid to prevent querying wrong token
+        if (!chainApp) {
+            console.warn('[TokenStore] fetchTokenInfo: chainApp is null/undefined, aborting to prevent cache corruption');
+            return;
+        }
 
-        // Check cache first
-        const cached = get().tokenInfo.get(tokenId);
-        if (cached && cached.status === 'success') {
-            const age = Date.now() - cached.timestamp;
-            if (age < TOKEN_INFO_TTL) {
-                // Cache hit - fresh data
-                return;
+        const key = `${tokenId}:${chainId}`;
+        const dedupeKey = `token-info-${key}`;
+
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().tokenInfo.get(key);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < TOKEN_INFO_TTL) {
+                    // Cache hit - fresh data
+                    return;
+                }
             }
         }
 
@@ -202,10 +223,11 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
             // Set loading state
             set((state) => {
                 const newTokenInfo = new Map(state.tokenInfo);
-                const existing = newTokenInfo.get(tokenId);
+                const existing = newTokenInfo.get(key);
 
-                newTokenInfo.set(tokenId, {
+                newTokenInfo.set(key, {
                     tokenId,
+                    chainId,
                     symbol: existing?.symbol ?? null,
                     name: existing?.name ?? null,
                     timestamp: existing?.timestamp ?? Date.now(),
@@ -217,12 +239,14 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
             });
 
             try {
-                if (!fungibleApp?.walletClient) {
-                    throw new Error('Wallet not connected');
+                if (!chainApp) {
+                    throw new Error('Chain is invalid');
                 }
 
+                // @todo: batch this query
+
                 // Fetch ticker symbol
-                const tickerResult = await fungibleApp.walletClient.query<string>(
+                const tickerResult = await chainApp.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.TickerSymbol())
                 );
                 const tickerParsed = JSON.parse(tickerResult) as {
@@ -230,7 +254,7 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                 };
 
                 // Fetch token name
-                const nameResult = await fungibleApp.walletClient.query<string>(
+                const nameResult = await chainApp.query<string>(
                     JSON.stringify(FUNGIBLE_QUERY.TokenName())
                 );
                 const nameParsed = JSON.parse(nameResult) as {
@@ -244,8 +268,9 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                 set((state) => {
                     const newTokenInfo = new Map(state.tokenInfo);
 
-                    newTokenInfo.set(tokenId, {
+                    newTokenInfo.set(key, {
                         tokenId,
+                        chainId,
                         symbol,
                         name,
                         timestamp: Date.now(),
@@ -261,10 +286,11 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                 // Update cache with error
                 set((state) => {
                     const newTokenInfo = new Map(state.tokenInfo);
-                    const existing = newTokenInfo.get(tokenId);
+                    const existing = newTokenInfo.get(key);
 
-                    newTokenInfo.set(tokenId, {
+                    newTokenInfo.set(key, {
                         tokenId,
+                        chainId,
                         symbol: existing?.symbol ?? null,
                         name: existing?.name ?? null,
                         timestamp: existing?.timestamp ?? Date.now(),
@@ -280,105 +306,45 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
         });
     },
 
-    fetchAccounts: async (tokenId, fungibleApp) => {
-        const dedupeKey = `accounts-${tokenId}`;
-
-        await queryDeduplicator.deduplicate(dedupeKey, async () => {
-            try {
-                if (!fungibleApp?.walletClient) {
-                    throw new Error('Wallet not connected');
-                }
-
-                const result = await fungibleApp.walletClient.query<string>(
-                    JSON.stringify(FUNGIBLE_QUERY.Accounts())
-                );
-
-                const parsed = JSON.parse(result) as {
-                    data: {
-                        accounts: {
-                            entries: Array<{ key: string; value: string }> | null;
-                        } | null;
-                    } | null;
-                };
-
-                const entries = parsed?.data?.accounts?.entries || [];
-
-                // Update cache for all accounts
-                set((state) => {
-                    const newBalances = new Map(state.balances);
-
-                    entries.forEach((account) => {
-                        const key = `${tokenId}:${account.key}`;
-                        newBalances.set(key, {
-                            tokenId,
-                            address: account.key,
-                            balance: account.value,
-                            timestamp: Date.now(),
-                            status: 'success',
-                            error: null,
-                        });
-                    });
-
-                    return { balances: newBalances };
-                });
-            } catch (err) {
-                console.error('Failed to fetch accounts:', err);
-                throw err;
-            }
-        });
-    },
-
     // ============ Getters ============
-    getBalance: (tokenId, address) => {
-        const key = `${tokenId}:${address}`;
+    getBalance: (tokenId, chainId, address) => {
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const entry = get().balances.get(key);
-
-        // Try case-insensitive match if exact match fails
-        if (!entry) {
-            const lowerAddress = address.toLowerCase();
-            for (const [cachedKey, cachedEntry] of get().balances.entries()) {
-                const [cachedTokenId, cachedAddress] = cachedKey.split(':');
-                if (
-                    cachedTokenId === tokenId &&
-                    cachedAddress.toLowerCase() === lowerAddress
-                ) {
-                    return cachedEntry.balance;
-                }
-            }
-        }
-
         return entry?.balance ?? null;
     },
 
-    getTokenSymbol: (tokenId) => {
-        const entry = get().tokenInfo.get(tokenId);
+    getTokenSymbol: (tokenId, chainId) => {
+        const key = `${tokenId}:${chainId}`;
+        const entry = get().tokenInfo.get(key);
         return entry?.symbol ?? null;
     },
 
-    getTokenName: (tokenId) => {
-        const entry = get().tokenInfo.get(tokenId);
+    getTokenName: (tokenId, chainId) => {
+        const key = `${tokenId}:${chainId}`;
+        const entry = get().tokenInfo.get(key);
         return entry?.name ?? null;
     },
 
-    getBalanceStatus: (tokenId, address) => {
-        const key = `${tokenId}:${address}`;
+    getBalanceStatus: (tokenId, chainId, address) => {
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const entry = get().balances.get(key);
         return entry?.status ?? 'idle';
     },
 
-    getTokenInfoStatus: (tokenId) => {
-        const entry = get().tokenInfo.get(tokenId);
+    getTokenInfoStatus: (tokenId, chainId) => {
+        const key = `${tokenId}:${chainId}`;
+        const entry = get().tokenInfo.get(key);
         return entry?.status ?? 'idle';
     },
 
     // ============ Invalidation Actions ============
-    invalidateBalance: (tokenId, address) => {
+    invalidateBalance: (tokenId, chainId, address) => {
         set((state) => {
             const newBalances = new Map(state.balances);
 
             if (address) {
                 // Invalidate specific balance
-                const key = `${tokenId}:${address}`;
+                const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
                 const existing = newBalances.get(key);
                 if (existing) {
                     newBalances.set(key, {
@@ -387,9 +353,9 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
                     });
                 }
             } else {
-                // Invalidate all balances for this token
+                // Invalidate all balances for this token + chain combo
                 newBalances.forEach((value, key) => {
-                    if (key.startsWith(`${tokenId}:`)) {
+                    if (key.startsWith(`${tokenId}:${chainId}:`)) {
                         newBalances.set(key, {
                             ...value,
                             timestamp: 0,
@@ -402,13 +368,14 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
         });
     },
 
-    invalidateTokenInfo: (tokenId) => {
+    invalidateTokenInfo: (tokenId, chainId) => {
         set((state) => {
             const newTokenInfo = new Map(state.tokenInfo);
-            const existing = newTokenInfo.get(tokenId);
+            const key = `${tokenId}:${chainId}`;
+            const existing = newTokenInfo.get(key);
 
             if (existing) {
-                newTokenInfo.set(tokenId, {
+                newTokenInfo.set(key, {
                     ...existing,
                     timestamp: 0, // Mark as stale
                 });
@@ -445,9 +412,51 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
         });
     },
 
+    // ============ Combined Invalidate + Refetch Actions ============
+    /**
+     * Invalidate and force refresh a specific balance
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshBalance: async (tokenId, chainId, address, chainApp) => {
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
+        const dedupeKey = `balance-${key}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(dedupeKey);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateBalance(tokenId, chainId, address.toLowerCase());
+
+        // Force fresh fetch
+        await get().fetchBalance(
+            tokenId, 
+            chainId, 
+            address, // must be checksum address (no .toLowerCase()) 
+            chainApp, true
+        );
+    },
+
+    /**
+     * Invalidate and force refresh token info
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshTokenInfo: async (tokenId, chainId, chainApp) => {
+        const key = `${tokenId}:${chainId}`;
+        const dedupeKey = `token-info-${key}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(dedupeKey);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateTokenInfo(tokenId, chainId);
+
+        // Force fresh fetch
+        await get().fetchTokenInfo(tokenId, chainId, chainApp, true);
+    },
+
     // ============ Utility Actions ============
-    isBalanceStale: (tokenId, address) => {
-        const key = `${tokenId}:${address}`;
+    isBalanceStale: (tokenId, chainId, address) => {
+        const key = `${tokenId}:${chainId}:${address.toLowerCase()}`;
         const entry = get().balances.get(key);
 
         if (!entry || entry.status === 'idle') return true;
@@ -456,8 +465,9 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
         return age > BALANCE_TTL;
     },
 
-    isTokenInfoStale: (tokenId) => {
-        const entry = get().tokenInfo.get(tokenId);
+    isTokenInfoStale: (tokenId, chainId) => {
+        const key = `${tokenId}:${chainId}`;
+        const entry = get().tokenInfo.get(key);
 
         if (!entry || entry.status === 'idle') return true;
 

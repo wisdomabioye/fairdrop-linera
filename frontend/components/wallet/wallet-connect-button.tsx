@@ -33,15 +33,15 @@ export function WalletConnectButton({
   fullWidth = false
 }: WalletConnectButtonProps) {
   const { isConnected, isConnecting, connect } = useWalletConnection();
-  const { isWalletClientSyncing } = useSyncStatus();
+  const { isClientSyncing } = useSyncStatus();
 
   // Already connected and synced - don't show button
-  if (isConnected && !isWalletClientSyncing) {
+  if (isConnected && !isClientSyncing) {
     return null;
   }
 
   // Show syncing state
-  if (isConnected && isWalletClientSyncing) {
+  if (isConnected && isClientSyncing) {
     return (
       <Button
         size={size}

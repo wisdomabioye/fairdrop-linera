@@ -11,38 +11,25 @@
  */
 import { useEffect, useState } from 'react';
 import { useLineraClient, useLineraApplication } from 'linera-react-client';
-import { useSyncStatus } from './sync-provider';
 import {
     useCachedActiveAuctions,
     useCachedSettledAuctions,
     useCachedAuctionsByCreator,
-    useCachedAllMyCommitments,
+    useCachedUserBalances,
+    useAacApp
 } from '@/hooks';
-import { useTokenStore } from '@/store/token-store';
 import { getTokenList } from '@/config/app.token-store';
-import { AAC_APP_ID, UIC_APP_ID } from '@/config/app.config';
 
 export function EagerLoader({
     children
 }: {
     children: React.ReactNode;
 }) {
-    const aacApp = useLineraApplication(AAC_APP_ID); // Same as uicApp
-    // const uicApp = useLineraApplication(UIC_APP_ID);
     const { isConnected, walletAddress } = useLineraClient();
-    const { isWalletClientSyncing } = useSyncStatus();
-
-    // ============ Token Store Actions ============
-    const { fetchAccounts, fetchTokenInfo } = useTokenStore();
+    const aacApp = useAacApp();
 
     // ============ Get Token Applications ============
     const tokens = getTokenList();
-    const lusdApp = useLineraApplication(tokens[0]?.appId);
-    const fusdApp = useLineraApplication(tokens[1]?.appId);
-    const tokenApps = [
-        { token: tokens[0], app: lusdApp.app },
-        { token: tokens[1], app: fusdApp.app },
-    ];
 
     // ============ Progressive Loading State ============
     const [loadTier2, setLoadTier2] = useState(false); // Settled auctions
@@ -123,33 +110,17 @@ export function EagerLoader({
         enablePolling: !!walletAddress && loadTier3,
     });
 
-    // Load user's commitments for all auctions (for "My Bids" page)
-    useCachedAllMyCommitments({
-        uicApp: aacApp.app, // uicApp is the same with aacApp
-        skip: !isConnected || !loadTier3,
-    });
+    // Load user's created auctions (wallet-gated)
+    useCachedUserBalances({
+        address: walletAddress ?? '',
+        tokenApps: tokens.map(t => t.appId),
+        aacApp: aacApp.app,
+        skip: !walletAddress || !loadTier3
+    })
 
     // ============ TIER 4: NICE-TO-HAVE (T=1500ms) - Background Updates ============
     // Load balances and token info for all supported tokens
-    useEffect(() => {
-        if (!isConnected || isWalletClientSyncing || !walletAddress || !loadTier4) return;
-
-        // Load token info and balances for each token
-        tokenApps.forEach(({ token, app }) => {
-            if (!token || !app) return;
-
-            // Fetch token info (name, symbol) - cached for 100 minutes
-            fetchTokenInfo(token.appId, app).catch((err) => {
-                console.error(`[EagerLoader] Failed to fetch token info for ${token.symbol}:`, err);
-            });
-
-            // Fetch all accounts (balances) for this user
-            fetchAccounts(token.appId, app).catch((err) => {
-                console.error(`[EagerLoader] Failed to fetch accounts for ${token.symbol}:`, err);
-            });
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isConnected, isWalletClientSyncing, walletAddress, loadTier4, fetchAccounts, fetchTokenInfo]);
+    // todo: add other non-critical fetches
 
     return (
         children

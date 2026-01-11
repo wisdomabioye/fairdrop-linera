@@ -3,8 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { useLineraApplication } from 'linera-react-client';
-import { useCachedSettledAuctions, useAuctionMutations, useCachedMyCommitment } from '@/hooks';
-import { AAC_APP_ID, UIC_APP_ID } from '@/config/app.config';
+import { useCachedSettledAuctions, useAuctionMutations, useCachedMyCommitment, useAacApp } from '@/hooks';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
@@ -17,15 +16,13 @@ import { APP_ROUTES } from '@/config/app.route';
 
 export default function SettledAuctions() {
     const router = useRouter();
-    const aacApp = useLineraApplication(AAC_APP_ID); // same as uicApp
-    // const uicApp = useLineraApplication(UIC_APP_ID);
+    const aacApp = useAacApp();
 
     const {
         auctions,
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
         refetch
     } = useCachedSettledAuctions({
         offset: 0,
@@ -34,17 +31,19 @@ export default function SettledAuctions() {
     });
 
     const { claimSettlement, isClaiming } = useAuctionMutations({
-        uicApp: aacApp.app,
-        onClaimSuccess: (auctionId) => {
-            toast.success('Settlement claimed successfully!', {
-                description: `Auction ID: ${auctionId}`
-            });
-            refetch();
+        aacApp: aacApp.app,
+        onSuccess: (event) => {
+            if (event.type === 'claim') {
+                toast.success('Settlement claimed successfully!');
+                refetch();
+            }
         },
-        onError: (error) => {
-            toast.error('Failed to claim settlement', {
-                description: error.message
-            });
+        onError: (event) => {
+            if (event.type === 'claim') {
+                toast.error('Failed to claim settlement', {
+                    description: event.error.message
+                });
+            }
         }
     });
 
@@ -79,7 +78,7 @@ export default function SettledAuctions() {
             </header>
 
             {/* Loading State */}
-            {((loading && !hasLoadedOnce)) && (
+            {((loading)) && (
                 <AuctionSkeletonGrid count={4} />
             )}
 
@@ -148,16 +147,16 @@ function SettledAuctionCard({
     onClaimClick: (id: number) => void;
     isClaiming: boolean;
 }) {
-    const uicApp = useLineraApplication(UIC_APP_ID);
+    const aacApp = useAacApp();
 
-    const { commitment } = useCachedMyCommitment({
+    const { commitment, totalQuantity } = useCachedMyCommitment({
         auctionId: auction.auctionId.toString(),
-        uicApp: uicApp.app,
-        skip: !uicApp.app
+        aacApp: aacApp.app,
+        skip: !aacApp.app
     });
 
-    const hasCommitment = commitment && commitment.totalQuantity > 0;
-    const hasClaimed = commitment?.settlement && commitment.totalQuantity > 0;
+    const hasCommitment = totalQuantity && totalQuantity > 0;
+    const hasClaimed = hasCommitment && commitment?.filter(c => !c.claimed);
 
     return (
         <AuctionCard

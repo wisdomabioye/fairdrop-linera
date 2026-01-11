@@ -3,6 +3,20 @@ import { withLinera } from "linera-react-client/config/nextjs";
 
 const nextConfig: NextConfig = {
   // Your Next.js config here
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: '**',
+      },
+    ],
+    // Configure Cloudinary domain
+    domains: ['res.cloudinary.com'],
+  }
 };
 
 // withLinera already adds all required headers (COOP/COEP) for all routes

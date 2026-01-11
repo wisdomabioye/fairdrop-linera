@@ -134,12 +134,10 @@ cp .env.example .env.local
 ### Environment Variables
 ```env
 NEXT_PUBLIC_FAUCET_URL=http://localhost:8080
-NEXT_PUBLIC_AAC_APP=your-auction-app-id
-NEXT_PUBLIC_INDEXER_APP=your-indexer-app-id
+NEXT_PUBLIC_AAC_APP_ID=your-auction-app-id
+NEXT_PUBLIC_INDEXER_APP_ID=your-indexer-app-id
 NEXT_PUBLIC_INDEXER_CHAIN_ID=indexer-chain-id
-NEXT_PUBLIC_AAC_CHAIN=auction-chain-id
-NEXT_PUBLIC_LUSD_APP_ID=test-token-app-id
-NEXT_PUBLIC_FUSD_APP_ID=test2-token-app-id
+NEXT_PUBLIC_AAC_CHAIN_ID=auction-chain-id
 ```
 
 ### Development
@@ -342,12 +340,10 @@ vercel
 ### Environment Variables
 Set these in Vercel dashboard:
 - `NEXT_PUBLIC_FAUCET_URL`
-- `NEXT_PUBLIC_AAC_APP`
-- `NEXT_PUBLIC_INDEXER_APP`
+- `NEXT_PUBLIC_AAC_APP_ID`
+- `NEXT_PUBLIC_INDEXER_APP_ID`
 - `NEXT_PUBLIC_INDEXER_CHAIN_ID`
-- `NEXT_PUBLIC_AAC_CHAIN`
-- `NEXT_PUBLIC_LUSD_APP_ID`
-- `NEXT_PUBLIC_FUSD_APP_ID`
+- `NEXT_PUBLIC_AAC_CHAIN_ID`
 
 ---
 

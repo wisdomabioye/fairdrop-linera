@@ -11,7 +11,7 @@ import type { ApplicationClient } from 'linera-react-client';
 
 export interface DetailSidebarActionsProps {
   auction: AuctionSummary;
-  uicApp: ApplicationClient | null;
+  aacApp: ApplicationClient | null;
   onBidSuccess?: () => void;
   onClaimSuccess?: () => void;
 }
@@ -24,7 +24,7 @@ export interface DetailSidebarActionsProps {
  */
 export function DetailSidebarActions({
   auction,
-  uicApp,
+  aacApp,
   onBidSuccess,
   onClaimSuccess
 }: DetailSidebarActionsProps) {
@@ -41,8 +41,8 @@ export function DetailSidebarActions({
       // ClaimForm handles all states internally (wallet check, loading, error, etc.)
       return (
         <ClaimForm
-          auctionId={auction.auctionId.toString()}
-          uicApp={uicApp}
+          auction={auction}
+          aacApp={aacApp}
           onSuccess={onClaimSuccess}
         />
       );

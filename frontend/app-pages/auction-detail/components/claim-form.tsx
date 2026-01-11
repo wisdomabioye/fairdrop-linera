@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { Gift, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useWalletConnection } from 'linera-react-client';
+import { useWalletConnection, type ApplicationClient } from 'linera-react-client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -11,14 +10,16 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WalletConnectButton } from '@/components/wallet';
 import { useSyncStatus } from '@/providers';
-import { useCachedMyCommitment } from '@/hooks/auctions/use-cached-my-commitment';
-import { useAuctionMutations } from '@/hooks/auctions/use-auction-mutations';
+import { useCachedMyCommitment } from '@/hooks/use-cached-my-bids';
+import { useAuctionMutations } from '@/hooks/use-auction-mutations';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
-import type { ApplicationClient } from 'linera-react-client';
+import { getTokenByAppId } from '@/config/app.token-store';
+import { type AuctionSummary } from '@/lib/gql/types';
+
 
 export interface ClaimFormProps {
-  auctionId: string;
-  uicApp: ApplicationClient | null;
+  auction: AuctionSummary;
+  aacApp: ApplicationClient | null;
   onSuccess?: () => void;
 }
 
@@ -28,38 +29,44 @@ export interface ClaimFormProps {
  * Allows users to claim their allocated items and refunds
  */
 export function ClaimForm({
-  auctionId,
-  uicApp,
+  auction,
+  aacApp,
   onSuccess
 }: ClaimFormProps) {
   const { isConnected, isConnecting } = useWalletConnection();
-  const { isWalletClientSyncing } = useSyncStatus();
-
+  const { isClientSyncing } = useSyncStatus();
+  const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Fetch user's commitment
   const {
     commitment,
+    totalQuantity = 0,
+    totalPaid = 0,
     loading,
     error: fetchError,
-    hasLoadedOnce
+    isFetching
   } = useCachedMyCommitment({
-    auctionId,
-    uicApp,
-    skip: !auctionId || !uicApp?.walletClient
+    auctionId: auction.auctionId.toString(),
+    aacApp,
+    skip: !auction || !aacApp
   });
 
   const { claimSettlement, isClaiming, error: claimError } = useAuctionMutations({
-    uicApp,
-    onClaimSuccess: () => {
-      toast.success('Successfully claimed your settlement!');
-      onSuccess?.();
+    aacApp,
+    onSuccess: (event) => {
+      if (event.type === 'claim') {
+        toast.success('Successfully claimed your settlement!');
+        onSuccess?.();
+      }
     },
-    onError: (err) => {
-      toast.error(err.message || 'Failed to claim settlement');
+    onError: (event) => {
+      if (event.type === 'claim') {
+        toast.error(event.error.message || 'Failed to claim settlement');
+      }
     }
   });
 
   const handleClaim = async () => {
-    const success = await claimSettlement(Number(auctionId));
+    const success = await claimSettlement(auction.auctionId);
     if (!success && claimError) {
       console.error('[ClaimForm] Claim failed:', claimError);
     }
@@ -88,13 +95,13 @@ export function ClaimForm({
   }
 
   // State 2: Wallet connecting or syncing
-  if (isConnecting || isWalletClientSyncing) {
+  if (isConnecting || isClientSyncing) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Settlement</CardTitle>
           <CardDescription>
-            Preparing wallet...
+            Syncing...
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -106,7 +113,7 @@ export function ClaimForm({
   }
 
   // State 3: Loading commitment data
-  if (loading || (!hasLoadedOnce && !fetchError)) {
+  if (loading || (isFetching && !fetchError)) {
     return (
       <Card>
         <CardHeader>
@@ -144,7 +151,7 @@ export function ClaimForm({
   }
 
   // State 5: No commitment - user didn't participate
-  if (!commitment) {
+  if (!commitment?.length) {
     return (
       <Card>
         <CardHeader>
@@ -162,12 +169,10 @@ export function ClaimForm({
     );
   }
 
-  // At this point, commitment is guaranteed to exist
-  // Check if user has items to claim
-  const claimed = !!commitment.settlement; // settlement is available only after claim
-  const hasAllocation = (commitment.totalQuantity || 0) > 0;
-  const hasRefund = commitment.settlement?.refund ? BigInt(parseFloat(commitment.settlement?.refund)) : BigInt(0);
-
+  const claimed = commitment.filter(c => c.claimed).length === 0;
+  const hasAllocation = (totalQuantity || 0) > 0;
+  const hasRefund = totalPaid && totalPaid > 0;
+  const pricePerItem = (totalQuantity || 0) / (totalPaid || 0)
   // State 6: No claimable items
   if (!hasAllocation && !hasRefund) {
     return (
@@ -203,14 +208,14 @@ export function ClaimForm({
           {!!hasAllocation && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Items Claimed</span>
-              <span className="font-semibold">{commitment.settlement?.allocatedQuantity || 0}</span>
+              <span className="font-semibold">{totalQuantity || 0}</span>
             </div>
           )}
           {!!hasRefund && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Refund Claimed</span>
               <span className="font-semibold font-mono">
-                {formatTokenAmount(commitment.settlement?.refund ?? '0', 18, 4)} fUSD
+                {formatTokenAmount('0', 18, 4)} {paymentToken.symbol}
               </span>
             </div>
           )}
@@ -233,10 +238,10 @@ export function ClaimForm({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Your Bids</span>
-            <span className="font-semibold">{commitment.totalQuantity}</span>
+            <span className="font-semibold">{totalQuantity}</span>
           </div>
 
-          {commitment.settlement && (
+          {commitment && totalQuantity && (
             <>
               <Separator />
               <div className="space-y-2">
@@ -246,7 +251,7 @@ export function ClaimForm({
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Items Won</span>
                     <span className="font-semibold text-green-600">
-                      {commitment.settlement.allocatedQuantity}
+                      {totalQuantity}
                     </span>
                   </div>
                 )}
@@ -254,14 +259,14 @@ export function ClaimForm({
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Clearing Price</span>
                   <span className="font-mono">
-                    {formatTokenAmount(commitment.settlement.clearingPrice, 18, 4)} fUSD
+                    {formatTokenAmount(pricePerItem.toString(), 18, 4)} {paymentToken.symbol}
                   </span>
                 </div>
 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total Cost</span>
                   <span className="font-mono">
-                    {formatTokenAmount(commitment.settlement.totalCost, 18, 4)} fUSD
+                    {formatTokenAmount((totalPaid || 0).toString(), 18, 4)} {paymentToken.symbol}
                   </span>
                 </div>
 
@@ -269,7 +274,7 @@ export function ClaimForm({
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Refund</span>
                     <span className="font-mono text-green-600">
-                      +{formatTokenAmount(commitment.settlement.refund, 18, 4)} fUSD
+                      +{formatTokenAmount((pricePerItem || 0).toString(), 18, 4)} {paymentToken.symbol}
                     </span>
                   </div>
                 )}
@@ -291,7 +296,7 @@ export function ClaimForm({
           className="w-full bg-green-600 hover:bg-green-700"
           size="lg"
           onClick={handleClaim}
-          disabled={isClaiming || !uicApp?.walletClient}
+          disabled={isClaiming || !aacApp}
         >
           {isClaiming ? (
             <>
@@ -306,7 +311,7 @@ export function ClaimForm({
           )}
         </Button>
 
-        {!uicApp?.walletClient && (
+        {!aacApp && (
           <p className="text-xs text-center text-muted-foreground">
             Connect your wallet to claim
           </p>

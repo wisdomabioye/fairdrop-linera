@@ -7,34 +7,222 @@ A decentralized, transparent Dutch auction protocol on Linera blockchain. Unifor
 
 ---
 
-## Project Structure
+## How It Works
+
+**Dutch Auction**: Price starts high and decreases at intervals until all items are sold or auction ends. All winners pay the same clearing price.
+
+**Internal Balance System**: Users deposit tokens to the Auction Authority Chain (AAC), bid using internal balances, and withdraw to any chain.
+
+---
+
+## Core Features
+
+- **Descending Price Mechanism** - Automated price reduction at preset intervals
+- **Uniform Clearing** - All participants pay the same final clearing price
+- **Cross-Chain Bidding** - Bid from any chain via message passing
+- **Real-Time Updates** - Live auction state via event streaming
+- **Token Integration** - Built on Linera's fungible token standard
+- **Smart Polling** - Efficient 30s intervals with tab visibility optimization
+
+---
+
+## Architecture
 
 ```
-fairdrop/
-├── smart-contract/
-│   ├── auction/              # Core auction application (AAC)
-│   │   └── src/
-│   │       ├── contract.rs   # Auction logic & cross-chain messaging
-│   │       ├── service.rs    # GraphQL queries & mutations
-│   │       └── state.rs      # Auction state management
-│   │
-│   └── indexer/              # User Interface Chain (UIC)
-│       └── src/              # Event indexing & bid history tracking
-│
-└── frontend/
-    ├── app-pages/            # Next.js pages (landing, auctions, faucet)
-    ├── components/           # React components
-    │   ├── auction/          # Auction cards, timers, bid forms
-    │   ├── faucet/           # Token faucet UI (enhanced)
-    │   └── wallet/           # Wallet connection & menu
-    ├── hooks/                # Custom React hooks
-    ├── providers/            # Context providers (Linera, sync status)
-    └── lib/                  # Utilities (polling, deduplication, formatting)
+┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│ User Chain  │────────▶│  AAC Chain  │────────▶│   Indexer   │
+│  (Any)      │  Bids   │  (Auction)  │ Events  │  (Query)    │
+└─────────────┘         └─────────────┘         └─────────────┘
 ```
 
-### Smart Contract Architecture
-- **auction/** - Auction Application Chain (AAC) handling auction creation, bidding, and settlement
-- **indexer/** - User Interface Chain (UIC) for querying auction state and bid history
+**Components:**
+- **Auction App (AAC)**: Manages auctions, processes bids, handles deposits/withdrawals
+- **Indexer**: Subscribes to events, provides fast queries for frontend
+- **Fungible Tokens**: Payment tokens (registered at deployment)
+
+---
+
+## Key Features
+
+### Token Operations (Index-Based)
+- **Deposit**: Transfer tokens from user chain → AAC internal balance
+- **Withdraw**: Transfer from AAC balance → target chain
+- **Internal Transfers**: Used for bidding and settlements
+
+### Auction Lifecycle
+1. **Create** auction on AAC with payment/auction tokens
+2. **Bid** from any chain using internal balance
+3. **Settle** at end time or when sold out (uniform clearing price)
+4. **Claim** won items or refunds
+
+### Cross-Chain
+- Deposit from any chain
+- Withdraw to any chain
+- Bid from any chain
+- Automatic message routing
+
+---
+
+## Build & Deploy
+
+### Build
+```bash
+cargo build --release --target wasm32-unknown-unknown
+```
+
+### Deploy Auction Application
+
+**⚠️ Critical**: Must include `--required-application-ids` for token operations to work.
+
+```bash
+linera publish-and-create \
+  target/wasm32-unknown-unknown/release/auction-contract.wasm \
+  target/wasm32-unknown-unknown/release/auction-service.wasm \
+  --json-parameters-path json-parameter.json \
+  --required-application-ids <TOKEN_1_APP_ID> \
+  --required-application-ids <TOKEN_2_APP_ID>
+```
+
+**Parameters (`json-parameter.json`):**
+```json
+{
+  "aac_chain": "<AAC_CHAIN_ID>",
+  "supported_tokens": [
+    "<TOKEN_1_APP_ID>",
+    "<TOKEN_2_APP_ID>"
+  ]
+}
+```
+
+**Note**: Tokens are accessed by index (0, 1) in deposit/withdraw operations. Max 2 tokens supported.
+
+### Deploy Indexer
+```bash
+cd indexer
+linera publish-and-create \
+  target/wasm32-unknown-unknown/release/indexer-contract.wasm \
+  target/wasm32-unknown-unknown/release/indexer-service.wasm
+
+---
+
+## Usage Examples
+
+### Deposit Tokens
+```graphql
+mutation {
+  deposit(tokenIndex: 0, amount: "1000")
+}
+```
+- `tokenIndex: 0` = First token in `supported_tokens` array
+- Transfers from user chain → AAC internal balance
+
+### Create Auction
+```graphql
+mutation {
+  createAuction(params: {
+    itemName: "NFT #123"
+    totalSupply: 100
+    startPrice: "10.0"
+    floorPrice: "1.0"
+    priceDecayInterval: 60
+    priceDecayAmount: "0.5"
+    startTime: 1704067200
+    endTime: 1704153600
+    creator: "Owner:7b91..."
+    paymentTokenApp: "90c35bf5..."  # Must be in supported_tokens[0] or [1]
+    auctionTokenApp: "b025bec5..."  # Must be in supported_tokens[0] or [1]
+  })
+}
+```
+
+### Place Bid
+```graphql
+mutation {
+  buy(auctionId: 1, quantity: "5")
+}
+```
+- Deducts from internal balance
+- Automatic refunds if price drops
+
+### Withdraw Tokens
+```graphql
+mutation {
+  withdraw(
+    tokenIndex: 0
+    amount: "500"
+    targetChain: "e476187f6ddfeb9d588c7b45d3df334d5501d6499b3f9ad5595cae86cce16a65"
+  )
+}
+```
+
+---
+
+## Token Index Mapping
+
+When deploying with 2 tokens:
+```json
+"supported_tokens": [
+  "90c35bf5f9f580bfe75c38f3fd6ec07e2386d43a3e561d9b9a3b47eabc96be2d",  // Index 0
+  "b025bec560dffb150616b687b0aff00c94dd46f4448a5929e3c6d4b35712e386"   // Index 1
+]
+```
+
+**Operations use indices:**
+- `deposit(tokenIndex: 0, ...)` - First token
+- `withdraw(tokenIndex: 1, ...)` - Second token
+
+**Query supported tokens:**
+```graphql
+query {
+  supportedTokens {
+    index
+    tokenApp
+  }
+}
+```
+
+---
+
+## Module Structure
+
+```
+auction/
+├── src/
+│   ├── contract.rs   # Auction logic, deposit/withdraw, cross-chain messaging
+│   ├── service.rs    # GraphQL API (queries, mutations)
+│   └── state.rs      # Auction state, user balances, bid tracking
+└── Cargo.toml
+
+indexer/
+├── src/
+│   ├── contract.rs   # Event subscription, processing
+│   ├── service.rs    # GraphQL queries (read-only)
+│   └── state.rs      # Indexed data storage
+└── Cargo.toml
+
+shared/
+└── src/
+    ├── events.rs     # AuctionEvent definitions
+    ├── messages.rs   # Cross-chain messages
+    └── types.rs      # AuctionParams, BidRecord, etc.
+```
+
+---
+
+## Testing
+
+```bash
+cargo test --package auction
+cargo test --package indexer
+```
+
+---
+
+## Requirements
+
+- **Linera SDK**: 0.15.5+
+- **Rust**: 1.85.0+
+- **Target**: wasm32-unknown-unknown
 
 ### Frontend Stack
 - **Next.js 16** + **React 19** + **TypeScript**
@@ -80,48 +268,6 @@ fairdrop/
 
 ---
 
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- Rust & Cargo
-- Linera CLI tools
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/wisdomabioye/fairdrop.git
-cd fairdrop
-
-# Install frontend dependencies
-cd frontend
-npm install
-
-# Run development server
-npm run dev
-```
-
-### Deploy Smart Contracts
-
-```bash
-cd smart-contract/auction
-linera project publish-and-create
-```
-
----
-
-## Core Features
-
-- **Descending Price Mechanism** - Automated price reduction at preset intervals
-- **Uniform Clearing** - All participants pay the same final clearing price
-- **Cross-Chain Bidding** - Bid from any chain via message passing
-- **Real-Time Updates** - Live auction state via event streaming
-- **Token Integration** - Built on Linera's fungible token standard
-- **Smart Polling** - Efficient 30s intervals with tab visibility optimization
-
----
-
 ## Contact
 
 📧 xpldevelopers@gmail.com
@@ -131,4 +277,4 @@ linera project publish-and-create
 
 ---
 
-*Last Updated: 2025-12-15*
+*Last Updated: 2026-01-08*

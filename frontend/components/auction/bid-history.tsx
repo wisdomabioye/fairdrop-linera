@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useLineraApplication } from 'linera-react-client';
 import { Trophy, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCachedBidHistory } from '@/hooks';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useCachedBidHistory, useAacApp } from '@/hooks';
 // import type { BidRecord } from '@/lib/gql/types';
 import {
   truncateAddress,
@@ -21,16 +19,16 @@ export interface BidHistoryProps {
   auctionId: string;
   limit?: number;
   compact?: boolean;
-  currentUserChain?: string;
+  currentUserWalletAddress?: string;
 }
 
 export function BidHistory({
   auctionId,
   limit = 20,
   compact = false,
-  currentUserChain
+  currentUserWalletAddress
 }: BidHistoryProps) {
-  const aacApp = useLineraApplication(AAC_APP_ID);
+  const aacApp = useAacApp();
   const [offset, setOffset] = useState(0);
 
   const {
@@ -38,7 +36,6 @@ export function BidHistory({
     loading,
     isFetching,
     error,
-    hasLoadedOnce
   } = useCachedBidHistory({
     auctionId,
     offset,
@@ -56,7 +53,7 @@ export function BidHistory({
   };
 
   // Loading state
-  if (loading && !hasLoadedOnce) {
+  if (loading) {
     return (
       <Card className={compact ? 'border-0 shadow-none' : undefined}>
         <CardHeader>
@@ -104,16 +101,13 @@ export function BidHistory({
     );
   }
 
-  // Sort bids by timestamp: recent to oldest (descending)
-  const sortedBids = [...bids].sort((a, b) => b.timestamp - a.timestamp);
-
   return (
     <Card className={compact ? 'border-0 shadow-none' : undefined}>
       {!compact && (
         <CardHeader>
           <CardTitle>Bid History</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {sortedBids.length} bid{sortedBids.length !== 1 ? 's' : ''} shown
+            {bids.length} bid{bids.length !== 1 ? 's' : ''} shown
           </p>
         </CardHeader>
       )}
@@ -132,8 +126,8 @@ export function BidHistory({
               </tr>
             </thead>
             <tbody>
-              {sortedBids.map((bid) => {
-                const isCurrentUser = currentUserChain && bid.userChain === currentUserChain;
+              {bids.map((bid) => {
+                const isCurrentUser = currentUserWalletAddress && bid.userAccount.toLowerCase() === currentUserWalletAddress.toLowerCase();
 
                 return (
                   <tr
@@ -149,7 +143,7 @@ export function BidHistory({
                           <div className="h-2 w-2 rounded-full bg-primary" />
                         )}
                         <code className="text-xs bg-muted px-2 py-1 rounded">
-                          {truncateAddress(bid.userChain, 8, 6)}
+                          {truncateAddress(bid.userAccount, 8, 6)}
                         </code>
                       </div>
                     </td>
@@ -184,8 +178,8 @@ export function BidHistory({
 
         {/* Mobile Card View */}
         <div className="md:hidden space-y-3">
-          {sortedBids.map((bid) => {
-            const isCurrentUser = currentUserChain && bid.userChain === currentUserChain;
+          {bids.map((bid) => {
+            const isCurrentUser = currentUserWalletAddress && bid.userAccount.toLowerCase() === currentUserWalletAddress.toLowerCase();
 
             return (
               <div
@@ -197,7 +191,7 @@ export function BidHistory({
               >
                 <div className="flex items-center justify-between">
                   <code className="text-xs bg-muted px-2 py-1 rounded">
-                    {truncateAddress(bid.userChain, 6, 4)}
+                    {truncateAddress(bid.userAccount, 6, 4)}
                   </code>
                   {bid.claimed ? (
                     <div className="flex items-center gap-1 text-success text-xs">
@@ -233,7 +227,7 @@ export function BidHistory({
         </div>
 
         {/* Pagination */}
-        {sortedBids.length >= limit && (
+        {bids.length >= limit && (
           <div className="flex items-center justify-between pt-4 border-t">
             <Button
               variant="outline"
@@ -245,7 +239,7 @@ export function BidHistory({
             </Button>
 
             <span className="text-sm text-muted-foreground">
-              Showing {offset + 1} - {offset + sortedBids.length}
+              Showing {offset + 1} - {offset + bids.length}
             </span>
 
             <Button

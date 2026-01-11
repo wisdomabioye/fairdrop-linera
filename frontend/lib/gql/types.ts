@@ -1,9 +1,13 @@
 import { microsecondsToMilliseconds } from '@/lib/utils/auction-utils';
 
+export interface RecipientAccount {
+    chainId: string;
+    owner: string;
+}
+
 export const AuctionStatus = {
     Scheduled: 'Scheduled',
     Active: 'Active',
-    Ended: 'Ended',
     Settled: 'Settled',
     Cancelled: 'Cancelled'
 } as const;
@@ -11,13 +15,16 @@ export const AuctionStatus = {
 export type AuctionStatus = typeof AuctionStatus[keyof typeof AuctionStatus];
 
 export interface AuctionParam {
-    image: string;
     itemName: string;
+    image: string;
     totalSupply: number;
-    startPrice: string;
-    floorPrice: string;
+    maxBidAmount: number;
+    paymentTokenApp: string;
+    auctionTokenApp: string;
+    startPrice: number;
+    floorPrice: number;
     priceDecayInterval: number;
-    priceDecayAmount: string;
+    priceDecayAmount: number;
     startTime: number;
     endTime: number;
     creator: string;
@@ -25,9 +32,11 @@ export interface AuctionParam {
 
 export interface AuctionSummary extends AuctionParam {
     auctionId: number;
-    currentPrice: string;
+    currentPrice: number;
     sold: number;
-    clearingPrice: string | null;
+    clearingPrice: number | null;
+    lastPriceUpdate: number | null;
+    settledAt: number | null;
     status: AuctionStatus;
     totalBids: number;
     totalBidders: number;
@@ -36,7 +45,7 @@ export interface AuctionSummary extends AuctionParam {
 export interface BidRecord {
     bidId: number;
     auctionId: number;
-    userChain: string;
+    userAccount: string;
     quantity: number;
     amountPaid: number;
     timestamp: number;
@@ -50,20 +59,23 @@ export interface SettlementResult {
     refund: string;
 }
 
-export interface UserCommitment {
-    totalQuantity: number;
-    settlement: SettlementResult | null;
-}
-
-export interface AuctionCommitment {
-    auctionId: string;
-    commitment: UserCommitment;
-}
-
 export interface SubscriptionInfo {
     aacChain: string;
     auctionApp: string;
     initialized: boolean;
+}
+
+export interface AuctionChainTokenBalance {
+    tokenApp: string; // Token Application Id
+    amount: number;
+}
+
+export interface AuctionGlobalStats {
+    totalAuctions: number;
+    totalBids: number;
+    depositedByToken: AuctionChainTokenBalance[],
+    withdrawnByToken: AuctionChainTokenBalance[],
+    totalValueLocked: AuctionChainTokenBalance[],
 }
 
 
@@ -81,18 +93,7 @@ export interface AuctionWithId {
     bidsPruned: boolean;
     totalBids: number;
     totalBidders: number;
-    params: {
-        image: string;
-        itemName: string;
-        totalSupply: number;
-        startPrice: string;
-        floorPrice: string;
-        priceDecayInterval: number;
-        priceDecayAmount: string;
-        startTime: number;
-        endTime: number;
-        creator: string;
-    };
+    params: AuctionParam;
 }
 
 export function transformAuctionStatus(auction: AuctionWithId): AuctionStatus {
@@ -112,7 +113,7 @@ export function transformAuctionStatus(auction: AuctionWithId): AuctionStatus {
         &&
         Date.now() > microsecondsToMilliseconds(auction.params.endTime)
     ) {
-        return AuctionStatus.Ended;
+        return AuctionStatus.Settled;
     }
 
     return auction.status;
@@ -122,20 +123,25 @@ export function transformAuctionStatus(auction: AuctionWithId): AuctionStatus {
 export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
     return {
         auctionId: auction.auctionId,
-        image: auction.params.image,
         itemName: auction.params.itemName,
-        totalSupply: auction.params.totalSupply,
-        startPrice: auction.params.startPrice,
-        floorPrice: auction.params.floorPrice,
+        image: auction.params.image,
+        maxBidAmount: Number(auction.params.maxBidAmount),
+        paymentTokenApp: auction.params.paymentTokenApp,
+        auctionTokenApp: auction.params.auctionTokenApp,
+        totalSupply: Number(auction.params.totalSupply),
+        startPrice: Number(auction.params.startPrice),
+        floorPrice: Number(auction.params.floorPrice),
         priceDecayInterval: auction.params.priceDecayInterval,
-        priceDecayAmount: auction.params.priceDecayAmount,
+        priceDecayAmount: Number(auction.params.priceDecayAmount),
         // Convert timestamps from microseconds (backend) to milliseconds (JavaScript)
         startTime: microsecondsToMilliseconds(auction.params.startTime),
         endTime: microsecondsToMilliseconds(auction.params.endTime),
         creator: auction.params.creator,
-        currentPrice: auction.currentPrice,
-        sold: auction.sold,
-        clearingPrice: auction.clearingPrice,
+        currentPrice: Number(auction.currentPrice),
+        settledAt: auction.settledAt,
+        lastPriceUpdate: auction.lastPriceUpdate,
+        sold: Number(auction.sold),
+        clearingPrice: Number(auction.clearingPrice),
         status: transformAuctionStatus(auction),
         totalBids: auction.totalBids,
         totalBidders: auction.totalBidders,
@@ -145,6 +151,8 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
 export function transformBidRecord(bid: BidRecord): BidRecord {
     return {
         ...bid,
+        amountPaid: Number(bid.amountPaid),
+        quantity: Number(bid.amountPaid),
         // Convert timestamp from microseconds (backend) to milliseconds (JavaScript)
         timestamp: microsecondsToMilliseconds(bid.timestamp)
     };

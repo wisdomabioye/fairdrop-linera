@@ -7,12 +7,13 @@
 export const APP_ROUTES = {
   home: '/',
   faucet: '/faucet',
+  myTokens: '/my-tokens',
   activeAuctions: '/active-auction',
   settledAuctions: '/settled-auction',
   createAuction: '/create-auction',
   myAuctions: '/my-auctions',
-  auctionDetail: (id: string | number) => `/auctions/${id}`,
-  auctionDetailLegacy: (id: string | number) => `/auction-detail?id=${id}`, // Keep old route for reference
+  aacBalances: '/aac-balances',
+  auctionDetail: (id: string | number) => `/auction-detail?id=${id}`,
 } as const;
 
 export type AppRoute = typeof APP_ROUTES[keyof typeof APP_ROUTES];

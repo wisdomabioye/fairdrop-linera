@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Package, Share2 } from 'lucide-react';
-import { useLineraApplication } from 'linera-react-client';
-import { useCachedAuctionSummary, useCachedMyCommitment } from '@/hooks';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useWalletConnection } from 'linera-react-client';
+import { useCachedAuctionSummary, useCachedMyCommitment, useAacApp } from '@/hooks';
 import { BidHistory } from '@/components/auction/bid-history';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -20,7 +18,6 @@ import { DetailCountdown } from './components/detail-countdown';
 import { DetailSidebarActions } from './components/detail-sidebar-actions';
 import { AuctionStatus } from '@/lib/gql/types';
 import {
-  calculateCurrentPrice,
   getAuctionStatusBadge,
   calculateSupplyPercentage,
   formatTokenAmount,
@@ -33,14 +30,12 @@ export default function AuctionDetailPage() {
   const searchParams = useSearchParams();
   const auctionId = searchParams?.get('id') || '';
 
-  const aacApp = useLineraApplication(AAC_APP_ID);
-
-  const [currentPrice, setCurrentPrice] = useState('0');
+  const aacApp = useAacApp();
+  const { address } = useWalletConnection();
 
   // Fetch auction details
   const {
     auction,
-    isFetching,
     loading,
     error,
     refetch
@@ -52,25 +47,11 @@ export default function AuctionDetailPage() {
   });
 
   // Fetch user's commitment (for active auctions display)
-  const { commitment } = useCachedMyCommitment({
+  const { commitment, totalQuantity } = useCachedMyCommitment({
     auctionId,
-    uicApp: aacApp.app,
-    skip: !auctionId || !aacApp.app?.walletClient
+    aacApp: aacApp.app,
+    skip: !auctionId || !aacApp.app
   });
-
-  // Update price only for active auctions
-  useEffect(() => {
-    if (!auction || auction.status !== AuctionStatus.Active) return;
-
-    const updatePrice = () => {
-      setCurrentPrice(calculateCurrentPrice(auction));
-    };
-
-    updatePrice();
-    const interval = setInterval(updatePrice, 1000);
-
-    return () => clearInterval(interval);
-  }, [auction]);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -89,7 +70,7 @@ export default function AuctionDetailPage() {
   };
 
   // Loading state
-  if (loading || (isFetching && !auction)) {
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <Skeleton className="h-10 w-32 mb-8" />
@@ -178,7 +159,7 @@ export default function AuctionDetailPage() {
                 {/* Status-aware price display */}
                 <DetailPriceDisplay
                   auction={auction}
-                  currentPrice={currentPrice}
+                  currentPrice={auction.currentPrice}
                   isEndingNow={isEndingVerySoon(auction.endTime)}
                 />
 
@@ -187,13 +168,13 @@ export default function AuctionDetailPage() {
 
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Supply</p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-xl font-bold">
                     {auction.sold} / {auction.totalSupply}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Total Bids</p>
-                  <p className="text-2xl font-bold">{auction.totalBids}</p>
+                  <p className="text-xl font-bold">{auction.totalBids}</p>
                 </div>
               </div>
 
@@ -249,7 +230,7 @@ export default function AuctionDetailPage() {
           {/* Bid History */}
           <BidHistory
             auctionId={auctionId}
-            currentUserChain={aacApp.app?.walletClient?.getChainId()}
+            currentUserWalletAddress={address}
           />
         </div>
 
@@ -258,7 +239,7 @@ export default function AuctionDetailPage() {
           {/* Status-aware Actions (Bid/Claim) */}
           <DetailSidebarActions
             auction={auction}
-            uicApp={aacApp.app}
+            aacApp={aacApp.app}
             onBidSuccess={() => {
               refetch();
             }}
@@ -268,7 +249,7 @@ export default function AuctionDetailPage() {
           />
 
           {/* User's Commitment (for active auctions) */}
-          {auction.status === AuctionStatus.Active && commitment && commitment.totalQuantity > 0 && (
+          {auction.status === AuctionStatus.Active && commitment && !!totalQuantity && totalQuantity > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Your Bids</CardTitle>
@@ -276,7 +257,7 @@ export default function AuctionDetailPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Total Quantity</span>
-                  <span className="font-semibold">{commitment.totalQuantity}</span>
+                  <span className="font-semibold">{totalQuantity}</span>
                 </div>
               </CardContent>
             </Card>

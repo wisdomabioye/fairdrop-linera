@@ -3,21 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, RefreshCw } from 'lucide-react';
-import { useLineraApplication } from 'linera-react-client';
-import { useCachedActiveAuctions } from '@/hooks';
-import { AAC_APP_ID } from '@/config/app.config';
+import { useCachedActiveAuctions, useAacApp } from '@/hooks';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
 import { Button } from '@/components/ui/button';
-import type { AuctionSummary } from '@/lib/gql/types';
 import { APP_ROUTES } from '@/config/app.route';
+import type { AuctionSummary } from '@/lib/gql/types';
 
 export default function ActiveAuctions() {
     const router = useRouter();
-    const aacApp = useLineraApplication(AAC_APP_ID);
+    const aacApp = useAacApp();
 
     const [bidDialog, setBidDialog] = useState<{
         open: boolean;
@@ -32,7 +30,6 @@ export default function ActiveAuctions() {
         loading,
         isFetching,
         error,
-        hasLoadedOnce,
         refetch
     } = useCachedActiveAuctions({
         offset: 0,
@@ -85,7 +82,7 @@ export default function ActiveAuctions() {
             </header>
 
             {/* Loading State */}
-            {((loading || (isFetching && !auctions?.length))) && (
+            {loading && (
                 <AuctionSkeletonGrid count={4} />
             )}
 
@@ -120,7 +117,7 @@ export default function ActiveAuctions() {
                         <AuctionCard
                             key={auction.auctionId}
                             auction={auction}
-                            isRefreshing={isFetching && hasLoadedOnce}
+                            isRefreshing={isFetching}
                             onBidClick={handleBidClick}
                         />
                     ))}

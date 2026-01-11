@@ -3,7 +3,9 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { AppLineraProvider } from '@/providers';
 import { ThemeProvider } from '@/components/theme';
-import { DashboardShell } from '@/components/dashboard/layout/dashboard-shell';
+import { Header } from '@/components/layout/header';
+import { Footer } from '@/components/layout/footer';
+import { SyncStatusIndicator } from '@/components/layout/sync-status-indicator';
 import { APP_INFO } from '@/config/app.config';
 
 import './globals.css';
@@ -53,9 +55,14 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AppLineraProvider>
-            <DashboardShell>
-              {children}
-            </DashboardShell>
+              <Header />
+              <main className="flex-1 flex flex-col">
+                {children}
+              </main>
+              <Footer />
+
+              {/* Global Sync Status Indicator */}
+              <SyncStatusIndicator />
           </AppLineraProvider>
 
           {/* Toast Notifications */}

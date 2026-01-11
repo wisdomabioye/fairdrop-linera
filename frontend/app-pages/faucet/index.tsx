@@ -1,6 +1,6 @@
 'use client';
 
-import { FaucetForm } from '@/components/faucet/faucet-form';
+import { FaucetForm } from '@/components/faucet';
 import { Sparkles, Zap, Gift } from 'lucide-react';
 
 export default function FaucetPage() {
