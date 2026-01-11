@@ -146,6 +146,7 @@ export function CreateAuctionForm({
     const endTime = millisecondsToMicroseconds(endDate.getTime());
 
     const params: AuctionParam = {
+      image: '',
       itemName: formData.itemName.trim(),
       totalSupply: parseInt(formData.totalSupply),
       startPrice: formData.startPrice,

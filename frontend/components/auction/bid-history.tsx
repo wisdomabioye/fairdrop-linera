@@ -104,13 +104,16 @@ export function BidHistory({
     );
   }
 
+  // Sort bids by timestamp: recent to oldest (descending)
+  const sortedBids = [...bids].sort((a, b) => b.timestamp - a.timestamp);
+
   return (
     <Card className={compact ? 'border-0 shadow-none' : undefined}>
       {!compact && (
         <CardHeader>
           <CardTitle>Bid History</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {bids.length} bid{bids.length !== 1 ? 's' : ''} shown
+            {sortedBids.length} bid{sortedBids.length !== 1 ? 's' : ''} shown
           </p>
         </CardHeader>
       )}
@@ -129,7 +132,7 @@ export function BidHistory({
               </tr>
             </thead>
             <tbody>
-              {bids.map((bid) => {
+              {sortedBids.map((bid) => {
                 const isCurrentUser = currentUserChain && bid.userChain === currentUserChain;
 
                 return (
@@ -181,7 +184,7 @@ export function BidHistory({
 
         {/* Mobile Card View */}
         <div className="md:hidden space-y-3">
-          {bids.map((bid) => {
+          {sortedBids.map((bid) => {
             const isCurrentUser = currentUserChain && bid.userChain === currentUserChain;
 
             return (
@@ -230,7 +233,7 @@ export function BidHistory({
         </div>
 
         {/* Pagination */}
-        {bids.length >= limit && (
+        {sortedBids.length >= limit && (
           <div className="flex items-center justify-between pt-4 border-t">
             <Button
               variant="outline"
@@ -242,7 +245,7 @@ export function BidHistory({
             </Button>
 
             <span className="text-sm text-muted-foreground">
-              Showing {offset + 1} - {offset + bids.length}
+              Showing {offset + 1} - {offset + sortedBids.length}
             </span>
 
             <Button
