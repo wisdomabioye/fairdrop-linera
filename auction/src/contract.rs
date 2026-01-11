@@ -60,6 +60,7 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
+                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -75,6 +76,7 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
+                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -90,6 +92,7 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
+                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -109,6 +112,7 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
+                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -241,7 +245,6 @@ impl Contract for AuctionContract {
                     AuctionResponse::Ok
                 }
             }
-
 
             AuctionOperation::Withdraw { app_token_id, amount, target_chain } => {
                 // Validate token is supported
