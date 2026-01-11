@@ -201,7 +201,7 @@ export default function MyTokens() {
             isChainAppReady ? (
               <BalanceDisplay
                 key={`balance-${selectedTokenId}-${selectedChainId}`}
-                balance={balance}
+                balance={Number(balance ?? 0)}
                 tokenSymbol={tickerSymbol || selectedToken.symbol}
                 isLoading={balanceLoading}
               />

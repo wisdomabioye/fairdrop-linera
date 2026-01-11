@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 
 
 export interface CreateAuctionFormProps {
-  onSuccess?: (auctionId: string) => void;
+  onSuccess?: (auctionId: string) => void | Promise<void>;
   onCancel?: () => void;
 }
 
@@ -49,7 +49,7 @@ const STEPS: Step[] = [
 ];
 
 export function CreateAuctionFormMultistep({
-  onSuccess,
+  onSuccess: onAuctionCreateSuccess,
   onCancel
 }: CreateAuctionFormProps) {
   const router = useRouter();
@@ -123,7 +123,7 @@ export function CreateAuctionFormMultistep({
   // Mutation hook
   const { createAuction, isCreating } = useAuctionMutations({
     aacApp: aacApp.app,
-    onSuccess: (event) => {
+    onSuccess: async (event) => {
       if (event.type === 'create') {
         const { auctionId } = event.data;
         toast.success('Auction created successfully!');
@@ -132,14 +132,10 @@ export function CreateAuctionFormMultistep({
         // Set redirecting state to update button
         setIsRedirecting(true);
 
-        // Wait 1 second to show success message, then redirect
-        setTimeout(() => {
-          if (onSuccess) {
-            onSuccess(auctionId);
-          } else {
-            router.push(APP_ROUTES.myAuctions);
-          }
-        }, 1000);
+        if (onAuctionCreateSuccess) {
+          await onAuctionCreateSuccess(auctionId);
+        } 
+        router.push(APP_ROUTES.myAuctions);
       }
     },
     onError: (event) => {

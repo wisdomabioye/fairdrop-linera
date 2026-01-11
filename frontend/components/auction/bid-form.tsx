@@ -57,7 +57,7 @@ export function BidForm({
       if (event.type === 'buy') {
         const { quantity, auctionId } = event.data;
         toast.success('Bid placed successfully!', {
-          description: `You bid ${quantity} unit(s) on ${auctionId}`
+          description: `You bid ${quantity} unit(s) on ${auction.itemName}`
         });
 
         if (onSuccess) {
@@ -301,7 +301,14 @@ export function BidForm({
           {/* Error Message */}
           {mutationError && (
             <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-              <p className="text-sm text-destructive">{mutationError.message}</p>
+              <p className="text-sm text-destructive">
+                {
+                  mutationError.message.indexOf(':') > -1 ?
+                  mutationError.message?.substring(0, mutationError.message.indexOf(':'))
+                  :
+                  mutationError.message
+                }
+              </p>
             </div>
           )}
 

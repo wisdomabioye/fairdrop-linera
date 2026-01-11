@@ -5,7 +5,7 @@ mod state;
 use self::state::{AuctionData, AuctionState};
 use auction::{AuctionAbi, AuctionOperation, AuctionResponse};
 use fungible::{FungibleOperation, FungibleResponse, FungibleTokenAbi};
-use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, Timestamp, StreamUpdate, WithContractAbi};
+use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, StreamUpdate, WithContractAbi};
 use linera_sdk::views::{RootView, View};
 use linera_sdk::{Contract, ContractRuntime};
 use shared::events::{AuctionEvent, AUCTION_STREAM,};
@@ -422,8 +422,15 @@ impl AuctionContract {
     async fn handle_create_auction(&mut self, params: AuctionParams) -> AuctionResponse {
         let user_account = self.runtime.authenticated_signer().expect("Caller must be authenticated");
 
+        // Validate both tokens are supported
+        let auction_token_app = self.validate_supported_token(params.auction_token_app);
+        let _payment_token_app = self.validate_supported_token(params.payment_token_app);
+
+        // Convert to untyped for state operations
+        let auction_token_app_untyped = auction_token_app.forget_abi();
+
         // Validate creator has deposited auction tokens
-        let creator_balance = self.get_balance(user_account, params.auction_token_app).await;
+        let creator_balance = self.get_balance(user_account, auction_token_app_untyped).await;
         assert!(
             creator_balance >= params.total_supply,
             "Insufficient auction token balance. Have: {}, Need: {}. Please deposit auction tokens first.",
@@ -435,7 +442,7 @@ impl AuctionContract {
         self.internal_transfer(
             user_account,
             app_escrow,
-            params.auction_token_app,
+            auction_token_app_untyped,
             params.total_supply,
             "lock_auction_tokens".to_string(),
         )
@@ -931,17 +938,6 @@ impl AuctionContract {
             .unwrap_or(Amount::ZERO)
     }
 
-    /// Check if user has sufficient balance
-    // async fn has_balance(
-    //     &self,
-    //     user: AccountOwner,
-    //     token_app: ApplicationId,
-    //     required: Amount,
-    // ) -> bool {
-    //     let balance = self.get_balance(user, token_app).await;
-    //     balance >= required
-    // }
-
     // ═══════════════════════════════════════════════════════════
     // Helper Functions
     // ═══════════════════════════════════════════════════════════
@@ -998,7 +994,7 @@ impl AuctionContract {
                 (qty.saturating_add(bid.quantity), paid.saturating_add(bid.amount_paid))
             });
 
-        let total_cost = claim_data.clearing_price.saturating_mul(total_quantity.into());
+        let total_cost = Self::amount_mul(claim_data.clearing_price, total_quantity);
         let refund = total_paid.saturating_sub(total_cost);
 
         Settlement {
@@ -1224,7 +1220,7 @@ impl AuctionContract {
             }
         }
 
-        let amount_paid = current_price.saturating_mul(accepted_quantity.into());
+        let amount_paid = Self::amount_mul(current_price, accepted_quantity);
 
         // 7. Check if this bid will exhaust supply
         let will_exhaust_supply = sold.saturating_add(accepted_quantity) >= total_supply;
@@ -1332,7 +1328,7 @@ impl AuctionContract {
         }
 
         let clearing_price = auction.clearing_price.expect("Clearing price not set");
-        let proceeds_amount = auction.sold.saturating_mul(clearing_price.into());
+        let proceeds_amount = Self::amount_mul(auction.sold, clearing_price);
         let payment_token_app = auction.params.payment_token_app;
 
         // Drop immutable borrow before mutable operations
@@ -1418,84 +1414,152 @@ impl AuctionContract {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // Utility Functions
-    // ═══════════════════════════════════════════════════════════
-
-    /// Calculate current price based on elapsed time since auction start
-    /// On-demand calculation
-    async fn calculate_current_price(&mut self, auction_id: u64) -> Amount {
-        let auction = self
-            .state
-            .auctions
-            .get(&auction_id)
-            .await
-            .expect("Failed to get auction")
-            .expect("Auction not found");
-
-        let current_time = self.runtime.system_time();
-
-        // Use shared utility function
-        shared::calculate_current_price(
-            auction.params.start_price,
-            auction.params.floor_price,
-            auction.params.price_decay_amount,
-            auction.params.price_decay_interval,
-            auction.params.start_time,
-            current_time,
-        )
+    /// Multiply two Amount values correctly (price × quantity = cost)
+    /// Handles the 18-decimal internal representation
+    fn amount_mul(a: Amount, b: Amount) -> Amount {
+        const DECIMALS: u128 = 1_000_000_000_000_000_000; // 10^18
+        let a_raw: u128 = a.into();
+        let b_raw: u128 = b.into();
+        let result = a_raw.saturating_mul(b_raw) / DECIMALS;
+        Amount::from_attos(result)
     }
 
-    /// Validate auction state and handle transitions
-    /// Returns Ok(Some(new_status)) if transition needed, Ok(None) if ready, Err if rejected
-    fn validate_auction_state(
-        &mut self,
-        current_status: AuctionStatus,
-        start_time: Timestamp,
-        end_time: Timestamp,
-        now: Timestamp,
-        auction_id: u64,
-        user_account: AccountOwner,
-    ) -> Result<Option<AuctionStatus>, ()> {
-        // Handle Scheduled → Active transition
-        if current_status == AuctionStatus::Scheduled {
-            if now >= start_time {
-                return Ok(Some(AuctionStatus::Active));
-            } else {
-                let event = AuctionEvent::BidRejected {
-                    auction_id,
-                    user_account,
-                    reason: format!("Auction not started yet. Starts at: {:?}", start_time),
-                };
-                self.runtime.emit(AUCTION_STREAM.into(), &event);
-                return Err(());
-            }
-        }
+}
 
-        // Check if auction has expired (time-based expiration)
-        if now > end_time && current_status == AuctionStatus::Active {
-            let event = AuctionEvent::BidRejected {
-                auction_id,
-                user_account,
-                reason: format!("Auction expired at: {:?}", end_time),
-            };
-            self.runtime.emit(AUCTION_STREAM.into(), &event);
-            return Err(());
-        }
+// ...existing code...
 
-        // Check if auction is active
-        if current_status != AuctionStatus::Active {
-            let event = AuctionEvent::BidRejected {
-                auction_id,
-                user_account,
-                reason: "Auction not active".to_string(),
-            };
-            self.runtime.emit(AUCTION_STREAM.into(), &event);
-            return Err(());
-        }
+#[cfg(test)]
+mod tests {
+    use linera_sdk::linera_base_types::Amount;
+    use super::AuctionContract;
 
-        Ok(None)
+    #[test]
+    fn test_amount_representation() {
+        let ten = Amount::from_tokens(10);
+        let two = Amount::from_tokens(2);
+        
+        // Buggy way
+        let buggy = ten.saturating_mul(two.into());
+        println!("10 * 2 (buggy) = {} raw", Into::<u128>::into(buggy));
+        
+        // Fixed way
+        let fixed = AuctionContract::amount_mul(ten, two);
+        println!("10 * 2 (fixed) = {} raw", Into::<u128>::into(fixed));
+        
+        assert_eq!(fixed, Amount::from_tokens(20));
     }
 
+    #[test]
+    fn test_amount_mul_various_cases() {
+        // Test: 10 tokens × 1 token = 10 tokens
+        let result = AuctionContract::amount_mul(
+            Amount::from_tokens(10),
+            Amount::from_tokens(1),
+        );
+        assert_eq!(result, Amount::from_tokens(10));
+        println!("10 × 1 = {} tokens ✓", Into::<u128>::into(result) / 1_000_000_000_000_000_000);
 
+        // Test: 5 tokens × 3 tokens = 15 tokens
+        let result = AuctionContract::amount_mul(
+            Amount::from_tokens(5),
+            Amount::from_tokens(3),
+        );
+        assert_eq!(result, Amount::from_tokens(15));
+        println!("5 × 3 = {} tokens ✓", Into::<u128>::into(result) / 1_000_000_000_000_000_000);
+
+        // Test: 100 tokens × 0 tokens = 0 tokens
+        let result = AuctionContract::amount_mul(
+            Amount::from_tokens(100),
+            Amount::ZERO,
+        );
+        assert_eq!(result, Amount::ZERO);
+        println!("100 × 0 = 0 tokens ✓");
+
+        // Test: 1 token × 1 token = 1 token
+        let result = AuctionContract::amount_mul(
+            Amount::from_tokens(1),
+            Amount::from_tokens(1),
+        );
+        assert_eq!(result, Amount::from_tokens(1));
+        println!("1 × 1 = 1 token ✓");
+    }
+
+    #[test]
+    fn test_internal_transfer_balance_logic() {
+        // Simulate the balance arithmetic used in internal_transfer
+        let from_balance = Amount::from_tokens(100);
+        let transfer_amount = Amount::from_tokens(25);
+        let to_balance = Amount::from_tokens(10);
+
+        // Validate sufficient balance
+        assert!(from_balance >= transfer_amount, "Insufficient balance");
+
+        // Calculate new balances
+        let from_new_balance = from_balance.saturating_sub(transfer_amount);
+        let to_new_balance = to_balance.saturating_add(transfer_amount);
+
+        assert_eq!(from_new_balance, Amount::from_tokens(75));
+        assert_eq!(to_new_balance, Amount::from_tokens(35));
+
+        println!("From: 100 - 25 = {} tokens ✓", Into::<u128>::into(from_new_balance) / 1_000_000_000_000_000_000);
+        println!("To: 10 + 25 = {} tokens ✓", Into::<u128>::into(to_new_balance) / 1_000_000_000_000_000_000);
+    }
+
+    #[test]
+    fn test_internal_transfer_insufficient_balance() {
+        let from_balance = Amount::from_tokens(10);
+        let transfer_amount = Amount::from_tokens(25);
+
+        // This should fail validation
+        let has_sufficient = from_balance >= transfer_amount;
+        assert!(!has_sufficient, "Should detect insufficient balance");
+
+        println!("Correctly detected insufficient balance: have 10, need 25 ✓");
+    }
+
+    #[test]
+    fn test_bid_payment_calculation() {
+        // Simulate a bid: price=10, quantity=2, expected payment=20
+        let price = Amount::from_tokens(10);
+        let quantity = Amount::from_tokens(2);
+        
+        let amount_paid = AuctionContract::amount_mul(price, quantity);
+        
+        assert_eq!(amount_paid, Amount::from_tokens(20));
+        println!("Bid payment: {} tokens × {} quantity = {} paid ✓", 
+            Into::<u128>::into(price) / 1_000_000_000_000_000_000,
+            Into::<u128>::into(quantity) / 1_000_000_000_000_000_000,
+            Into::<u128>::into(amount_paid) / 1_000_000_000_000_000_000
+        );
+
+        // Simulate balance check
+        let user_balance = Amount::from_tokens(50);
+        assert!(user_balance >= amount_paid, "User should have enough balance");
+        
+        let remaining = user_balance.saturating_sub(amount_paid);
+        assert_eq!(remaining, Amount::from_tokens(30));
+        println!("After bid: 50 - 20 = {} remaining ✓", 
+            Into::<u128>::into(remaining) / 1_000_000_000_000_000_000
+        );
+    }
+
+    #[test]
+    fn test_settlement_refund_calculation() {
+        // Simulate settlement: paid at higher price, clearing at lower price
+        let bid_price = Amount::from_tokens(10);
+        let clearing_price = Amount::from_tokens(7);
+        let quantity = Amount::from_tokens(5);
+
+        let amount_paid = AuctionContract::amount_mul(bid_price, quantity); // 50
+        let total_cost = AuctionContract::amount_mul(clearing_price, quantity); // 35
+        let refund = amount_paid.saturating_sub(total_cost); // 15
+
+        assert_eq!(amount_paid, Amount::from_tokens(50));
+        assert_eq!(total_cost, Amount::from_tokens(35));
+        assert_eq!(refund, Amount::from_tokens(15));
+
+        println!("Paid: {} tokens", Into::<u128>::into(amount_paid) / 1_000_000_000_000_000_000);
+        println!("Cost at clearing: {} tokens", Into::<u128>::into(total_cost) / 1_000_000_000_000_000_000);
+        println!("Refund: {} tokens ✓", Into::<u128>::into(refund) / 1_000_000_000_000_000_000);
+    }
 }

@@ -17,17 +17,17 @@ const FAIR_APP_ID = '1c2686a275dfa34110f483a755b048c1ed32f0b136d8a84ce52b4dd2df5
 /** List of supported tokens for auction payment */
 export const PAYMENT_TOKEN: Record<ApplicationId, TokenInfo> = {
     [LUSD_APP_ID]: {
-        name: 'LN USD Token',
+        name: 'LN USD Token [Payment]',
         symbol: 'LUSD',
         appId: LUSD_APP_ID,
     },
     [FUSD_APP_ID]: {
-        name: 'fUSD Token',
+        name: 'fUSD Token [Payment]',
         symbol: 'fUSD',
         appId: FUSD_APP_ID,
     },
     [XUSD_APP_ID]: {
-        name: 'xUSD Token',
+        name: 'xUSD Token [Payment]',
         symbol: 'xUSD',
         appId: XUSD_APP_ID,
     }
@@ -36,17 +36,17 @@ export const PAYMENT_TOKEN: Record<ApplicationId, TokenInfo> = {
 /** List of token that can be auctioned (for development purpose) */
 export const AUCTION_TOKEN: Record<ApplicationId, TokenInfo> = {
     [SPL_APP_ID]: {
-        name: 'SPleen Token',
+        name: 'SPleen Token [Auction]',
         symbol: 'SPL',
         appId: SPL_APP_ID,
     },
     [DIGI_APP_ID]: {
-        name: 'DIGI Token',
+        name: 'DIGI Token [Auction]',
         symbol: 'DIGI',
         appId: DIGI_APP_ID,
     },
     [FAIR_APP_ID]: {
-        name: 'Fair Token',
+        name: 'Fair Token [Auction]',
         symbol: 'FAIR',
         appId: FAIR_APP_ID,
     }

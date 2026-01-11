@@ -151,6 +151,8 @@ export function transformAuctionWithId(auction: AuctionWithId): AuctionSummary {
 export function transformBidRecord(bid: BidRecord): BidRecord {
     return {
         ...bid,
+        amountPaid: Number(bid.amountPaid),
+        quantity: Number(bid.amountPaid),
         // Convert timestamp from microseconds (backend) to milliseconds (JavaScript)
         timestamp: microsecondsToMilliseconds(bid.timestamp)
     };

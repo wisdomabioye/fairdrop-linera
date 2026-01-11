@@ -863,7 +863,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     const auctionMap = newMap.get(auctionId) ?? new Map();
 
                     auctionMap.set(address, {
-                        data: data.userBids,
+                        data: (data.userBids || [])?.map(transformBidRecord), // Amount ("10.") type to number
                         timestamp: Date.now(),
                         status: 'success',
                         error: null,

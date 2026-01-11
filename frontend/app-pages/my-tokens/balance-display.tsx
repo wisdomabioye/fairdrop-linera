@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 export interface BalanceDisplayProps {
-  balance: string | null;
+  balance: number | null;
   tokenSymbol?: string;
   isLoading?: boolean;
   className?: string;
@@ -40,7 +40,7 @@ export const BalanceDisplay = memo(function BalanceDisplay({
           ) : (
             <>
               <div className="text-3xl md:text-4xl font-bold tracking-tight">
-                {balance || '0'}
+                {balance?.toLocaleString() || '0'}
               </div>
               <div className="text-sm text-muted-foreground font-medium">
                 {tokenSymbol}

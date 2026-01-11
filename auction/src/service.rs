@@ -7,8 +7,8 @@ use linera_sdk::graphql::GraphQLMutationRoot;
 use linera_sdk::linera_base_types::{Amount, AccountOwner, ApplicationId, WithServiceAbi};
 use linera_sdk::views::View;
 use linera_sdk::{Service, ServiceRuntime};
-use auction::AuctionAbi;
-use shared::types::{AuctionId, AuctionParameters, BidRecord, GlobalStats, TokenVolume};
+use auction::{AuctionAbi};
+use shared::types::{AuctionId, AuctionStatus, AuctionParameters, BidRecord, GlobalStats, TokenVolume};
 use std::sync::Arc;
 use self::state::{AuctionState, AuctionData};
 
@@ -79,14 +79,33 @@ impl QueryRoot {
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "Auction not found".to_string())?;
 
-        // Return the stored current_price
-        // This is updated by the contract during operations (bids, price updates, etc.)
-        Ok(auction.current_price)
+        // Calculate real-time price based on current time
+        let now = self.runtime.system_time();
+        
+        // Only calculate dynamic price for active auctions
+        let price = match auction.status {
+            AuctionStatus::Active | AuctionStatus::Scheduled => {
+                shared::calculate_current_price(
+                    auction.params.start_price,
+                    auction.params.floor_price,
+                    auction.params.price_decay_amount,
+                    auction.params.price_decay_interval,
+                    auction.params.start_time,
+                    now,
+                )
+            }
+            AuctionStatus::Settled | AuctionStatus::Cancelled | AuctionStatus::Pruned => {
+                // For settled/cancelled auctions, return clearing price or last known price
+                auction.clearing_price.unwrap_or(auction.current_price)
+            }
+        };
+
+        Ok(price)
     }
 
     /// Get auction info (AAC only)
     async fn auction_info(&self, auction_id: AuctionId) -> Result<AuctionWithId, String> {
-        let auction = self
+        let mut auction = self
             .state
             .auctions
             .get(&auction_id)
@@ -94,12 +113,30 @@ impl QueryRoot {
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "Auction not found".to_string())?;
 
+        // Calculate real-time price for active/scheduled auctions
+        let now = self.runtime.system_time();
+        
+        match auction.status {
+            AuctionStatus::Active | AuctionStatus::Scheduled => {
+                auction.current_price = shared::calculate_current_price(
+                    auction.params.start_price,
+                    auction.params.floor_price,
+                    auction.params.price_decay_amount,
+                    auction.params.price_decay_interval,
+                    auction.params.start_time,
+                    now,
+                );
+            }
+            _ => {
+                // Keep stored price for settled/cancelled auctions
+            }
+        }
+
         Ok(AuctionWithId {
             auction_id,
             data: auction,
         })
     }
-
     /// Get user's bids for a specific auction (AAC only)
     /// O(1) lookup using composite key (user, auction_id)
     async fn user_bids(
@@ -155,19 +192,35 @@ impl QueryRoot {
         let items_available = start_id + 1; // How many auctions from start_id down to 0
         let items_to_fetch = items_available.min(limit);
 
+        let now = self.runtime.system_time();
         let mut result = Vec::new();
 
         // Iterate in reverse: from start_id down to (start_id - items_to_fetch + 1)
         for i in 0..items_to_fetch {
             let auction_id = (start_id - i) as u64;
 
-            if let Some(auction) = self
+            if let Some(mut auction) = self
                 .state
                 .auctions
                 .get(&auction_id)
                 .await
                 .map_err(|e| e.to_string())?
             {
+                // Calculate real-time price for active/scheduled auctions
+                match auction.status {
+                    AuctionStatus::Active | AuctionStatus::Scheduled => {
+                        auction.current_price = shared::calculate_current_price(
+                            auction.params.start_price,
+                            auction.params.floor_price,
+                            auction.params.price_decay_amount,
+                            auction.params.price_decay_interval,
+                            auction.params.start_time,
+                            now,
+                        );
+                    }
+                    _ => {}
+                }
+
                 result.push(AuctionWithId {
                     auction_id,
                     data: auction,
@@ -191,11 +244,12 @@ impl QueryRoot {
             return Ok(Vec::new());
         }
 
+        let now = self.runtime.system_time();
         let mut result = Vec::new();
 
         // Iterate all auctions in reverse (newest first) and filter by creator
         for auction_id in (0..next_id).rev() {
-            if let Some(auction) = self
+            if let Some(mut auction) = self
                 .state
                 .auctions
                 .get(&auction_id)
@@ -203,6 +257,21 @@ impl QueryRoot {
                 .map_err(|e| e.to_string())?
             {
                 if auction.params.creator == creator {
+                    // Calculate real-time price for active/scheduled auctions
+                    match auction.status {
+                        AuctionStatus::Active | AuctionStatus::Scheduled => {
+                            auction.current_price = shared::calculate_current_price(
+                                auction.params.start_price,
+                                auction.params.floor_price,
+                                auction.params.price_decay_amount,
+                                auction.params.price_decay_interval,
+                                auction.params.start_time,
+                                now,
+                            );
+                        }
+                        _ => {}
+                    }
+
                     result.push(AuctionWithId {
                         auction_id,
                         data: auction,
