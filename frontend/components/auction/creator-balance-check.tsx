@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useWalletConnection } from 'linera-react-client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ export interface CreatorBalanceCheckProps {
   onBalanceValidated: (isValid: boolean) => void;
   /** Callback to open deposit dialog */
   onDepositClick: () => void;
+  /** Current AAC balance for the token */
   currentAACBalance: number;
 }
 
@@ -34,7 +35,7 @@ export function CreatorBalanceCheck({
   onBalanceValidated,
   onDepositClick
 }: CreatorBalanceCheckProps) {
-  const { address } = useWalletConnection();
+  const { address, isConnected } = useWalletConnection();
 
   const tokenInfo = useMemo(() => {
     return getTokenByAppId(auctionTokenId);
@@ -42,6 +43,11 @@ export function CreatorBalanceCheck({
 
   const hasEnoughBalance = currentAACBalance >= requiredAmount;
   const shortfall = Math.max(0, requiredAmount - currentAACBalance);
+
+  // Notify parent when balance validation status changes
+  useEffect(() => {
+    onBalanceValidated(hasEnoughBalance && isConnected);
+  }, [hasEnoughBalance, isConnected, onBalanceValidated]);
 
   // Handle missing token info
   if (!tokenInfo) {
@@ -51,6 +57,21 @@ export function CreatorBalanceCheck({
         <AlertDescription>
           Invalid auction token selected.
         </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Wallet not connected
+  if (!isConnected) {
+    return (
+      <Alert>
+        <Wallet className="h-4 w-4" />
+        <div className="space-y-3">
+          <AlertDescription>
+            Connect your wallet to check your {tokenInfo.symbol} balance.
+          </AlertDescription>
+          <WalletConnectButton />
+        </div>
       </Alert>
     );
   }
@@ -69,16 +90,16 @@ export function CreatorBalanceCheck({
         {/* Status Message */}
         <div>
           <p className="font-semibold">
-            {hasEnoughBalance ? `${tokenInfo.symbol} Balance on Auction Chain (AAC) Check Passed` : `Insufficient ${tokenInfo.symbol} Balance on Auction Chain (AAC)`}
+            {hasEnoughBalance ? `${tokenInfo.symbol} Balance Check Passed` : `Insufficient ${tokenInfo.symbol} Balance`}
           </p>
           <AlertDescription className="mt-1">
             {hasEnoughBalance ? (
               <>
-                You have enough {tokenInfo.symbol} deposited in your Auction Chain balance for {tokenInfo.symbol} to create this auction.
+                You have enough {tokenInfo.symbol} deposited to create this auction.
               </>
             ) : (
               <>
-                You need to deposit at least {shortfall.toLocaleString()} more {tokenInfo.symbol} to your Auction Chain balance before creating this auction.
+                You need to deposit at least {shortfall.toLocaleString()} more {tokenInfo.symbol} to your AAC balance.
               </>
             )}
           </AlertDescription>
@@ -87,19 +108,13 @@ export function CreatorBalanceCheck({
         {/* Balance Summary */}
         <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
           <div className="flex justify-between items-center text-sm gap-2">
-            <span className="text-muted-foreground">AAC Balance (Deposited)</span>
+            <span className="text-muted-foreground">AAC Balance</span>
             <span className="font-medium">
               {currentAACBalance.toLocaleString()} {tokenInfo.symbol}
             </span>
           </div>
-          {/* <div className="flex justify-between items-center text-sm gap-2">
-            <span className="text-muted-foreground">Wallet Balance (Available)</span>
-            <span className="font-medium">
-              {walletBalance.toLocaleString()} {tokenInfo.symbol}
-            </span>
-          </div> */}
           <div className="flex justify-between items-center text-sm gap-2 pt-1.5 border-t">
-            <span className="text-muted-foreground">Required for Auction</span>
+            <span className="text-muted-foreground">Required</span>
             <span className="font-medium">
               {requiredAmount.toLocaleString()} {tokenInfo.symbol}
             </span>
@@ -114,24 +129,18 @@ export function CreatorBalanceCheck({
           )}
         </div>
 
-        {/* Deposit Button */}
-        {
-        
-          !hasEnoughBalance && address ? (
-            <Button
-              type="button"
-              onClick={onDepositClick}
-              className="w-full"
-              variant="default"
-            >
-              <Wallet className="h-4 w-4 mr-2" />
-              Deposit {tokenInfo.symbol} to AAC
-            </Button>
-          )
-          :
-          <WalletConnectButton />
-      
-        }
+        {/* Deposit Button - only show when insufficient balance */}
+        {!hasEnoughBalance && (
+          <Button
+            type="button"
+            onClick={onDepositClick}
+            className="w-full"
+            variant="default"
+          >
+            <Wallet className="h-4 w-4 mr-2" />
+            Deposit {tokenInfo.symbol} to AAC
+          </Button>
+        )}
       </div>
     </Alert>
   );
