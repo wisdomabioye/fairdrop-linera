@@ -10,11 +10,11 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
     <LineraProvider
       faucetUrl={process.env.NEXT_PUBLIC_FAUCET_URL!}
       readOnlyWallet={{
-        constantAddress: '0x0000000000000000000000000000000000000010'
+        constantAddress: '0x0000000000000000000000000000000000000011'
       }}
       fallback={<PageLoading />}
       errorFallback={() => <ErrorFallback />}
-      skipProcessInbox={false}
+      skipProcessInbox={true}
       logging={{
         enabled: true,
         level: LogLevel.DEBUG

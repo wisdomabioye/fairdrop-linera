@@ -1,9 +1,9 @@
 /** Indexer App Id */
-export const INDEXER_APP_ID = process.env.NEXT_PUBLIC_INDEXER_APP!;
+export const INDEXER_APP_ID = process.env.NEXT_PUBLIC_INDEXER_APP_ID!;
 /** 
  * Auction app AAC App Id 
  * */
-export const AAC_APP_ID = process.env.NEXT_PUBLIC_AAC_APP!;
+export const AAC_APP_ID = process.env.NEXT_PUBLIC_AAC_APP_ID!;
 /** 
  * The chain where AAC app is running.
  * This is usually our public-chain
