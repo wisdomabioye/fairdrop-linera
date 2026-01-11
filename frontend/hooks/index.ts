@@ -75,8 +75,10 @@ export { useCachedUserBalances } from './use-cached-user-balances';
 export type {
     UseCachedUserBalancesOptions,
     UseCachedUserBalancesResult
-} from './use-cached-user-balances'
+} from './use-cached-user-balances';
 
-export { usePersistedAuctionForm } from './use-persisted-auction-form'
-
-export { useAacApp } from './use-aac-app'
+export { usePersistedAuctionForm } from './use-persisted-auction-form';
+export { useAacApp } from './use-aac-app';
+export { useGlobalStats } from './use-global-stats';
+export { usePersonalStats } from './use-personal-stats';
+export { useCreatorStats } from './use-creator-stats'

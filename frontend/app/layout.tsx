@@ -3,8 +3,6 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { AppLineraProvider } from '@/providers';
 import { ThemeProvider } from '@/components/theme';
-import { Header } from '@/components/layout/header';
-import { Footer } from '@/components/layout/footer';
 import { SyncStatusIndicator } from '@/components/layout/sync-status-indicator';
 import { APP_INFO } from '@/config/app.config';
 
@@ -55,14 +53,9 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AppLineraProvider>
-              <Header />
-              <main className="flex-1 flex flex-col">
-                {children}
-              </main>
-              <Footer />
-
-              {/* Global Sync Status Indicator */}
-              <SyncStatusIndicator />
+            {children}
+            {/* Global Sync Status Indicator */}
+            <SyncStatusIndicator />
           </AppLineraProvider>
 
           {/* Toast Notifications */}
@@ -74,16 +67,16 @@ export default function RootLayout({
             duration={4000}
             toastOptions={{
               classNames: {
-                // toast: 'bg-card border border-white/10 backdrop-blur-xl shadow-2xl',
-                // title: 'text-text-primary font-semibold',
-                // description: 'text-text-secondary text-sm',
-                // actionButton: 'bg-primary text-white hover:bg-primary/90',
-                // cancelButton: 'bg-glass hover:bg-white/10',
-                // closeButton: 'bg-glass border border-white/10 hover:bg-white/10',
-                // error: 'border-error/30 bg-error/5',
-                // success: 'border-success/30 bg-success/5',
-                // warning: 'border-warning/30 bg-warning/5',
-                // info: 'border-info/30 bg-info/5',
+                toast: 'bg-card border border-white/10 backdrop-blur-xl shadow-2xl',
+                title: 'text-text-primary font-semibold',
+                description: 'text-text-secondary text-sm',
+                actionButton: 'bg-primary text-white hover:bg-primary/90',
+                cancelButton: 'bg-glass hover:bg-white/10',
+                closeButton: 'bg-glass border border-white/10 hover:bg-white/10',
+                error: 'border-error/30 bg-error/5',
+                success: 'border-success/30 bg-success/5',
+                warning: 'border-warning/30 bg-warning/5',
+                info: 'border-info/30 bg-info/5',
               },
             }}
           />

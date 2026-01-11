@@ -4,7 +4,7 @@ import { Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BidForm } from '@/components/auction/bid-form';
-import { ClaimForm } from './claim-form';
+import { ClaimForm } from '../auction/auction-claim-form';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import { formatTimeRemaining } from '@/lib/utils/auction-utils';
 import type { ApplicationClient } from 'linera-react-client';

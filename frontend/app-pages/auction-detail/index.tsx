@@ -13,9 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ErrorState } from '@/components/loading/error-state';
-import { DetailPriceDisplay } from './components/detail-price-display';
-import { DetailCountdown } from './components/detail-countdown';
-import { DetailSidebarActions } from './components/detail-sidebar-actions';
+import { DetailPriceDisplay } from '../../components/shared/detail-price-display';
+import { DetailCountdown } from '../../components/shared/detail-countdown';
+import { DetailSidebarActions } from '../../components/shared/detail-sidebar-actions';
 import { AuctionStatus } from '@/lib/gql/types';
 import {
   getAuctionStatusBadge,
