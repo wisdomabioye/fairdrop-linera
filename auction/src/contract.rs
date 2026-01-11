@@ -8,7 +8,7 @@ use fungible::{FungibleOperation, FungibleResponse, FungibleTokenAbi};
 use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, Timestamp, StreamUpdate, WithContractAbi};
 use linera_sdk::views::{RootView, View};
 use linera_sdk::{Contract, ContractRuntime};
-use shared::events::{AuctionEvent, AUCTION_STREAM};
+use shared::events::{AuctionEvent, AUCTION_STREAM,};
 use shared::messages::AuctionMessage;
 use shared::types::{AuctionParams, BidRecord, AuctionStatus, AuctionParameters};
 
@@ -1077,11 +1077,32 @@ impl AuctionContract {
         quantity: Amount,
         bidder: AccountOwner,
     ) -> Result<BidValidation, ()> {
-        let current_price = self.calculate_current_price(auction_id).await;
         let now = self.runtime.system_time();
 
-        // Get auction data (single read)
-        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+        // 1. Read auction data immutably first
+        let auction = match self.state.auctions.get(&auction_id).await {
+            Ok(Some(a)) => a,
+            Ok(None) => {
+                let event = AuctionEvent::BidRejected {
+                    auction_id,
+                    user_account: bidder,
+                    reason: "Auction not found".to_string(),
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+                return Err(());
+            }
+            Err(e) => {
+                let event = AuctionEvent::BidRejected {
+                    auction_id,
+                    user_account: bidder,
+                    reason: format!("Failed to load auction: {}", e),
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+                return Err(());
+            }
+        };
+
+        // Extract all needed values before any mutations
         let current_status = auction.status;
         let start_time = auction.params.start_time;
         let end_time = auction.params.end_time;
@@ -1089,12 +1110,32 @@ impl AuctionContract {
         let sold = auction.sold;
         let payment_token_app = auction.params.payment_token_app;
         let max_bid_amount = auction.params.max_bid_amount;
-        
-        // Check time expiration first
+        let start_price = auction.params.start_price;
+        let floor_price = auction.params.floor_price;
+        let price_decay_amount = auction.params.price_decay_amount;
+        let price_decay_interval = auction.params.price_decay_interval;
+
+        // Drop the immutable borrow
+        drop(auction);
+
+        // 2. Calculate current price using extracted values
+        let current_price = shared::calculate_current_price(
+            start_price,
+            floor_price,
+            price_decay_amount,
+            price_decay_interval,
+            start_time,
+            now,
+        );
+
+        // 3. Check time expiration - handle settlement if needed
         if now > end_time && current_status == AuctionStatus::Active {
-            // Set clearing price and settle
-            auction.clearing_price = Some(current_price);
+            // Set clearing price
+            if let Ok(Some(auction_mut)) = self.state.auctions.get_mut(&auction_id).await {
+                auction_mut.clearing_price = Some(current_price);
+            }
             
+            // Settle auction (separate mutable borrow)
             self.settle_auction(auction_id).await;
 
             let event = AuctionEvent::BidRejected {
@@ -1106,23 +1147,39 @@ impl AuctionContract {
             return Err(());
         }
 
-        // Validate auction state (Scheduled→Active transition)
-        let new_status = self.validate_auction_state(
-            current_status,
-            start_time,
-            end_time,
-            now,
-            auction_id,
-            bidder,
-        )?;
-
-        // Apply status change if needed
-        if let Some(status) = new_status {
-            let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
-            auction.status = status;
+        // 4. Validate auction state and handle Scheduled → Active transition
+        match current_status {
+            AuctionStatus::Scheduled => {
+                if now >= start_time {
+                    // Transition to Active
+                    if let Ok(Some(auction_mut)) = self.state.auctions.get_mut(&auction_id).await {
+                        auction_mut.status = AuctionStatus::Active;
+                    }
+                } else {
+                    let event = AuctionEvent::BidRejected {
+                        auction_id,
+                        user_account: bidder,
+                        reason: format!("Auction not started yet. Starts at: {:?}", start_time),
+                    };
+                    self.runtime.emit(AUCTION_STREAM.into(), &event);
+                    return Err(());
+                }
+            }
+            AuctionStatus::Active => {
+                // Already active, continue
+            }
+            _ => {
+                let event = AuctionEvent::BidRejected {
+                    auction_id,
+                    user_account: bidder,
+                    reason: format!("Auction not active. Current status: {:?}", current_status),
+                };
+                self.runtime.emit(AUCTION_STREAM.into(), &event);
+                return Err(());
+            }
         }
 
-        // Validate supply
+        // 5. Validate supply
         let remaining = total_supply.saturating_sub(sold);
         if remaining == Amount::ZERO {
             let event = AuctionEvent::BidRejected {
@@ -1136,21 +1193,20 @@ impl AuctionContract {
 
         let mut accepted_quantity = quantity.min(remaining);
 
-        // Check user's cumulative bid against max_bid_amount
+        // 6. Check user's cumulative bid against max_bid_amount
         let user_current_total = self.state.user_totals
             .get(&(auction_id, bidder))
             .await
-            .unwrap()
+            .ok()
+            .flatten()
             .unwrap_or(Amount::ZERO);
 
         let new_total = user_current_total.saturating_add(accepted_quantity);
 
-        // Adjust accepted_quantity if new total would exceed max_bid_amount
         if new_total > max_bid_amount {
             let allowed = max_bid_amount.saturating_sub(user_current_total);
             accepted_quantity = allowed.min(accepted_quantity);
 
-            // Reject if no quantity can be accepted (user already at max)
             if accepted_quantity == Amount::ZERO {
                 let event = AuctionEvent::BidRejected {
                     auction_id,
@@ -1167,7 +1223,7 @@ impl AuctionContract {
 
         let amount_paid = current_price.saturating_mul(accepted_quantity.into());
 
-        // Check if this bid will exhaust supply
+        // 7. Check if this bid will exhaust supply
         let will_exhaust_supply = sold.saturating_add(accepted_quantity) >= total_supply;
 
         Ok(BidValidation {
@@ -1255,24 +1311,29 @@ impl AuctionContract {
     }
 
     /// Withdraw auction proceeds by auction creator
-    /// Auction must have ended or cancelled
     async fn withdraw_auction_proceeds(&mut self, auction_id: u64) -> AuctionResponse {
         let creator = self.runtime.authenticated_signer()
             .expect("Caller must be authenticated");
-        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+        
+        let auction = self.state.auctions.get(&auction_id).await
+            .expect("Failed to get auction")
+            .expect("Auction not found");
         
         if creator != auction.params.creator {
             panic!("Only Auction creator can withdraw proceeds");
         }
 
-        if auction.status != AuctionStatus::Settled 
-        || auction.status != AuctionStatus::Cancelled {
-            panic!("Auction must have ended or cancelled");
+        // both conditions must be checked properly
+        if auction.status != AuctionStatus::Settled && auction.status != AuctionStatus::Cancelled {
+            panic!("Auction must be settled or cancelled");
         }
 
         let clearing_price = auction.clearing_price.expect("Clearing price not set");
         let proceeds_amount = auction.sold.saturating_mul(clearing_price.into());
         let payment_token_app = auction.params.payment_token_app;
+
+        // Drop immutable borrow before mutable operations
+        drop(auction);
 
         // Transfer proceeds from app escrow to creator (internal balance)
         let app_escrow = self.runtime.application_id().into();
@@ -1290,28 +1351,33 @@ impl AuctionContract {
     }
 
     /// Withdraw auction unsold token by auction creator
-    /// Auction must have ended or cancelled
     async fn withdraw_auction_unsold_token(&mut self, auction_id: u64) -> AuctionResponse {
         let creator = self.runtime.authenticated_signer()
             .expect("Caller must be authenticated");
-        let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
+        
+        let auction = self.state.auctions.get(&auction_id).await
+            .expect("Failed to get auction")
+            .expect("Auction not found");
         
         if creator != auction.params.creator {
-            panic!("Only Auction creator can withdraw proceeds");
+            panic!("Only Auction creator can withdraw unsold tokens");
         }
 
-        if auction.status != AuctionStatus::Settled 
-        || auction.status != AuctionStatus::Cancelled {
-            panic!("Auction must have ended or cancelled");
+        // Fix: Use && instead of || 
+        if auction.status != AuctionStatus::Settled && auction.status != AuctionStatus::Cancelled {
+            panic!("Auction must be settled or cancelled");
         }
 
         let unsold_token = auction.params.total_supply.saturating_sub(auction.sold);
 
-        if unsold_token <= Amount::ZERO {
-            panic!("No unsold token");
+        if unsold_token == Amount::ZERO {
+            panic!("No unsold tokens");
         }
 
         let auction_token_app = auction.params.auction_token_app;
+
+        // Drop immutable borrow before mutable operations
+        drop(auction);
 
         // Transfer unsold tokens from app escrow to creator (internal balance)
         let app_escrow = self.runtime.application_id().into();
