@@ -1,16 +1,12 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
-import { useFungibleQuery } from '@/hooks';
-import { useAacApp } from '@/hooks';
-import { useWalletConnection, useLineraApplication, useLineraClient } from 'linera-react-client';
+import { useMemo } from 'react';
+import { useWalletConnection } from 'linera-react-client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { WalletConnectButton } from '@/components/wallet';
 import { AlertCircle, CheckCircle, Wallet } from 'lucide-react';
 import { getTokenByAppId } from '@/config/app.token-store';
-import { useSyncStatus } from '@/providers';
 
 export interface CreatorBalanceCheckProps {
   /** The auction token application ID to check balance for */
@@ -39,25 +35,6 @@ export function CreatorBalanceCheck({
   onDepositClick
 }: CreatorBalanceCheckProps) {
   const { address } = useWalletConnection();
-  const { walletChainId } = useLineraClient();
-  const { isWalletClientSyncing } = useSyncStatus();
-  const tokenApp = useLineraApplication(auctionTokenId);
-
-
-  // Fetch wallet balance on wallet-chain (available to deposit)
-  const { getAccountBalance, balanceLoading: walletLoading } = useFungibleQuery({
-    tokenId: auctionTokenId,
-    chainId: walletChainId,
-    chainApp: tokenApp.app?.wallet,
-    autoFetch: true
-  });
-
-  console.log("getAccountBalance(address)", getAccountBalance(address!))
-
-  const walletBalance = useMemo(() => {
-    const balance = address ? getAccountBalance(address) : null;
-    return balance ?? 0;
-  }, [address, getAccountBalance]);
 
   const tokenInfo = useMemo(() => {
     return getTokenByAppId(auctionTokenId);
@@ -115,12 +92,12 @@ export function CreatorBalanceCheck({
               {currentAACBalance.toLocaleString()} {tokenInfo.symbol}
             </span>
           </div>
-          <div className="flex justify-between items-center text-sm gap-2">
+          {/* <div className="flex justify-between items-center text-sm gap-2">
             <span className="text-muted-foreground">Wallet Balance (Available)</span>
             <span className="font-medium">
               {walletBalance.toLocaleString()} {tokenInfo.symbol}
             </span>
-          </div>
+          </div> */}
           <div className="flex justify-between items-center text-sm gap-2 pt-1.5 border-t">
             <span className="text-muted-foreground">Required for Auction</span>
             <span className="font-medium">
