@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useFungibleQuery } from '@/hooks';
-import { useCachedUserBalances, useAacApp } from '@/hooks';
+import { useAacApp } from '@/hooks';
 import { useWalletConnection, useLineraApplication, useLineraClient } from 'linera-react-client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ export interface CreatorBalanceCheckProps {
   onBalanceValidated: (isValid: boolean) => void;
   /** Callback to open deposit dialog */
   onDepositClick: () => void;
+  currentAACBalance: number;
 }
 
 /**
@@ -33,43 +34,25 @@ export interface CreatorBalanceCheckProps {
 export function CreatorBalanceCheck({
   auctionTokenId,
   requiredAmount,
+  currentAACBalance,
   onBalanceValidated,
   onDepositClick
 }: CreatorBalanceCheckProps) {
   const { address } = useWalletConnection();
   const { walletChainId } = useLineraClient();
-  const { isClientSyncing } = useSyncStatus();
-  const aacApp = useAacApp();
+  const { isWalletClientSyncing } = useSyncStatus();
   const tokenApp = useLineraApplication(auctionTokenId);
 
-  // Fetch AAC balance (deposited tokens)
-  const { balances: aacBalances, loading: aacLoading, error: aacError, refetch: refetchAACBalance } = useCachedUserBalances({
-    address: address || '',
-    tokenApps: [auctionTokenId],
-    aacApp: aacApp.app,
-    skip: !address || !aacApp.app || !auctionTokenId || isClientSyncing
-  });
 
-  // Fetch wallet balance (available to deposit)
-  const { getAccountBalance, balanceLoading: walletLoading, fetchBalance: fetchUICBalance } = useFungibleQuery({
+  // Fetch wallet balance on wallet-chain (available to deposit)
+  const { getAccountBalance, balanceLoading: walletLoading } = useFungibleQuery({
     tokenId: auctionTokenId,
     chainId: walletChainId,
     chainApp: tokenApp.app?.wallet,
-    autoFetch: !address || !tokenApp.app || !auctionTokenId || isClientSyncing
+    autoFetch: true
   });
 
-  // Fetch balances when dependencies change
-  useEffect(() => {
-    if (address && aacApp.app && tokenApp.app && auctionTokenId) {
-      refetchAACBalance();
-      fetchUICBalance(address);
-    }
-  }, [address, aacApp.app, tokenApp.app, auctionTokenId, refetchAACBalance, fetchUICBalance]);
-
-  // Get balances and token info
-  const aacBalance = useMemo(() => {
-    return aacBalances?.get(auctionTokenId) ?? 0;
-  }, [aacBalances, auctionTokenId]);
+  console.log("getAccountBalance(address)", getAccountBalance(address!))
 
   const walletBalance = useMemo(() => {
     const balance = address ? getAccountBalance(address) : null;
@@ -80,37 +63,8 @@ export function CreatorBalanceCheck({
     return getTokenByAppId(auctionTokenId);
   }, [auctionTokenId]);
 
-  const hasEnoughBalance = aacBalance >= requiredAmount;
-  const shortfall = Math.max(0, requiredAmount - aacBalance);
-
-  // Notify parent component about validation state
-  useEffect(() => {
-    if (!aacLoading && !aacError) {
-      onBalanceValidated(hasEnoughBalance);
-    }
-  }, [hasEnoughBalance, aacLoading, aacError, onBalanceValidated]);
-
-  // Handle loading state
-  if (aacLoading || walletLoading) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-48" />
-        <Skeleton className="h-24 w-full" />
-      </div>
-    );
-  }
-
-  // Handle error state
-  if (aacError) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to check balance. Please try again.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  const hasEnoughBalance = currentAACBalance >= requiredAmount;
+  const shortfall = Math.max(0, requiredAmount - currentAACBalance);
 
   // Handle missing token info
   if (!tokenInfo) {
@@ -158,7 +112,7 @@ export function CreatorBalanceCheck({
           <div className="flex justify-between items-center text-sm gap-2">
             <span className="text-muted-foreground">AAC Balance (Deposited)</span>
             <span className="font-medium">
-              {aacBalance.toLocaleString()} {tokenInfo.symbol}
+              {currentAACBalance.toLocaleString()} {tokenInfo.symbol}
             </span>
           </div>
           <div className="flex justify-between items-center text-sm gap-2">

@@ -45,7 +45,7 @@ export function DetailCountdown({ auction }: DetailCountdownProps) {
       return (
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Starts In</p>
-          <p className="text-2xl font-bold flex items-center gap-2">
+          <p className="text-xl font-bold flex items-center gap-2">
             <Clock className="h-6 w-6 text-blue-600" />
             {timeDisplay}
           </p>
@@ -56,7 +56,7 @@ export function DetailCountdown({ auction }: DetailCountdownProps) {
       return (
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Time Remaining</p>
-          <p className="text-2xl font-bold flex items-center gap-2">
+          <p className="text-xl font-bold flex items-center gap-2">
             <Clock className="h-6 w-6" />
             {timeDisplay}
           </p>
@@ -67,7 +67,7 @@ export function DetailCountdown({ auction }: DetailCountdownProps) {
       return (
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Ended</p>
-          <p className="text-2xl font-bold text-muted-foreground flex items-center gap-2">
+          <p className="text-xl font-bold text-muted-foreground flex items-center gap-2">
             <CheckCircle className="h-6 w-6 text-green-600" />
             {timeDisplay}
           </p>

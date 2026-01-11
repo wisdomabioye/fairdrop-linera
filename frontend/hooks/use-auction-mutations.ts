@@ -132,7 +132,7 @@ export function useAuctionMutations(
         invalidateAuction,
         invalidateAndRefreshAuction,
         invalidateAndRefreshBidHistory,
-        invalidateUserBids,
+        invalidateAndRefreshUserBids,
         invalidateAndRefreshUserBalances
     } = useAuctionStore();
 
@@ -211,10 +211,6 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate and force refresh user balances
-                const tokenApps = getTokenList().map(token => token.appId);
-                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac-chain
-
                 // Invalidate active auctions list to trigger refetch
                 invalidateActiveAuctions();
                 
@@ -282,9 +278,13 @@ export function useAuctionMutations(
                 // Invalidate and force refresh affected caches
                 await Promise.all([
                     invalidateAndRefreshAuction(auctionId.toString(), aacApp),
-                    invalidateUserBids(auctionId.toString(), address),
+                    invalidateAndRefreshUserBids(auctionId.toString(), address, aacApp),
                     invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp),
-                    invalidateAndRefreshUserBalances(address, tokenApps, aacApp) // on aac hain
+                    invalidateAndRefreshUserBalances(
+                        aacApp.wallet.getAddress(), 
+                        tokenApps, 
+                        aacApp
+                    ) // on aac hain
                 ]);
 
                 onSuccess?.({ type: 'buy', data: { auctionId, quantity } });
@@ -337,7 +337,11 @@ export function useAuctionMutations(
 
                 // Invalidate and force refresh user balances
                 const tokenApps = getTokenList().map(token => token.appId);
-                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac-chain
+                await invalidateAndRefreshUserBalances(
+                    aacApp.wallet.getAddress(), // checksum address
+                    tokenApps, 
+                    aacApp
+                ); // on aac-chain
 
                 onSuccess?.({ type: 'claim', data: { auctionId } });
                 return true;
@@ -389,13 +393,18 @@ export function useAuctionMutations(
 
                 // Invalidate and force refresh user balances
                 const tokenApps = getTokenList().map(token => token.appId);
-                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac-chain
-                await invalidateAndRefreshBalanceOnUic(
-                    appTokenId, // tokenId
-                    walletChainId, // aacApp.wallet.getChainId(), // UIC chain (User Chain)
-                    address, // aacApp.wallet.getAddress(),
-                    aacApp.wallet
-                ) // refresh user balance on user-chain 
+                await Promise.all([
+                    invalidateAndRefreshUserBalances(
+                        aacApp.wallet.getAddress(), // checksum address only
+                        tokenApps, aacApp), 
+                        // on aac-chain
+                    invalidateAndRefreshBalanceOnUic(
+                        appTokenId, // tokenId
+                        aacApp.wallet.getChainId(), // UIC chain (User Chain)
+                        aacApp.wallet.getAddress(), // Use checksum address
+                        aacApp.wallet
+                    ) // refresh user balance on user-chain
+                ])
 
                 onSuccess?.({ type: 'deposit', data: { appTokenId, amount } });
                 return true;
@@ -454,13 +463,15 @@ export function useAuctionMutations(
 
                 // Invalidate and force refresh user balances
                 const tokenApps = getTokenList().map(token => token.appId);
-                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
-                await invalidateAndRefreshBalanceOnUic(
-                    appTokenId, // tokenId
-                    walletChainId, // aacApp.wallet.getChainId(), // UIC chain (User Chain)
-                    address, // aacApp.wallet.getAddress(),
-                    aacApp.wallet
-                ) // refresh user balance on user-chain 
+                await Promise.all([
+                    invalidateAndRefreshUserBalances(aacApp.wallet.getAddress(), tokenApps, aacApp), // on aac-chain
+                    invalidateAndRefreshBalanceOnUic(
+                        appTokenId, // tokenId
+                        aacApp.wallet.getChainId(), // UIC chain (User Chain)
+                        aacApp.wallet.getAddress(),
+                        aacApp.wallet
+                    ) // refresh user balance on user-chain
+                ])
 
                 onSuccess?.({ type: 'withdraw', data: { appTokenId, amount, targetChain } });
                 return true;

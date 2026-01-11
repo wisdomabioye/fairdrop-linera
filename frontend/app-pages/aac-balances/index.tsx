@@ -109,15 +109,7 @@ export default function AACBalances() {
         </Alert>
       )}
 
-      {/* Stale Data Warning */}
-      {isStale && !loading && (
-        <Alert className="mb-6">
-          <AlertDescription>
-            Data may be outdated. Click refresh to update.
-          </AlertDescription>
-        </Alert>
-      )}
-
+    
       {/* Balances Table */}
       <Card>
         <CardHeader className="pb-4">
@@ -276,6 +268,16 @@ export default function AACBalances() {
               </p>
             </div>
           )}
+
+        {/* Stale Data Warning */}
+        {isStale && (
+          <Alert className="mb-6">
+            <AlertDescription>
+              Data may be outdated. Click refresh to update.
+            </AlertDescription>
+          </Alert>
+        )}
+
         </CardContent>
       </Card>
 
@@ -290,16 +292,16 @@ export default function AACBalances() {
               tokenInfo={getTokenByAppId(selectedToken)}
               aacApp={aacApp.app}
               currentAACBalance={balances?.get(selectedToken) ?? 0}
-              onDepositSuccess={refetch}
+              // onDepositSuccess={refetch}
             />
             <WithdrawDialog
               open={withdrawDialogOpen}
               onOpenChange={setWithdrawDialogOpen}
               appTokenId={selectedToken}
               tokenInfo={getTokenByAppId(selectedToken)}
-              currentBalance={balances?.get(selectedToken) ?? 0}
+              currentAACBalance={balances?.get(selectedToken) ?? 0}
               aacApp={aacApp.app}
-              onWithdrawSuccess={refetch}
+              // onWithdrawSuccess={refetch}
             />
           </>
         );

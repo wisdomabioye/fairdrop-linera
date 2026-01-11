@@ -168,13 +168,13 @@ export default function AuctionDetailPage() {
 
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Supply</p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-xl font-bold">
                     {auction.sold} / {auction.totalSupply}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Total Bids</p>
-                  <p className="text-2xl font-bold">{auction.totalBids}</p>
+                  <p className="text-xl font-bold">{auction.totalBids}</p>
                 </div>
               </div>
 

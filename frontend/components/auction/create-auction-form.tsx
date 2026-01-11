@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLineraApplication, useWalletConnection } from 'linera-react-client';
+import { useWalletConnection } from 'linera-react-client';
 import { ArrowLeft, ArrowRight, Info, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,7 @@ import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
 import { CreatorBalanceCheck } from './creator-balance-check';
 import { DepositDialog } from '@/app-pages/aac-balances/deposit-dialog';
-import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
+import { getAuctionTokenList, getPaymentTokenList, getTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { APP_ROUTES } from '@/config/app.route';
 import { useSyncStatus } from '@/providers';
 import type { AuctionParam } from '@/lib/gql/types';
@@ -110,15 +110,12 @@ export function CreateAuctionFormMultistep({
   const paymentTokenList = getPaymentTokenList();
   const auctionTokenList = getAuctionTokenList();
 
-  // const paymentTokenApp = paymentTokenList.find(t => t.appId === formData.paymentTokenApp);
-  // const auctionTokenApp = auctionTokenList.find(t => t.appId === formData.auctionTokenApp);
-
   // Fetch current AAC balance for deposit dialog
   const { balances: aacBalances } = useCachedUserBalances({
     address: address || '',
-    tokenApps: formData.auctionTokenApp ? [formData.auctionTokenApp] : [],
+    tokenApps: getTokenList().map(t => t.appId),
     aacApp: aacApp.app,
-    skip: !address || !aacApp.app || !formData.auctionTokenApp
+    skip: !address || !aacApp.app
   });
 
   const currentAACBalance = aacBalances?.get(formData.auctionTokenApp) ?? 0;
@@ -562,6 +559,7 @@ export function CreateAuctionFormMultistep({
                   requiredAmount={Number(formData.totalSupply)}
                   onBalanceValidated={setHasValidBalance}
                   onDepositClick={() => setDepositDialogOpen(true)}
+                  currentAACBalance={currentAACBalance}
                 />
               )}
 

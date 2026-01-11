@@ -25,7 +25,7 @@ export interface WithdrawDialogProps {
   onOpenChange: (open: boolean) => void;
   appTokenId: string;
   tokenInfo: TokenInfo;
-  currentBalance: number;
+  currentAACBalance: number;
   aacApp: ApplicationClient | null;
   onWithdrawSuccess?: () => Promise<void>;
 }
@@ -35,7 +35,7 @@ export function WithdrawDialog({
   onOpenChange,
   appTokenId,
   tokenInfo,
-  currentBalance,
+  currentAACBalance,
   aacApp,
   onWithdrawSuccess
 }: WithdrawDialogProps) {
@@ -81,7 +81,7 @@ export function WithdrawDialog({
   };
 
   const handleMaxClick = () => {
-    setAmount(currentBalance.toString());
+    setAmount(currentAACBalance.toString());
   };
 
   const handleChainChange = (chainId: string, _canWrite?: boolean) => {
@@ -89,7 +89,7 @@ export function WithdrawDialog({
   };
 
   const amountValue = parseFloat(amount) || 0;
-  const isAmountValid = amountValue > 0 && amountValue <= currentBalance;
+  const isAmountValid = amountValue > 0 && amountValue <= currentAACBalance;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -117,7 +117,7 @@ export function WithdrawDialog({
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={isWithdrawing}
                 min="0"
-                max={currentBalance}
+                max={currentAACBalance}
                 step="any"
                 className="flex-1"
               />
@@ -125,16 +125,16 @@ export function WithdrawDialog({
                 variant="outline"
                 size="sm"
                 onClick={handleMaxClick}
-                disabled={isWithdrawing || currentBalance === 0}
+                disabled={isWithdrawing || currentAACBalance === 0}
               >
                 Max
               </Button>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">
-                Available: {currentBalance.toLocaleString()} {tokenInfo.symbol}
+                Available: {currentAACBalance?.toLocaleString()} {tokenInfo.symbol}
               </span>
-              {amountValue > currentBalance && (
+              {amountValue > currentAACBalance && (
                 <span className="text-destructive">Insufficient balance</span>
               )}
             </div>
@@ -166,7 +166,7 @@ export function WithdrawDialog({
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Current AAC Balance</span>
               <span className="font-medium">
-                {currentBalance.toLocaleString()}
+                {currentAACBalance?.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -178,7 +178,7 @@ export function WithdrawDialog({
             <div className="flex justify-between text-sm font-semibold pt-1 border-t">
               <span>Remaining Balance</span>
               <span className="text-orange-600">
-                {(currentBalance - amountValue).toLocaleString()}
+                {(currentAACBalance - amountValue).toLocaleString()}
               </span>
             </div>
           </div>

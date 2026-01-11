@@ -33,18 +33,6 @@ export function AuctionCard({
   isRefreshing = false
 }: AuctionCardProps) {
   const router = useRouter();
-  const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
-
-  // Only update price for active auctions
-  useEffect(() => {
-    if (auction.status !== AuctionStatus.Active) return;
-
-    const interval = setInterval(() => {
-      setCurrentPrice(calculateCurrentPrice(auction));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [auction]);
 
   const handleViewDetails = () => {
     if (onViewDetails) {
@@ -91,7 +79,7 @@ export function AuctionCard({
         {/* Status-aware Price Display */}
         <AuctionCardPrice
           auction={auction}
-          currentPrice={currentPrice}
+          currentPrice={auction.currentPrice}
           isEndingNow={isEndingVerySoon(auction.endTime)}
         />
       </CardHeader>

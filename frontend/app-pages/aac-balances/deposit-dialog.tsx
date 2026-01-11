@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { ArrowDownToLine, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuctionMutations } from '@/hooks/use-auction-mutations';
-import { useFungibleQuery } from '@/hooks';
+import { useAuctionMutations, useFungibleQuery } from '@/hooks';
 import { useWalletConnection, useLineraClient, useLineraApplication } from 'linera-react-client';
 import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
@@ -27,8 +26,8 @@ export interface DepositDialogProps {
   appTokenId: string;
   tokenInfo: TokenInfo;
   aacApp: ApplicationClient | null;
-  currentAACBalance: number;
   onDepositSuccess?: () => Promise<void>;
+  currentAACBalance: number;
 }
 
 export function DepositDialog({
@@ -37,8 +36,8 @@ export function DepositDialog({
   appTokenId,
   tokenInfo,
   aacApp,
-  currentAACBalance,
-  onDepositSuccess
+  onDepositSuccess,
+  currentAACBalance
 }: DepositDialogProps) {
   const { address } = useWalletConnection();
   const { walletChainId } = useLineraClient();
@@ -48,8 +47,8 @@ export function DepositDialog({
   // Get the fungible token app to query wallet balance
   const fungibleApp = useLineraApplication(appTokenId);
 
-  // Fetch wallet balance for this token
-  const { getAccountBalance, balanceLoading, fetchBalance } = useFungibleQuery({
+  // Fetch wallet balance on wallet-chain for this token
+  const { getAccountBalance, balanceLoading } = useFungibleQuery({
     chainApp: fungibleApp.app?.wallet,
     tokenId: appTokenId,
     chainId: walletChainId || '',
@@ -58,20 +57,9 @@ export function DepositDialog({
     isWalletSyncing: isWalletClientSyncing,
   });
 
-  // Refetch balance when dialog opens
-  useEffect(() => {
-    if (open && address && fungibleApp.app) {
-      fetchBalance(address);
-    }
-  }, [open, address, fungibleApp.app, fetchBalance]);
-
-  // Get wallet balance as number
-  const walletBalance = useMemo(() => {
-    if (!address) return 0;
-    const balance = getAccountBalance(address);
-    return balance ? parseFloat(balance) || 0 : 0;
-  }, [address, getAccountBalance]);
-
+  // Get token balance wallet on Wallet-Chain 
+  const walletBalance = address ? Number(getAccountBalance(address)) : 0;
+  
   const { deposit, isDepositing, trigger, error } = useAuctionMutations({
     aacApp,
     onSuccess: async (event) => {

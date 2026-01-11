@@ -115,34 +115,50 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         return getBalance(tokenId, chainId, targetAddress);
     }, [tokenId, chainId, getBalance]);
 
-    // Track chainApp to detect changes and invalidate stale cache
+    // Track chainApp changes and initialization
     const prevChainAppRef = useRef(chainApp);
+    const hasInitializedRef = useRef(false);
 
-    // Invalidate cache when chainApp changes (indicates token switch completed)
     useEffect(() => {
+        // Guard: can't do anything without these
+        if (!chainApp || !tokenId || !chainId || !address || isWalletSyncing) {
+            return;
+        }
+
         const chainAppChanged = prevChainAppRef.current !== chainApp;
+        const isFirstRun = !hasInitializedRef.current;
 
-        if (chainAppChanged && chainApp && tokenId && chainId && address) {
-            console.log('[useFungibleQuery] chainApp changed, invalidating and refetching for token:', tokenId);
-            // Invalidate the cached balance to clear any stale data
+        // Scenario 1: chainApp changed (token switched)
+        // Always invalidate and refetch to prevent stale balance display
+        if (chainAppChanged) {
+            console.log('[useFungibleQuery] chainApp changed, clearing cache for:', tokenId);
             invalidateBalance(tokenId, chainId, address);
-
-            // Force refetch with new chainApp
             fetchBalance(address);
-            fetchTokenInfo(); // This never changes
+            fetchTokenInfo();
+            hasInitializedRef.current = true;
+        }
+        // Scenario 2: Initial mount with autoFetch enabled
+        // Only fetch on first mount, not on every dep change
+        else if (isFirstRun && autoFetch) {
+            console.log('[useFungibleQuery] Initial fetch for:', tokenId);
+            fetchBalance(address);
+            fetchTokenInfo();
+            hasInitializedRef.current = true;
         }
 
         prevChainAppRef.current = chainApp;
-    }, [chainApp, tokenId, chainId, address, invalidateBalance, fetchBalance, fetchTokenInfo]);
-
-    // Auto-fetch on mount only (not on subsequent renders)
-    useEffect(() => {
-        if (autoFetch && chainApp && tokenId && chainId && address && !isWalletSyncing) {
-            fetchBalance(address);
-            fetchTokenInfo();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoFetch, tokenId, address, isWalletSyncing, chainApp]); // Only run when autoFetch changes (typically just on mount)
+    }, [
+        chainApp,
+        tokenId,
+        chainId,
+        address,
+        autoFetch,
+        isWalletSyncing,
+        invalidateBalance,
+        fetchBalance,
+        fetchTokenInfo
+    ]);
+   
 
     return {
         balanceLoading,

@@ -428,7 +428,12 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
         get().invalidateBalance(tokenId, chainId, address.toLowerCase());
 
         // Force fresh fetch
-        await get().fetchBalance(tokenId, chainId, address.toLowerCase(), chainApp, true);
+        await get().fetchBalance(
+            tokenId, 
+            chainId, 
+            address, // must be checksum address (no .toLowerCase()) 
+            chainApp, true
+        );
     },
 
     /**
