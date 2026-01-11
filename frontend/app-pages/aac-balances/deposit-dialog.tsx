@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { ArrowDownToLine, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -36,7 +36,6 @@ export function DepositDialog({
   appTokenId,
   tokenInfo,
   aacApp,
-  onDepositSuccess,
   currentAACBalance
 }: DepositDialogProps) {
   const { address } = useWalletConnection();
@@ -48,7 +47,7 @@ export function DepositDialog({
   const fungibleApp = useLineraApplication(appTokenId);
 
   // Fetch wallet balance on wallet-chain for this token
-  const { getAccountBalance, balanceLoading } = useFungibleQuery({
+  const { getAccountBalance, balanceLoading, fetchBalance } = useFungibleQuery({
     chainApp: fungibleApp.app?.wallet,
     tokenId: appTokenId,
     chainId: walletChainId || '',
@@ -59,15 +58,14 @@ export function DepositDialog({
 
   // Get token balance wallet on Wallet-Chain 
   const walletBalance = address ? Number(getAccountBalance(address)) : 0;
-  
   const { deposit, isDepositing, trigger, error } = useAuctionMutations({
     aacApp,
     onSuccess: async (event) => {
       if (event.type === 'deposit') {
         setAmount('');
         // Force refetch AAC balance
-        if (onDepositSuccess) {
-          await onDepositSuccess();
+        if (address) {
+          await fetchBalance(address!);
         }
         onOpenChange(false);
       }
