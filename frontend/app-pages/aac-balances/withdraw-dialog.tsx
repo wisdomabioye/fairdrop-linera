@@ -186,7 +186,7 @@ export function WithdrawDialog({
           {/* Error Alert */}
           {error && (
             <Alert variant="destructive">
-              <AlertDescription>{error.message}</AlertDescription>
+              <AlertDescription>{error.message?.substring(0, error.message.indexOf(':'))}</AlertDescription>
             </Alert>
           )}
         </div>
