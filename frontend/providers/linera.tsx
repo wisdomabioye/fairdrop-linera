@@ -14,7 +14,7 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
       }}
       fallback={<PageLoading />}
       errorFallback={() => <ErrorFallback />}
-      skipProcessInbox={true}
+      skipProcessInbox={false}
       logging={{
         enabled: true,
         level: LogLevel.DEBUG

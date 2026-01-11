@@ -4,8 +4,7 @@ import { Calendar, Clock, Coins, TrendingDown, Users, Package } from 'lucide-rea
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { formatAbsoluteTime, microsecondsToMilliseconds } from '@/lib/utils/auction-utils';
-import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
-import type { TokenInfo } from '@/config/app.token-store';
+import { getTokenByAppId } from '@/config/app.token-store';
 import type { AuctionParam } from '@/lib/gql/types';
 
 export interface AuctionPreviewProps {

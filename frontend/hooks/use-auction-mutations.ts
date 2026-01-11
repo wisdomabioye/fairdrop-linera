@@ -363,7 +363,7 @@ export function useAuctionMutations(
      */
     const deposit = useCallback(
         async (appTokenId: string, amount: string): Promise<boolean> => {
-            if (!aacApp?.wallet || !address || !walletChainId) {
+            if (!aacApp?.wallet || !address) {
                 const err = new Error('Wallet not connected');
                 setError(err);
                 onError?.({ type: 'deposit', error: err });
@@ -396,7 +396,8 @@ export function useAuctionMutations(
                 await Promise.all([
                     invalidateAndRefreshUserBalances(
                         aacApp.wallet.getAddress(), // checksum address only
-                        tokenApps, aacApp), 
+                        tokenApps, aacApp
+                    ), 
                         // on aac-chain
                     invalidateAndRefreshBalanceOnUic(
                         appTokenId, // tokenId

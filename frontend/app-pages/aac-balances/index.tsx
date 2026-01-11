@@ -27,8 +27,7 @@ export default function AACBalances() {
     loading,
     status,
     error,
-    refetch,
-    isStale
+    refetch: refetchAacBalance,
   } = useCachedUserBalances({
     address: address || '',
     tokenApps: tokens.map(t => t.appId),
@@ -92,7 +91,7 @@ export default function AACBalances() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => refetch()}
+          onClick={() => refetchAacBalance()}
           disabled={loading || isPublicClientSyncing}
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -269,39 +268,28 @@ export default function AACBalances() {
             </div>
           )}
 
-        {/* Stale Data Warning */}
-        {isStale && (
-          <Alert className="mb-6">
-            <AlertDescription>
-              Data may be outdated. Click refresh to update.
-            </AlertDescription>
-          </Alert>
-        )}
-
         </CardContent>
       </Card>
-
+      
       {/* Dialogs */}
       {selectedToken !== null && (() => {
         return (
           <>
             <DepositDialog
+              key={`deposit-${selectedToken}-${depositDialogOpen}`}
               open={depositDialogOpen}
               onOpenChange={setDepositDialogOpen}
               appTokenId={selectedToken}
               tokenInfo={getTokenByAppId(selectedToken)}
-              aacApp={aacApp.app}
               currentAACBalance={balances?.get(selectedToken) ?? 0}
-              // onDepositSuccess={refetch}
             />
             <WithdrawDialog
+              key={`withdrawal-${selectedToken}-${withdrawDialogOpen}`}
               open={withdrawDialogOpen}
               onOpenChange={setWithdrawDialogOpen}
               appTokenId={selectedToken}
               tokenInfo={getTokenByAppId(selectedToken)}
               currentAACBalance={balances?.get(selectedToken) ?? 0}
-              aacApp={aacApp.app}
-              // onWithdrawSuccess={refetch}
             />
           </>
         );

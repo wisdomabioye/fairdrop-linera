@@ -15,9 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ChainSelectorAdvanced } from '@/components/shared';
-import { useAuctionMutations } from '@/hooks/use-auction-mutations';
+import { useAuctionMutations, useAacApp } from '@/hooks';
 import { useLineraClient } from 'linera-react-client';
-import type { ApplicationClient } from 'linera-react-client';
 import type { TokenInfo } from '@/config/app.token-store';
 
 export interface WithdrawDialogProps {
@@ -26,7 +25,6 @@ export interface WithdrawDialogProps {
   appTokenId: string;
   tokenInfo: TokenInfo;
   currentAACBalance: number;
-  aacApp: ApplicationClient | null;
   onWithdrawSuccess?: () => Promise<void>;
 }
 
@@ -36,20 +34,20 @@ export function WithdrawDialog({
   appTokenId,
   tokenInfo,
   currentAACBalance,
-  aacApp,
   onWithdrawSuccess
 }: WithdrawDialogProps) {
   const [amount, setAmount] = useState('');
   const [targetChain, setTargetChain] = useState<string | null>(null);
   const { walletChainId } = useLineraClient();
+  const aacApp = useAacApp()
 
-  const { withdraw, isWithdrawing, trigger, error } = useAuctionMutations({
-    aacApp,
+  const { withdraw, trigger, isWithdrawing, error } = useAuctionMutations({
+    aacApp: aacApp.app,
     onSuccess: async (event) => {
       if (event.type === 'withdraw') {
         setAmount('');
         setTargetChain(null);
-        // Force refetch AAC balance
+        // Call parent callback BEFORE closing
         if (onWithdrawSuccess) {
           await onWithdrawSuccess();
         }
@@ -68,8 +66,10 @@ export function WithdrawDialog({
       return;
     }
 
-    await withdraw(appTokenId, amount, targetChain);
-    await trigger();
+    const result = await withdraw(appTokenId, amount, targetChain);
+    if (result) {
+      await trigger();
+    }
   };
 
   const handleClose = () => {
@@ -184,9 +184,17 @@ export function WithdrawDialog({
           </div>
 
           {/* Error Alert */}
-          {error && (
+          {error && error.message && (
             <Alert variant="destructive">
-              <AlertDescription>{error.message?.substring(0, error.message.indexOf(':'))}</AlertDescription>
+              <AlertDescription>
+                {
+                  error.message.indexOf(':') > -1 ?
+                  error.message?.substring(0, error.message.indexOf(':'))
+                  :
+                  error.message
+                }
+                  
+              </AlertDescription>
             </Alert>
           )}
         </div>

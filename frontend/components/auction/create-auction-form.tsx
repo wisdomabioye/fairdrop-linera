@@ -669,11 +669,11 @@ export function CreateAuctionFormMultistep({
       {/* Deposit Dialog */}
       {formData.auctionTokenApp && (
         <DepositDialog
+          key={`deposit-${formData.auctionTokenApp}-${depositDialogOpen}`}
           open={depositDialogOpen}
           onOpenChange={setDepositDialogOpen}
           appTokenId={formData.auctionTokenApp}
           tokenInfo={getTokenByAppId(formData.auctionTokenApp)}
-          aacApp={aacApp.app}
           currentAACBalance={currentAACBalance}
           onDepositSuccess={async () => {
             // Balance check component will automatically refetch after deposit

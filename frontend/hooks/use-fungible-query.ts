@@ -22,6 +22,7 @@ export interface UseFungibleQueryOptions {
 export interface UseFungibleQueryResult {
     balanceLoading: boolean;
     balanceError: Error | null;
+    invalidateBalance: (tokenId: string, chainId: string, address?: string) => void;
     fetchBalance: (address: string) => Promise<void>;
 
     // Token info
@@ -164,6 +165,7 @@ export function useFungibleQuery(options: UseFungibleQueryOptions): UseFungibleQ
         balanceLoading,
         balanceError,
         fetchBalance,
+        invalidateBalance,
         tickerSymbol,
         tokenName,
         tokenInfoLoading,

@@ -70,7 +70,7 @@ export function useCachedUserBalances(
     // Subscribe to store
     const {
         userBalances,
-        fetchUserBalances,
+        // fetchUserBalances,
         invalidateAndRefreshUserBalances,
         isStale: checkIsStale
     } = useAuctionStore();
@@ -111,11 +111,11 @@ export function useCachedUserBalances(
         if (!aacApp || skip || isPublicClientSyncing || tokenApps.length === 0) return;
 
         try {
-            await fetchUserBalances(address, tokenApps, aacApp);
+            await invalidateAndRefreshUserBalances(address, tokenApps, aacApp);
         } catch (err) {
             console.error('[useCachedUserBalances] Refetch failed:', err);
         }
-    }, [aacApp, skip, isPublicClientSyncing, address, tokenApps, fetchUserBalances]);
+    }, [aacApp, skip, isPublicClientSyncing, address, tokenApps, invalidateAndRefreshUserBalances]);
 
     /**
      * Initial fetch and refetch on stale data

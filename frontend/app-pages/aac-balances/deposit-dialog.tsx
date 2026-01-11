@@ -14,10 +14,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuctionMutations, useFungibleQuery } from '@/hooks';
+import { useAacApp, useAuctionMutations, useFungibleQuery } from '@/hooks';
 import { useWalletConnection, useLineraClient, useLineraApplication } from 'linera-react-client';
 import { useSyncStatus } from '@/providers';
-import type { ApplicationClient } from 'linera-react-client';
 import type { TokenInfo } from '@/config/app.token-store';
 
 export interface DepositDialogProps {
@@ -25,7 +24,6 @@ export interface DepositDialogProps {
   onOpenChange: (open: boolean) => void;
   appTokenId: string;
   tokenInfo: TokenInfo;
-  aacApp: ApplicationClient | null;
   onDepositSuccess?: () => Promise<void>;
   currentAACBalance: number;
 }
@@ -35,8 +33,8 @@ export function DepositDialog({
   onOpenChange,
   appTokenId,
   tokenInfo,
-  aacApp,
-  currentAACBalance
+  currentAACBalance,
+  onDepositSuccess  // Add this back to props
 }: DepositDialogProps) {
   const { address } = useWalletConnection();
   const { walletChainId } = useLineraClient();
@@ -45,27 +43,30 @@ export function DepositDialog({
 
   // Get the fungible token app to query wallet balance
   const fungibleApp = useLineraApplication(appTokenId);
+  const aacApp = useAacApp();
 
   // Fetch wallet balance on wallet-chain for this token
-  const { getAccountBalance, balanceLoading, fetchBalance } = useFungibleQuery({
+  const { getAccountBalance, balanceLoading } = useFungibleQuery({
     chainApp: fungibleApp.app?.wallet,
     tokenId: appTokenId,
-    chainId: walletChainId || '',
-    address: address || '',
+    chainId: walletChainId,
+    address: address,
     autoFetch: true,
     isWalletSyncing: isWalletClientSyncing,
   });
 
+
   // Get token balance wallet on Wallet-Chain 
   const walletBalance = address ? Number(getAccountBalance(address)) : 0;
-  const { deposit, isDepositing, trigger, error } = useAuctionMutations({
-    aacApp,
+
+  const { deposit, trigger, isDepositing, error } = useAuctionMutations({
+    aacApp: aacApp.app,
     onSuccess: async (event) => {
       if (event.type === 'deposit') {
         setAmount('');
-        // Force refetch AAC balance
-        if (address) {
-          await fetchBalance(address!);
+        // Call parent callback BEFORE closing
+        if (onDepositSuccess) {
+          await onDepositSuccess();
         }
         onOpenChange(false);
       }
@@ -82,8 +83,10 @@ export function DepositDialog({
       return;
     }
 
-    await deposit(appTokenId, amount);
-    await trigger();
+    const result = await deposit(appTokenId, amount);
+    if (result) {
+      await trigger();
+    }
   };
 
   const handleClose = () => {
@@ -181,9 +184,17 @@ export function DepositDialog({
           </div>
 
           {/* Error Alert */}
-          {error && (
+          {error && error.message && (
             <Alert variant="destructive">
-              <AlertDescription>{error.message?.substring(0, error.message.indexOf(':'))}</AlertDescription>
+              <AlertDescription>
+                {
+                  error.message.indexOf(':') > -1 ?
+                  error.message?.substring(0, error.message.indexOf(':'))
+                  :
+                  error.message
+                }
+                  
+              </AlertDescription>
             </Alert>
           )}
         </div>
