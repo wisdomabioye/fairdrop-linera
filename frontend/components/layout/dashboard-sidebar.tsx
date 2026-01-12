@@ -119,9 +119,9 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
                   <Link href={APP_ROUTES.howBidWorks}>
                     <div className={cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
-                      'bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/30',
-                      'hover:from-primary/20 hover:to-primary/10 hover:border-primary/50 hover:shadow-md',
-                      'text-primary group',
+                      'bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/30',
+                      'hover:from-accent/20 hover:to-accent/10 hover:border-accent/50 hover:shadow-md',
+                      'text-accent group',
                       sidebarCollapsed && 'justify-center'
                     )}>
                       <Rocket className="h-5 w-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
