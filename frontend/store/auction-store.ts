@@ -172,6 +172,8 @@ export interface AuctionStore {
 
     // ============ Combined Invalidate + Refetch Actions ============
     invalidateAndRefreshAuction: (auctionId: string, aacApp: ApplicationClient) => Promise<void>;
+    invalidateAndRefreshActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
+    invalidateAndRefreshAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshUserBids: (auctionId: string, address: string, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient) => Promise<void>;
@@ -1210,6 +1212,40 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
         // Force fresh fetch
         await get().fetchAuctionSummary(auctionId, aacApp, true);
+    },
+
+    /**
+     * Invalidate and force refresh active auctions list
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshActiveAuctions: async (offset, limit, aacApp) => {
+        const key = `all-auctions-${offset}-${limit}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateActiveAuctions();
+
+        // Force fresh fetch
+        await get().fetchActiveAuctions(offset, limit, aacApp);
+    },
+
+    /**
+     * Invalidate and force refresh auctions by creator
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshAuctionsByCreator: async (creator, aacApp) => {
+        const key = `auctions-by-creator-${creator}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateAuctionsByCreator(creator);
+
+        // Force fresh fetch
+        await get().fetchAuctionsByCreator(creator, aacApp);
     },
 
     /**

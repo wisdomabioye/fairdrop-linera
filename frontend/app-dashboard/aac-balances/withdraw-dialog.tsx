@@ -41,7 +41,7 @@ export function WithdrawDialog({
   const { walletChainId } = useLineraClient();
   const aacApp = useAacApp()
 
-  const { withdraw, trigger, isWithdrawing, error } = useAuctionMutations({
+  const { withdraw, isWithdrawing, error } = useAuctionMutations({
     aacApp: aacApp.app,
     onSuccess: async (event) => {
       if (event.type === 'withdraw') {
@@ -66,10 +66,7 @@ export function WithdrawDialog({
       return;
     }
 
-    const result = await withdraw(appTokenId, amount, targetChain);
-    if (result) {
-      await trigger();
-    }
+    await withdraw(appTokenId, amount, targetChain);
   };
 
   const handleClose = () => {

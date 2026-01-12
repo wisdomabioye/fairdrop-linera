@@ -59,7 +59,7 @@ export function DepositDialog({
   // Get token balance wallet on Wallet-Chain 
   const walletBalance = address ? Number(getAccountBalance(address)) : 0;
 
-  const { deposit, trigger, isDepositing, error } = useAuctionMutations({
+  const { deposit, isDepositing, error } = useAuctionMutations({
     aacApp: aacApp.app,
     onSuccess: async (event) => {
       if (event.type === 'deposit') {
@@ -83,10 +83,8 @@ export function DepositDialog({
       return;
     }
 
-    const result = await deposit(appTokenId, amount);
-    if (result) {
-      await trigger();
-    }
+    await deposit(appTokenId, amount);
+  
   };
 
   const handleClose = () => {
