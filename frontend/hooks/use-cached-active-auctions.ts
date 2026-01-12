@@ -84,7 +84,7 @@ export function useCachedActiveAuctions(
     if ((!activeAuctions || isStale) && !isFetching) {
       refetch();
     }
-  }, [skip, aacApp, isStale, isPublicClientSyncing, activeAuctions, isFetching, refetch]);
+  }, [skip, aacApp, isStale, isPublicClientSyncing, activeAuctions, isFetching]);
 
   return {
     auctions,

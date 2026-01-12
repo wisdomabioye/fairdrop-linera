@@ -26,7 +26,6 @@ export default function AACBalances() {
   const {
     balances,
     loading,
-    status,
     error,
     refetch: refetchAacBalance,
   } = useCachedUserBalances({
@@ -37,8 +36,6 @@ export default function AACBalances() {
     // No enablePolling - EagerLoader handles background updates
   });
 
-  /** Not first load, i.e already loaded */
-  const isIdle = status === 'idle';
   // Dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
@@ -135,7 +132,7 @@ export default function AACBalances() {
                 </tr>
               </thead>
               <tbody>
-                {loading && isIdle ? (
+                {loading ? (
                   // Loading skeleton
                   tokens.map((token) => (
                     <tr key={token.appId} className="border-b last:border-0">
@@ -200,7 +197,7 @@ export default function AACBalances() {
 
           {/* Mobile Cards */}
           <div className="md:hidden space-y-4">
-            {loading && isIdle ? (
+            {loading ? (
               // Loading skeleton
               tokens.map((token) => (
                 <Card key={token.appId}>

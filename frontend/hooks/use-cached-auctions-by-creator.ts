@@ -45,6 +45,8 @@ export function useCachedAuctionsByCreator(
 
   // Use ref to track first load (no re-renders)
   const hasLoadedOnce = useRef(false);
+  // Track if this is initial mount to force fetch
+  const isInitialMount = useRef(true);
 
   // Get auctions for this specific creator
   const creatorEntry = creator ? auctionsByCreator.get(creator) : null;
@@ -79,12 +81,17 @@ export function useCachedAuctionsByCreator(
     }
   }, [aacApp, skip, creator, isPublicClientSyncing, fetchAuctionsByCreator]);
 
-  // Initial fetch
+  // Initial fetch - always fetch on first mount to get fresh data
   useEffect(() => {
     if (skip || !aacApp || !creator || isPublicClientSyncing) return;
 
-    if ((!creatorEntry || isStale) && !isFetching) {
-      refetch();
+    // Always fetch on initial mount (handles navigation from create page)
+    // After that, only fetch if stale or no data
+    if (isInitialMount.current || !creatorEntry || isStale) {
+      isInitialMount.current = false;
+      if (!isFetching) {
+        refetch();
+      }
     }
   }, [skip, aacApp, creator, isPublicClientSyncing, creatorEntry, isStale, isFetching, refetch]);
 

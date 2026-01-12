@@ -24,6 +24,7 @@ import {
   formatAbsoluteTime,	
   isEndingVerySoon	
 } from '@/lib/utils/auction-utils';	
+import { getTokenByAppId } from '@/config/app.token-store';
 
 export default function AuctionDetailPage() {	
   const router = useRouter();	
@@ -53,10 +54,6 @@ export default function AuctionDetailPage() {
     skip: !auctionId || !aacApp.app?.wallet	
   });	
 
-  // Memoize callbacks to prevent child re-renders
-  const handleSuccessCallback = useCallback(() => {
-    refetch();
-  }, [refetch]);
 
   const handleShare = useCallback(() => {	
     if (navigator.share) {	
@@ -108,6 +105,9 @@ export default function AuctionDetailPage() {
   const statusBadge = getAuctionStatusBadge(auction);	
   const supplyPercentage = calculateSupplyPercentage(auction.sold, auction.totalSupply);	
   const isActive = auction.status === AuctionStatus.Active;	
+  const paymentTokenInfo = getTokenByAppId(auction.paymentTokenApp);
+  const auctionTokenInfo = getTokenByAppId(auction.auctionTokenApp);
+
 
   return (	
     <div className="max-w-7xl mx-auto space-y-6">	
@@ -167,7 +167,7 @@ export default function AuctionDetailPage() {
               <div className="absolute bottom-4 left-4 right-4 flex gap-2">	
                 <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">	
                   <p className="text-xs text-muted-foreground mb-1">Supply</p>	
-                  <p className="text-lg font-bold">{auction.sold} / {auction.totalSupply}</p>	
+                  <p className="text-lg font-bold">{auction.sold.toLocaleString()} / {auction.totalSupply.toLocaleString()} {auctionTokenInfo.symbol}</p>	
                 </div>	
                 <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">	
                   <p className="text-xs text-muted-foreground mb-1">Bids</p>	
@@ -187,7 +187,6 @@ export default function AuctionDetailPage() {
                 </div>	
                 <DetailPriceDisplay	
                   auction={auction}	
-                  currentPrice={auction.currentPrice}	
                   isEndingNow={isEndingVerySoon(auction.endTime)}	
                 />	
               </CardContent>	
@@ -232,7 +231,7 @@ export default function AuctionDetailPage() {
               <div className="flex items-center justify-between">	
                 <p className="text-sm font-medium">Supply Progress</p>	
                 <p className="text-sm text-muted-foreground">	
-                  {auction.sold} of {auction.totalSupply} sold	
+                  {auction.sold} of {auction.totalSupply.toLocaleString()} {auctionTokenInfo.symbol} sold	
                 </p>	
               </div>	
               <div className="relative w-full h-4 bg-secondary rounded-full overflow-hidden">	
@@ -262,19 +261,19 @@ export default function AuctionDetailPage() {
                 <div className="space-y-1">	
                   <p className="text-muted-foreground">Start Price</p>	
                   <p className="text-lg font-mono font-semibold">	
-                    {formatTokenAmount(auction.startPrice, 18, 4)}	
+                    {formatTokenAmount(auction.startPrice, 18, 4)} {paymentTokenInfo.symbol}	
                   </p>	
                 </div>	
                 <div className="space-y-1">	
                   <p className="text-muted-foreground">Floor Price</p>	
                   <p className="text-lg font-mono font-semibold">	
-                    {formatTokenAmount(auction.floorPrice, 18, 4)}	
+                    {formatTokenAmount(auction.floorPrice, 18, 4)} {paymentTokenInfo.symbol}
                   </p>	
                 </div>	
                 <div className="space-y-1">	
                   <p className="text-muted-foreground">Price Decay</p>	
                   <p className="text-base font-mono">	
-                    -{formatTokenAmount(auction.priceDecayAmount, 18, 4)} / {auction.priceDecayInterval}s	
+                    -{formatTokenAmount(auction.priceDecayAmount, 18, 4)} {paymentTokenInfo.symbol} / {auction.priceDecayInterval}s	
                   </p>	
                 </div>	
                 <div className="space-y-1">	
@@ -282,7 +281,7 @@ export default function AuctionDetailPage() {
                   <p className="text-lg font-mono font-semibold">	
                     {auction.clearingPrice	
                       ? formatTokenAmount(auction.clearingPrice, 18, 4)	
-                      : <span className="text-muted-foreground">Not set</span>	
+                      : <span className="text-muted-foreground">TBD</span>	
                     }	
                   </p>	
                 </div>	
@@ -341,8 +340,8 @@ export default function AuctionDetailPage() {
           <DetailSidebarActions	
             auction={auction}	
             aacApp={aacApp.app}	
-            onBidSuccess={handleSuccessCallback}
-            onClaimSuccess={handleSuccessCallback}
+            // onBidSuccess={handleSuccessCallback}
+            // onClaimSuccess={handleSuccessCallback}
           />	
 
           {/* User's Commitment */}	

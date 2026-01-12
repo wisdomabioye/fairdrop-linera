@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import { Trophy, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -106,9 +106,23 @@ export function BidHistory({
     offset,
     limit,
     aacApp: aacApp.app,
-    enablePolling: false, // Explicitly disabled
+    enablePolling: false,
     skip: !aacApp.app
   });
+
+  // Memoize lowercase wallet address to avoid recalculating on each row
+  const normalizedUserAddress = useMemo(
+    () => currentUserWalletAddress?.toLowerCase() ?? null,
+    [currentUserWalletAddress]
+  );
+
+  // Memoize the check function
+  const isCurrentUser = useCallback(
+    (bidderAddress: string) => 
+      normalizedUserAddress !== null && 
+      bidderAddress.toLowerCase() === normalizedUserAddress,
+    [normalizedUserAddress]
+  );
 
   // Sort bids: latest first
   const sortedBids = useMemo(() => {
@@ -162,10 +176,7 @@ export function BidHistory({
           <BidRow
             key={bid.bidId}
             bid={bid}
-            isCurrentUser={
-              !!currentUserWalletAddress &&
-              bid.userAccount.toLowerCase() === currentUserWalletAddress.toLowerCase()
-            }
+            isCurrentUser={isCurrentUser(bid.userAccount)}
           />
         ))}
       </div>

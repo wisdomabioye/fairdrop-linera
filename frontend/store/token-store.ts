@@ -398,12 +398,12 @@ export const useTokenStore = create<TokenStore>((set, get) => ({
 
             // Mark all token info as stale
             const newTokenInfo = new Map(state.tokenInfo);
-            newTokenInfo.forEach((value, key) => {
-                newTokenInfo.set(key, {
-                    ...value,
-                    timestamp: 0,
-                });
-            });
+            // newTokenInfo.forEach((value, key) => {
+            //     newTokenInfo.set(key, {
+            //         ...value,
+            //         timestamp: 0,
+            //     });
+            // });
 
             return {
                 balances: newBalances,

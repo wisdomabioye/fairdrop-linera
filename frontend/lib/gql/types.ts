@@ -152,7 +152,7 @@ export function transformBidRecord(bid: BidRecord): BidRecord {
     return {
         ...bid,
         amountPaid: Number(bid.amountPaid),
-        quantity: Number(bid.amountPaid),
+        quantity: Number(bid.quantity),
         // Convert timestamp from microseconds (backend) to milliseconds (JavaScript)
         timestamp: microsecondsToMilliseconds(bid.timestamp)
     };

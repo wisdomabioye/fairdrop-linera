@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWalletConnection } from 'linera-react-client';
 import { ArrowLeft, ArrowRight, Info, Save } from 'lucide-react';
@@ -57,6 +57,9 @@ export function CreateAuctionFormMultistep({
   const { isConnected, isConnecting, connect, address } = useWalletConnection();
   const { isClientSyncing } = useSyncStatus();
   const { loadDraft, saveDraft, clearDraft } = usePersistedAuctionForm();
+
+  // Memoize draft check to avoid calling loadDraft() on every render
+  const hasDraft = useMemo(() => !!loadDraft(), [loadDraft]);
 
   // Current step
   const [currentStep, setCurrentStep] = useState(0);
@@ -134,7 +137,13 @@ export function CreateAuctionFormMultistep({
 
         if (onAuctionCreateSuccess) {
           await onAuctionCreateSuccess(auctionId);
-        } 
+        }
+
+        // Small delay to let blockchain state settle before redirect
+        // The mutation already refreshed the cache, but we need time for
+        // the new auction to appear in subsequent queries
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         router.push(APP_ROUTES.creatorAuctions);
       }
     },
@@ -280,7 +289,7 @@ export function CreateAuctionFormMultistep({
               Set up a descending-price auction with uniform clearing
             </CardDescription>
           </div>
-          {loadDraft() && (
+          {hasDraft && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-md">
               <Save className="h-3 w-3" />
               <span>Draft saved</span>

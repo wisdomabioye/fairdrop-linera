@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useChain } from '@/hooks/use-chain';
+import { useTokenStore } from '@/store/token-store';
 
 export interface SyncStatus {
     /** True if either wallet or public client is syncing */
@@ -31,6 +32,7 @@ export function SyncProvider({
 } & SyncProviderOptions) {
     const { publicChain, walletChain, isConnected, isInitialized } = useChain();
     const { invalidateAll } = useAuctionStore();
+    const { invalidateAll: invalidateAllFungibleData } = useTokenStore()
     const [isWalletClientSyncing, setIsWalletClientSyncing] = useState(false);
     const [isPublicClientSyncing, setIsPublicClientSyncing] = useState(false);
 
@@ -105,6 +107,7 @@ export function SyncProvider({
             } else {
                 console.log('[SyncProvider] Wallet client sync completed, invalidating caches');
                 invalidateAll();
+                invalidateAllFungibleData();
             }
         }
         prevWalletSyncingRef.current = isWalletClientSyncing;
@@ -116,10 +119,11 @@ export function SyncProvider({
             } else {
                 console.log('[SyncProvider] Public client sync completed, invalidating caches');
                 invalidateAll();
+                invalidateAllFungibleData();
             }
         }
         prevPublicSyncingRef.current = isPublicClientSyncing;
-    }, [isPublicClientSyncing, invalidateAll]);
+    }, [isPublicClientSyncing, isWalletClientSyncing, invalidateAll, invalidateAllFungibleData]);
 
     /**
      * Handle wallet client notifications

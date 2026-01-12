@@ -60,9 +60,9 @@ export const navigation: NavSection[] = [
         title: 'Tokens',
         show: true,
         items: [
-        { name: 'Wallet Balance', href: APP_ROUTES.walletBalance, icon: Wallet2 },
-        { name: 'AAC Balance', href: APP_ROUTES.aacBalance, icon: Wallet },
         { name: 'Faucet', href: APP_ROUTES.faucet, icon: Gift },
+        { name: 'AAC Balance', href: APP_ROUTES.aacBalance, icon: Wallet },
+        { name: 'My Tokens', href: APP_ROUTES.myToken, icon: Wallet2 },
         ],
     },
 ];

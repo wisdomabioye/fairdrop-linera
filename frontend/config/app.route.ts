@@ -20,7 +20,7 @@ export const APP_ROUTES = {
   
   // Token routes
   faucet: '/faucet',
-  walletBalance: '/token/wallet-balance',
+  myToken: '/token/my-tokens',
   aacBalance: '/token/aac-balance',
 } as const;
 

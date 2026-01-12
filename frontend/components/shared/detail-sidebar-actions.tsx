@@ -25,7 +25,8 @@ const MemoizedBidForm = memo(BidForm, (prevProps, nextProps) => {
     prevProps.auction.currentPrice === nextProps.auction.currentPrice &&
     prevProps.auction.sold === nextProps.auction.sold &&
     prevProps.auction.status === nextProps.auction.status &&
-    prevProps.auction.totalBids === nextProps.auction.totalBids
+    prevProps.auction.totalBids === nextProps.auction.totalBids &&
+    prevProps.auction.maxBidAmount === nextProps.auction.maxBidAmount
   );
 });
 

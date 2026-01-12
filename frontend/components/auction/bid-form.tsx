@@ -43,7 +43,7 @@ export function BidForm({
   const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
 
   // Fetch user's AAC balance
-  const { balances, loading: balanceLoading, refetch: refetchBalance } = useCachedUserBalances({
+  const { balances, loading: balanceLoading } = useCachedUserBalances({
     address: address || '',
     tokenApps: getPaymentTokenList().map(p => p.appId),
     aacApp: aacApp.app,
@@ -68,7 +68,6 @@ export function BidForm({
       if (event.type === 'buy') {
         toast.success(`Bid placed for ${event.data.quantity} unit(s)!`);
         setQuantity(1);
-        refetchBalance();
         onSuccess?.(event.data.auctionId, event.data.quantity);
       }
     },
@@ -78,7 +77,6 @@ export function BidForm({
       }
     }
   });
-
   // Calculations
   const maxQuantity = auction.maxBidAmount;
   const currentCommitment = totalQuantity || 0;
@@ -107,10 +105,6 @@ export function BidForm({
     if (!canSubmit) return;
     const success = await buy(auction.auctionId, quantity);
     if (success) setQuantity(1);
-  };
-
-  const handleDepositSuccess = async () => {
-    await refetchBalance();
   };
 
   // Wallet connection guard
@@ -313,7 +307,6 @@ export function BidForm({
         appTokenId={auction.paymentTokenApp}
         tokenInfo={paymentToken}
         currentAACBalance={userBalance}
-        onDepositSuccess={handleDepositSuccess}
       />
     </>
   );

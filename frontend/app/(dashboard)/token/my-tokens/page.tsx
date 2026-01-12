@@ -1,4 +1,4 @@
-import MyTokensWalletBalance from '@/app-dashboard/wallet-balance';
+import MyTokensWalletBalance from '@/app-dashboard/my-tokens';
 
 export const dynamic = 'force-static';
 export const revalidate = false;

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { APP_ROUTES } from '@/config/app.route';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import { calculateCurrentPrice, formatTokenAmount, formatTimeRemaining } from '@/lib/utils/auction-utils';
+import { getTokenByAppId } from '@/config/app.token-store';
 
 interface AuctionTableProps {
   auctions: AuctionSummary[];
@@ -77,19 +78,9 @@ interface AuctionTableRowProps {
 }
 
 function AuctionTableRow({ auction, onBidClick, onClaimClick, onViewDetails }: AuctionTableRowProps) {
-  const [currentPrice, setCurrentPrice] = useState(calculateCurrentPrice(auction));
-  const [timeRemaining, setTimeRemaining] = useState(formatTimeRemaining(auction.endTime));
-
-  useEffect(() => {
-    if (auction.status !== AuctionStatus.Active) return;
-
-    const interval = setInterval(() => {
-      setCurrentPrice(calculateCurrentPrice(auction));
-      setTimeRemaining(formatTimeRemaining(auction.endTime));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [auction]);
+  const timeRemaining = formatTimeRemaining(auction.endTime);
+  const paymentTokenInfo = getTokenByAppId(auction.paymentTokenApp);
+  const auctionTokenInfo = getTokenByAppId(auction.auctionTokenApp);
 
   const getStatusBadge = () => {
     switch (auction.status) {
@@ -135,7 +126,7 @@ function AuctionTableRow({ auction, onBidClick, onClaimClick, onViewDetails }: A
       </td>
       <td className="px-4 py-4">
         <div className="text-sm font-semibold text-primary">
-          {formatTokenAmount(currentPrice.toString())}
+          {formatTokenAmount(auction.currentPrice)} {paymentTokenInfo.symbol}
         </div>
       </td>
       <td className="px-4 py-4">
@@ -145,8 +136,8 @@ function AuctionTableRow({ auction, onBidClick, onClaimClick, onViewDetails }: A
       </td>
       <td className="px-4 py-4">
         <div className="text-sm">
-          <span className="font-semibold">{auction.sold}</span>
-          <span className="text-muted-foreground"> / {auction.totalSupply}</span>
+          <span className="font-semibold">{auction.sold.toLocaleString()}</span>
+          <span className="text-muted-foreground"> / {auction.totalSupply.toLocaleString()} {auctionTokenInfo.symbol}</span>
         </div>
       </td>
       <td className="px-4 py-4">

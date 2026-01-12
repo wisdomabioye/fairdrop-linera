@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 
 export interface DetailPriceDisplayProps {
   auction: AuctionSummary;
-  currentPrice: number;
   isEndingNow?: boolean;
 }
 
@@ -20,7 +19,6 @@ export interface DetailPriceDisplayProps {
  */
 export function DetailPriceDisplay({
   auction,
-  currentPrice,
   isEndingNow = false
 }: DetailPriceDisplayProps) {
   
@@ -36,7 +34,7 @@ export function DetailPriceDisplay({
             isEndingNow && 'animate-countdown-pulse'
           )}>
             <TrendingDown className="h-6 w-6" />
-            {formatTokenAmount(currentPrice, 18, 4)} {paymentToken.symbol}
+            {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol}
           </p>
         </div>
       );
@@ -68,7 +66,7 @@ export function DetailPriceDisplay({
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Price</p>
           <p className="text-2xl font-bold text-muted-foreground">
-            {formatTokenAmount(currentPrice, 18, 4)} {paymentToken.symbol}
+            {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol}
           </p>
         </div>
       );
