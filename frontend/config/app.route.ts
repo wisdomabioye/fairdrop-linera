@@ -17,7 +17,7 @@ export const APP_ROUTES = {
   // Bid routes
   bidSummary: '/my',
   myBids: '/my/bids',
-  
+  howBidWorks: '/how-bid-works',
   // Token routes
   faucet: '/faucet',
   myToken: '/token/my-tokens',

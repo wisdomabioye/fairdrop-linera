@@ -40,7 +40,7 @@ export const navigation: NavSection[] = [
         ],
     },
     {
-        title: 'My Activity',
+        title: 'Collector',
         show: true,
         items: [
         { name: 'My Dashboard', href: APP_ROUTES.bidSummary, icon: LayoutDashboard },

@@ -114,9 +114,27 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
                   );
                 })}
 
+                {/* Collector How-bid-works CTA */}
+                {section.title === 'Collector' && (
+                  <Link href={APP_ROUTES.howBidWorks}>
+                    <div className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+                      'bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/30',
+                      'hover:from-primary/20 hover:to-primary/10 hover:border-primary/50 hover:shadow-md',
+                      'text-primary group',
+                      sidebarCollapsed && 'justify-center'
+                    )}>
+                      <Rocket className="h-5 w-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                      {!sidebarCollapsed && (
+                        <span>How Bid Works</span>
+                      )}
+                    </div>
+                  </Link>
+                )}
+
                 {/* Creator Get Started CTA */}
                 {section.title === 'Creator' && (
-                  <Link href="/creator/get-started">
+                  <Link href={APP_ROUTES.creatorGetStarted}>
                     <div className={cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
                       'bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/30',
