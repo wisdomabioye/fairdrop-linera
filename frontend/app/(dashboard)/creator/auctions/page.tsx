@@ -1,4 +1,4 @@
-import CreatorAuctions from "@/app-dashboard/creator-auctions";
+import CreatorAuctions from "@/app-dashboard/create-auction";
 
 export const dynamic = 'force-static';
 export const revalidate = false;

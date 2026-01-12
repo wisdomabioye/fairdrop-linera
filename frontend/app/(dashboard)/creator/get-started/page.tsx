@@ -1,4 +1,4 @@
-import CreatorGetStarted from "@/app-dashboard/creator/get-started";
+import CreatorGetStarted from "@/app-dashboard/get-started";
 
 export const dynamic = 'force-static';
 export const revalidate = false;

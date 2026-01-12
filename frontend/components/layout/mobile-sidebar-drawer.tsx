@@ -3,74 +3,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Compass,
-  Zap,
-  CheckCircle,
-  LayoutDashboard,
-  TrendingUp,
-  Trophy,
-  Gavel,
-  BarChart,
-  Wallet,
   Plus,
   Droplet,
   Rocket,
-  X,
-  LucideIcon,
+  X
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { AppLogo } from '@/components/layout/logo';
 import { useUIStore } from '@/store/ui-store';
-import { cn } from '@/lib/utils';
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: LucideIcon;
-}
-
-interface NavSection {
-  title: string;
-  items: NavItem[];
-  show?: boolean;
-}
+import { navigation } from './nav-link';
 
 export function MobileSidebarDrawer() {
   const pathname = usePathname();
   const { mobileMenuOpen, setMobileMenuOpen } = useUIStore();
-
-  // Always show all navigation sections
-  const navigation: NavSection[] = [
-    {
-      title: 'Discover',
-      show: true,
-      items: [
-        { name: 'Explore Auctions', href: '/', icon: Compass },
-        { name: 'Ending Soon', href: '/?filter=ending-soon', icon: Zap },
-        { name: 'Recently Settled', href: '/?filter=settled', icon: CheckCircle },
-      ],
-    },
-    {
-      title: 'My Activity',
-      show: true,
-      items: [
-        { name: 'My Dashboard', href: '/my', icon: LayoutDashboard },
-        { name: 'My Bids', href: '/my/bids', icon: TrendingUp },
-        { name: 'My Wins', href: '/my/settlements', icon: Trophy },
-      ],
-    },
-    {
-      title: 'Creator',
-      show: true,
-      items: [
-        { name: 'My Auctions', href: '/creator/auctions', icon: Gavel },
-        { name: 'Analytics', href: '/creator/analytics', icon: BarChart },
-        { name: 'Withdrawals', href: '/creator/withdrawals', icon: Wallet },
-      ],
-    },
-  ];
 
   const handleLinkClick = () => {
     setMobileMenuOpen(false);

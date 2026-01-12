@@ -6,14 +6,22 @@
 
 export const APP_ROUTES = {
   home: '/',
+
+  auction: (auctionId: string) => `/auctions/${auctionId}`,
+
+  // Creator routes
+  creator: '/creator',
+  creatorAuctions: '/creator/auctions',
+  creatorCreate: '/creator/create',
+  creatorGetStarted: '/creator/get-started',
+  // Bid routes
+  bidSummary: '/my',
+  myBids: '/my/bids',
+  
+  // Token routes
   faucet: '/faucet',
-  myTokens: '/my-tokens',
-  activeAuctions: '/active-auction',
-  settledAuctions: '/settled-auction',
-  createAuction: '/create-auction',
-  myAuctions: '/my-auctions',
-  aacBalances: '/aac-balances',
-  auctionDetail: (id: string | number) => `/auction-detail?id=${id}`,
+  walletBalance: '/token/wallet-balance',
+  aacBalance: '/token/aac-balance',
 } as const;
 
 export type AppRoute = typeof APP_ROUTES[keyof typeof APP_ROUTES];

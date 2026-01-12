@@ -63,7 +63,7 @@ export default function AACBalances() {
   // Wallet connection guard
   if (!isConnected) {
     return (
-      <div className="mx-auto my-6 py-6 max-w-5xl">
+      <div className="mx-auto my-6 py-6 max-w-xl">
         <WalletConnectionPrompt
           title="AAC Balances"
           description="Connect your wallet to view your token balances on the Auction Authority Chain"

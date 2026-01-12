@@ -1,4 +1,4 @@
-import Faucet from '@/app-pages/faucet';
+import Faucet from '@/app-dashboard/faucet';
 
 export const dynamic = 'force-static';
 export const revalidate = false;

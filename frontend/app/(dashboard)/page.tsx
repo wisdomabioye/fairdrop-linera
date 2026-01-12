@@ -1,4 +1,4 @@
-import DashboardOverview from '@/app-dashboard/overview';
+import DashboardOverview from '@/app-dashboard/home';
 
 export const dynamic = 'force-static';
 export const revalidate = false;

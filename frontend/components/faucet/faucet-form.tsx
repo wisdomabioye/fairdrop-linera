@@ -148,7 +148,7 @@ export function FaucetForm({ defaultToken, onSuccess }: FaucetFormProps) {
   // Wallet connection guard
   if (!isConnected) {
     return (
-      <div className='mx-auto max-w-3xl'>
+      <div className='mx-auto my-6 py-6 max-w-xl'>
         <WalletConnectionPrompt
           title="Token Faucet"
           description="Connect your wallet to receive test tokens instantly"

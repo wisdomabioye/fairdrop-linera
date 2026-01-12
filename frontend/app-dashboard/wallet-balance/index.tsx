@@ -79,7 +79,7 @@ export default function MyTokens() {
   // Wallet connection guard
   if (!isConnected) {
     return (
-      <div className="mx-auto my-6 py-6 max-w-5xl">
+      <div className="mx-auto my-6 py-6 max-w-xl">
         <WalletConnectionPrompt
           title="My Tokens"
           description="Connect your wallet to manage your fungible tokens"

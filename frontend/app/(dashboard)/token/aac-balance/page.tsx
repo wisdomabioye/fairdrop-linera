@@ -1,4 +1,4 @@
-import AACBalances from '@/app-pages/aac-balances';
+import AACBalances from '@/app-dashboard/aac-balances';
 
 export const dynamic = 'force-static';
 export const revalidate = false;

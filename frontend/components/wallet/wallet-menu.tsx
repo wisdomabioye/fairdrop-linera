@@ -150,7 +150,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
         {/* Navigation Links */}
         <div className="p-2">
           <Link
-            href={APP_ROUTES.myAuctions}
+            href={APP_ROUTES.creatorAuctions}
             onClick={() => setIsOpen(false)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/5 transition-all group"
           >
@@ -158,7 +158,7 @@ export function WalletMenu({ address, onDisconnect, isDisconnecting }: WalletMen
             <span>My Auctions</span>
           </Link>
           <Link
-            href={APP_ROUTES.aacBalances}
+            href={APP_ROUTES.aacBalance}
             onClick={() => setIsOpen(false)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/5 transition-all group"
           >

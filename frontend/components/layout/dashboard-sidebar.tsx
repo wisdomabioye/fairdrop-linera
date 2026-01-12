@@ -3,39 +3,17 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
-  Compass,
-  Zap,
-  CheckCircle,
-  LayoutDashboard,
-  TrendingUp,
-  Trophy,
-  Gavel,
-  BarChart,
-  Wallet,
   Plus,
   Droplet,
   ChevronLeft,
-  Rocket,
-  LucideIcon,
+  Rocket
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { AppLogo } from '@/components/layout/logo';
 import { useUIStore } from '@/store/ui-store';
-import { cn } from '@/lib/utils';
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: LucideIcon;
-  badge?: string | number;
-}
-
-interface NavSection {
-  title: string;
-  items: NavItem[];
-  show?: boolean; // Conditional display
-}
+import { navigation } from './nav-link';
 
 interface DashboardSidebarProps {
   className?: string;
@@ -46,36 +24,7 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
   const searchParams = useSearchParams();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
 
-  // Navigation sections - Always show all sections
-  const navigation: NavSection[] = [
-    {
-      title: 'Discover',
-      show: true,
-      items: [
-        { name: 'Explore Auctions', href: '/', icon: Compass },
-        { name: 'Ending Soon', href: '/?filter=ending-soon', icon: Zap },
-        { name: 'Recently Settled', href: '/?filter=settled', icon: CheckCircle },
-      ],
-    },
-    {
-      title: 'My Activity',
-      show: true,
-      items: [
-        { name: 'My Dashboard', href: '/my', icon: LayoutDashboard },
-        { name: 'My Bids', href: '/my/bids', icon: TrendingUp },
-        { name: 'My Wins', href: '/my/settlements', icon: Trophy },
-      ],
-    },
-    {
-      title: 'Creator',
-      show: true,
-      items: [
-        { name: 'My Auctions', href: '/creator/auctions', icon: Gavel },
-        { name: 'Analytics', href: '/creator/analytics', icon: BarChart },
-        { name: 'Withdrawals', href: '/creator/withdrawals', icon: Wallet },
-      ],
-    },
-  ];
+  
 
   const isActiveRoute = (href: string) => {
     // Split href into path and query

@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Compass, LayoutDashboard, Plus, Gavel, Menu } from 'lucide-react';
-import { useUIStore } from '@/store/ui-store';
 import { cn } from '@/lib/utils';
+import { useUIStore } from '@/store/ui-store';
+import { APP_ROUTES } from '@/config/app.route';
 
 export function MobileBottomNav() {
   const pathname = usePathname();
@@ -12,10 +13,10 @@ export function MobileBottomNav() {
 
   // Always show all nav items
   const navItems = [
-    { name: 'Explore', href: '/', icon: Compass, show: true },
-    { name: 'Dashboard', href: '/my', icon: LayoutDashboard, show: true },
-    { name: 'Create', href: '/create-auction', icon: Plus, show: true, highlight: true },
-    { name: 'Auctions', href: '/creator/auctions', icon: Gavel, show: true },
+    { name: 'Explore', href: APP_ROUTES.home, icon: Compass, show: true },
+    { name: 'Dashboard', href: APP_ROUTES.bidSummary, icon: LayoutDashboard, show: true },
+    { name: 'Create', href: APP_ROUTES.creatorCreate, icon: Plus, show: true, highlight: true },
+    { name: 'Auctions', href: APP_ROUTES.creatorAuctions, icon: Gavel, show: true },
     { name: 'Menu', href: '#', icon: Menu, show: true, action: () => setMobileMenuOpen(true) },
   ].filter(item => item.show);
 

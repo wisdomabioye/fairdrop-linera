@@ -23,7 +23,7 @@ export function WalletConnectionPrompt({
   description = 'Connect your wallet to access this feature. You\'ll be able to interact with auctions and manage your account.',
   showAlternativeAction = true,
   alternativeActionText = 'Browse active auctions',
-  alternativeActionHref = APP_ROUTES.activeAuctions,
+  alternativeActionHref = APP_ROUTES.home,
   onAlternativeAction,
   className,
 }: WalletConnectionPromptProps) {

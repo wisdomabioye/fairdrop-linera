@@ -38,7 +38,7 @@ export function AuctionCard({
     if (onViewDetails) {
       onViewDetails(auction.auctionId);
     } else {
-      router.push(APP_ROUTES.auctionDetail(auction.auctionId));
+      router.push(APP_ROUTES.auction(auction.auctionId.toString()));
     }
   };
 

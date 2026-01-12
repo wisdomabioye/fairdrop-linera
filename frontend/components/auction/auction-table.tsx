@@ -59,7 +59,7 @@ export function AuctionTable({ auctions, onBidClick, onClaimClick }: AuctionTabl
                 auction={auction}
                 onBidClick={onBidClick}
                 onClaimClick={onClaimClick}
-                onViewDetails={() => router.push(APP_ROUTES.auctionDetail(auction.auctionId))}
+                onViewDetails={() => router.push(APP_ROUTES.auction(auction.auctionId.toString()))}
               />
             ))}
           </tbody>

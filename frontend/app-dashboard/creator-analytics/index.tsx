@@ -13,7 +13,7 @@ export default function CreatorAnalytics() {
 
   if (!isConnected) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="mx-auto my-6 py-6 max-w-xl">
         <WalletConnectionPrompt
           title="Connect Your Wallet"
           description="Connect your wallet to view your creator analytics."

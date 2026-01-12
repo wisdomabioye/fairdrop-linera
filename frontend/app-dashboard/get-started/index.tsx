@@ -2,10 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useWalletConnection } from 'linera-react-client';
+import { Plus, Gavel, BarChart, Wallet, CheckCircle } from 'lucide-react';
 import { WalletConnectionPrompt } from '@/components/wallet/wallet-connection-prompt';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Gavel, BarChart, Wallet, CheckCircle } from 'lucide-react';
+import { APP_ROUTES } from '@/config/app.route';
 
 export default function CreatorGetStarted() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function CreatorGetStarted() {
 
   if (!isConnected) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="mx-auto my-6 py-6 max-w-xl">
         <WalletConnectionPrompt
           title="Connect Your Wallet"
           description="Connect your wallet to get started as a creator."
@@ -27,7 +28,7 @@ export default function CreatorGetStarted() {
       icon: Plus,
       title: 'Create Your First Auction',
       description: 'Set up a descending-price auction with uniform clearing. Define your item, pricing, and duration.',
-      action: () => router.push('/create-auction'),
+      action: () => router.push(APP_ROUTES.creatorCreate),
       buttonText: 'Create Auction',
       buttonVariant: 'default' as const,
     },
@@ -35,7 +36,7 @@ export default function CreatorGetStarted() {
       icon: Gavel,
       title: 'Manage Active Auctions',
       description: 'Monitor your live auctions, track bids, and view real-time performance metrics.',
-      action: () => router.push('/creator/auctions'),
+      action: () => router.push(APP_ROUTES.creatorAuctions),
       buttonText: 'View My Auctions',
       buttonVariant: 'outline' as const,
     },
@@ -43,7 +44,7 @@ export default function CreatorGetStarted() {
       icon: BarChart,
       title: 'Track Analytics',
       description: 'Analyze your auction performance, revenue trends, and bidder engagement.',
-      action: () => router.push('/creator/analytics'),
+      action: () => router.push(APP_ROUTES.creator),
       buttonText: 'View Analytics',
       buttonVariant: 'outline' as const,
     },
@@ -51,7 +52,7 @@ export default function CreatorGetStarted() {
       icon: Wallet,
       title: 'Withdraw Proceeds',
       description: 'Collect your earnings from settled auctions and manage your revenue.',
-      action: () => router.push('/creator/withdrawals'),
+      action: () => router.push(APP_ROUTES.aacBalance),
       buttonText: 'Manage Withdrawals',
       buttonVariant: 'outline' as const,
     },

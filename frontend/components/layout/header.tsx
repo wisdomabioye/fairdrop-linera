@@ -16,8 +16,8 @@ interface NavLink {
 
 const NAV_LINKS: NavLink[] = [
   {
-    label: 'Active Auctions',
-    href: APP_ROUTES.activeAuctions,
+    label: 'Explore Auctions',
+    href: APP_ROUTES.home,
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -25,17 +25,8 @@ const NAV_LINKS: NavLink[] = [
     ),
   },
   {
-    label: 'Settled Auctions',
-    href: APP_ROUTES.settledAuctions,
-    icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
     label: 'My Tokens',
-    href: APP_ROUTES.myTokens,
+    href: APP_ROUTES.aacBalance,
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -53,7 +44,7 @@ const NAV_LINKS: NavLink[] = [
   },
   {
     label: 'Create Auction',
-    href: APP_ROUTES.createAuction,
+    href: APP_ROUTES.creatorCreate,
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

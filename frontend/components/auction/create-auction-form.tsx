@@ -23,7 +23,7 @@ import { ImageUpload } from '@/components/shared';
 import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
 import { CreatorBalanceCheck } from './creator-balance-check';
-import { DepositDialog } from '@/app-pages/aac-balances/deposit-dialog';
+import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
 import { getAuctionTokenList, getPaymentTokenList, getTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { APP_ROUTES } from '@/config/app.route';
 import { useSyncStatus } from '@/providers';
@@ -135,7 +135,7 @@ export function CreateAuctionFormMultistep({
         if (onAuctionCreateSuccess) {
           await onAuctionCreateSuccess(auctionId);
         } 
-        router.push(APP_ROUTES.myAuctions);
+        router.push(APP_ROUTES.creatorAuctions);
       }
     },
     onError: (event) => {

@@ -20,11 +20,10 @@ const FOOTER_SECTIONS: FooterSection[] = [
   {
     title: 'Platform',
     links: [
-      { label: 'Active Auctions', href: APP_ROUTES.activeAuctions },
-      { label: 'Settled Auctions', href: APP_ROUTES.settledAuctions },
+      { label: 'Explore Auctions', href: APP_ROUTES.home },
       { label: 'Faucet', href: APP_ROUTES.faucet },
-      { label: 'My Auctions', href: APP_ROUTES.myAuctions },
-      { label: 'Create Auction', href: APP_ROUTES.createAuction },
+      { label: 'My Auctions', href: APP_ROUTES.creatorAuctions },
+      { label: 'Create Auction', href: APP_ROUTES.creatorCreate },
     ],
   },
   {

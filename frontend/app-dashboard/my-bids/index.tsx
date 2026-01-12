@@ -21,7 +21,7 @@ export default function MyBids() {
 
   if (!isConnected) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="mx-auto my-6 py-6 max-w-xl">
         <WalletConnectionPrompt
           title="Connect Your Wallet"
           description="Connect your wallet to view your bids."
@@ -62,7 +62,7 @@ export default function MyBids() {
             <BidCommitmentCard
               key={item.auctionId}
               auctionId={item.auctionId.toString()}
-              commitment={item.quantity}
+              totalQuantity={item.quantity}
               aacApp={aacApp.app}
             />
           ))}
@@ -75,11 +75,11 @@ export default function MyBids() {
 // Component to fetch and display auction with commitment badge
 function BidCommitmentCard({
   auctionId,
-  commitment,
+  totalQuantity,
   aacApp,
 }: {
   auctionId: string;
-  commitment: UserCommitment;
+  totalQuantity: number;
   aacApp: ApplicationClient | null;
 }) {
   const { auction, loading } = useCachedAuctionSummary({
@@ -97,7 +97,7 @@ function BidCommitmentCard({
       {/* Commitment Badge */}
       <div className="absolute top-2 right-2 z-10">
         <div className="bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs font-semibold shadow-lg">
-          Qty: {commitment.totalQuantity}
+          Qty: {totalQuantity}
         </div>
       </div>
       <AuctionCard auction={auction} />
