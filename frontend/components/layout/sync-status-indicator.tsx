@@ -27,11 +27,11 @@ export function SyncStatusIndicator() {
         {/* Status Text */}
         <div className="flex items-center gap-2 text-sm">
           {isWalletClientSyncing && isPublicClientSyncing ? (
-            <span className="font-medium text-foreground">Syncing wallet & public</span>
+            <span className="font-medium text-foreground">Syncing wallet & AAC</span>
           ) : isWalletClientSyncing ? (
             <span className="font-medium text-foreground">Syncing Wallet Chain</span>
           ) : (
-            <span className="font-medium text-foreground">Syncing Public Chain</span>
+            <span className="font-medium text-foreground">Syncing Auction Chain</span>
           )}
         </div>
 
