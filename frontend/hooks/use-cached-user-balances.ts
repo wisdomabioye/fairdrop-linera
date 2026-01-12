@@ -51,7 +51,6 @@ export interface UseCachedUserBalancesResult {
     isStale: boolean;
     /** Manually refetch balances */
     refetch: () => Promise<void>;
-    invalidateAndRefreshUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient) => Promise<void>;
 }
 
 export function useCachedUserBalances(
@@ -139,6 +138,5 @@ export function useCachedUserBalances(
         status,
         isStale,
         refetch,
-        invalidateAndRefreshUserBalances
     };
 }

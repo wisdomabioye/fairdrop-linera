@@ -481,7 +481,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionInfo(auctionId))
                 );
-                console.log('AuctionInfo', result);
+                // console.log('AuctionInfo', result);
                 const parsed = JSON.parse(result) as {
                     data: { auctionInfo: AuctionWithId | null } | null
                 };

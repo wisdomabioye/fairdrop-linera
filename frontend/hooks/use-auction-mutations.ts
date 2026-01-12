@@ -272,20 +272,28 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-
                 const tokenApps = getTokenList().map(token => token.appId);
-
+                await trigger();
                 // Invalidate and force refresh affected caches
-                await Promise.all([
-                    invalidateAndRefreshAuction(auctionId.toString(), aacApp),
-                    invalidateAndRefreshUserBids(auctionId.toString(), address, aacApp),
-                    invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp),
-                    invalidateAndRefreshUserBalances(
+                await invalidateAndRefreshAuction(auctionId.toString(), aacApp);
+                await invalidateAndRefreshUserBids(auctionId.toString(), address, aacApp);
+                await invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp);
+                await invalidateAndRefreshUserBalances(
                         aacApp.wallet.getAddress(), 
                         tokenApps, 
                         aacApp
                     ) // on aac hain
-                ]);
+
+                // await Promise.all([
+                //     invalidateAndRefreshAuction(auctionId.toString(), aacApp),
+                //     invalidateAndRefreshUserBids(auctionId.toString(), address, aacApp),
+                //     invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp),
+                //     invalidateAndRefreshUserBalances(
+                //         aacApp.wallet.getAddress(), 
+                //         tokenApps, 
+                //         aacApp
+                //     ) // on aac hain
+                // ]);
 
                 onSuccess?.({ type: 'buy', data: { auctionId, quantity } });
                 return true;
@@ -574,7 +582,7 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate and force refresh user balances (proceeds go to user's balance)
+                // Invalidate and force refresh user balances (proceeds goes to user's balance)
                 const tokenApps = getTokenList().map(token => token.appId);
                 await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac chain
 
