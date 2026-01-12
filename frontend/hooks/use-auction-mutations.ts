@@ -124,7 +124,7 @@ export function useAuctionMutations(
     const { address } = useWalletConnection();
     const { walletChainId } = useLineraClient();
     // Get sync status
-    const { isClientSyncing } = useSyncStatus();
+    const { isWalletClientSyncing } = useSyncStatus();
 
     // Get store actions for cache invalidation and refresh
     const {
@@ -184,7 +184,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'create', error: err });
@@ -233,7 +233,7 @@ export function useAuctionMutations(
                 setIsCreating(false);
             }
         },
-        [aacApp, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -255,7 +255,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'buy', error: err });
@@ -311,7 +311,7 @@ export function useAuctionMutations(
                 setIsBuying(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -326,7 +326,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'claim', error: err });
@@ -367,7 +367,7 @@ export function useAuctionMutations(
                 setIsClaiming(false);
             }
         },
-        [aacApp, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -382,7 +382,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'deposit', error: err });
@@ -431,7 +431,7 @@ export function useAuctionMutations(
                 setIsDepositing(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -446,7 +446,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'withdraw', error: err });
@@ -498,7 +498,7 @@ export function useAuctionMutations(
                 setIsWithdrawing(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -513,7 +513,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'cancel', error: err });
@@ -550,7 +550,7 @@ export function useAuctionMutations(
                 setIsCancelling(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -565,7 +565,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'withdrawProceed', error: err });
@@ -602,7 +602,7 @@ export function useAuctionMutations(
                 setIsWithdrawingProceed(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -617,7 +617,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'withdrawUnsoldToken', error: err });
@@ -654,7 +654,7 @@ export function useAuctionMutations(
                 setIsWithdrawingUnsoldToken(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     /**
@@ -669,7 +669,7 @@ export function useAuctionMutations(
                 return false;
             }
 
-            if (isClientSyncing) {
+            if (isWalletClientSyncing) {
                 const err = new Error('Client is syncing, please wait');
                 setError(err);
                 onError?.({ type: 'prune', error: err });
@@ -705,7 +705,7 @@ export function useAuctionMutations(
                 setIsPruning(false);
             }
         },
-        [aacApp, address, onSuccess, onError, trigger, isClientSyncing]
+        [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
     return {

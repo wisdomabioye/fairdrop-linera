@@ -37,10 +37,8 @@ export default function MyAuctionsPage() {
         refetch: refetchCreated
     } = useCachedAuctionsByCreator({
         creator: address!,
-        offset: 0,
-        limit: 20,
         aacApp: aacApp.app,
-        skip: !address || !aacApp.app
+        skip: !address || !aacApp.app,
     });
 
     const handleBidClick = (auctionId: number) => {

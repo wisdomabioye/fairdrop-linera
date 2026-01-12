@@ -36,7 +36,7 @@ export function BidForm({
 }: BidFormProps) {
   const aacApp = useAacApp();
   const { isConnected, isConnecting, connect } = useWalletConnection();
-  const { isClientSyncing } = useSyncStatus();
+  const { isWalletClientSyncing } = useSyncStatus();
   const [quantity, setQuantity] = useState(1);
 
   // Fetch user's current commitment
@@ -259,7 +259,7 @@ export function BidForm({
                 variant="outline"
                 size="icon"
                 onClick={handleIncrement}
-                disabled={quantity >= availableSupply || isBuying || isClientSyncing}
+                disabled={quantity >= availableSupply || isBuying}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -327,11 +327,11 @@ export function BidForm({
             )}
             <Button
               type="submit"
-              disabled={!canSubmit || isClientSyncing}
+              disabled={!canSubmit || isWalletClientSyncing}
               className={cn('gap-2', onCancel ? 'flex-1' : 'w-full')}
             >
               {
-              isClientSyncing ?
+              isWalletClientSyncing ?
               (
                 <>
                   <Spinner className="h-4 w-4" />

@@ -8,18 +8,8 @@
  * - Reference counting: starts polling when first subscriber connects,
  *   stops when last unsubscribes
  * - Adaptive polling: slows down when tab is inactive
+ * - Uses setTimeout instead of setInterval to prevent overlapping executions
  * - Efficient resource management
- *
- * Example:
- * const manager = new PollingManager();
- *
- * // Component 1 subscribes
- * const unsub1 = manager.subscribe('auction-123', fetchAuction, 5000);
- *
- * // Component 2 subscribes (reuses same interval)
- * const unsub2 = manager.subscribe('auction-123', fetchAuction, 5000);
- *
- * // When both unsubscribe, polling stops automatically
  */
 
 type UnsubscribeFn = () => void;
@@ -28,9 +18,10 @@ interface PollingSubscription {
   key: string;
   callback: () => Promise<void> | void;
   interval: number;
-  intervalId: NodeJS.Timeout | null;
+  timeoutId: ReturnType<typeof setTimeout> | null;
   subscribers: Set<string>;
   isPaused: boolean;
+  isExecuting: boolean;
 }
 
 export class PollingManager {
@@ -92,9 +83,10 @@ export class PollingManager {
         key,
         callback,
         interval,
-        intervalId: null,
+        timeoutId: null,
         subscribers: new Set([subscriberId]),
         isPaused: false,
+        isExecuting: false,
       };
 
       this.subscriptions.set(key, subscription);
@@ -145,7 +137,7 @@ export class PollingManager {
   }
 
   /**
-   * Start polling for a subscription
+   * Start polling using setTimeout (non-overlapping)
    */
   private startPolling(subscription: PollingSubscription): void {
     // Don't start if tab is inactive
@@ -154,22 +146,56 @@ export class PollingManager {
       return;
     }
 
-    // Execute callback immediately
-    this.executeCallback(subscription);
+    // Execute immediately on start
+    this.scheduleNext(subscription, 0);
+  }
 
-    // Set up interval
-    subscription.intervalId = setInterval(() => {
-      this.executeCallback(subscription);
-    }, subscription.interval);
+  /**
+   * Schedule the next poll execution
+   */
+  private scheduleNext(subscription: PollingSubscription, delay: number): void {
+    // Clear any existing timeout
+    if (subscription.timeoutId) {
+      clearTimeout(subscription.timeoutId);
+      subscription.timeoutId = null;
+    }
+
+    // Don't schedule if paused or no subscribers
+    if (subscription.isPaused || subscription.subscribers.size === 0) {
+      return;
+    }
+
+    subscription.timeoutId = setTimeout(async () => {
+      // Skip if already executing (shouldn't happen with setTimeout, but safety check)
+      if (subscription.isExecuting) {
+        this.scheduleNext(subscription, subscription.interval);
+        return;
+      }
+
+      subscription.isExecuting = true;
+
+      try {
+        await subscription.callback();
+      } catch (error) {
+        console.error(`[PollingManager] Error in callback for key: ${subscription.key}`, error);
+      } finally {
+        subscription.isExecuting = false;
+
+        // Schedule next only if still active
+        if (!subscription.isPaused && subscription.subscribers.size > 0) {
+          this.scheduleNext(subscription, subscription.interval);
+        }
+      }
+    }, delay);
   }
 
   /**
    * Stop polling for a subscription
    */
   private stopPolling(subscription: PollingSubscription): void {
-    if (subscription.intervalId) {
-      clearInterval(subscription.intervalId);
-      subscription.intervalId = null;
+    if (subscription.timeoutId) {
+      clearTimeout(subscription.timeoutId);
+      subscription.timeoutId = null;
     }
   }
 
@@ -177,11 +203,11 @@ export class PollingManager {
    * Pause polling for a subscription
    */
   private pausePolling(subscription: PollingSubscription): void {
-    if (subscription.intervalId) {
-      clearInterval(subscription.intervalId);
-      subscription.intervalId = null;
-      subscription.isPaused = true;
+    if (subscription.timeoutId) {
+      clearTimeout(subscription.timeoutId);
+      subscription.timeoutId = null;
     }
+    subscription.isPaused = true;
   }
 
   /**
@@ -189,18 +215,8 @@ export class PollingManager {
    */
   private resumePolling(subscription: PollingSubscription): void {
     subscription.isPaused = false;
-    this.startPolling(subscription);
-  }
-
-  /**
-   * Execute the callback with error handling
-   */
-  private async executeCallback(subscription: PollingSubscription): Promise<void> {
-    try {
-      await subscription.callback();
-    } catch (error) {
-      console.error(`[PollingManager] Error in callback for key: ${subscription.key}`, error);
-    }
+    // Resume with full interval delay (not immediately)
+    this.scheduleNext(subscription, subscription.interval);
   }
 
   /**
@@ -209,8 +225,15 @@ export class PollingManager {
    */
   async trigger(key: string): Promise<void> {
     const subscription = this.subscriptions.get(key);
-    if (subscription) {
-      await this.executeCallback(subscription);
+    if (subscription && !subscription.isExecuting) {
+      subscription.isExecuting = true;
+      try {
+        await subscription.callback();
+      } catch (error) {
+        console.error(`[PollingManager] Error in trigger for key: ${key}`, error);
+      } finally {
+        subscription.isExecuting = false;
+      }
     }
   }
 

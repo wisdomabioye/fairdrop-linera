@@ -46,8 +46,6 @@ export default function DashboardOverview() {
     offset: 0,
     limit: 20,
     aacApp: aacApp.app,
-    pollInterval: 30000,
-    enablePolling: true,
   });
 
   const handleBidClick = (auctionId: number) => {

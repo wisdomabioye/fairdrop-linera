@@ -1,128 +1,116 @@
-'use client'
+'use client';
 
 /**
- * Eagerly load needed data with Progressive Loading strategy
+ * EagerLoader - Centralized Background Data Fetching
  *
- * Loading Priority Tiers:
- * - Tier 1 (T=0ms): Critical - Active Auctions (homepage must-have)
- * - Tier 2 (T=500ms): Important - Settled Auctions (visible tabs)
- * - Tier 3 (T=1000ms): User Data - Creator auctions, Commitments (wallet-gated)
- * - Tier 4 (T=1500ms): Nice-to-Have - Token balances (background updates)
+ * Manages polling for LIST data only:
+ * - Active auctions list (polling)
+ * - Settled auctions list (no polling - rarely changes)
+ * - User's created auctions (no polling - user triggers refetch)
+ * - User's token balances (polling - can change externally)
+ *
+ * Individual auction detail polling is handled by useCachedAuctionSummary.
  */
-import { useEffect, useState } from 'react';
-import { useLineraClient, useLineraApplication } from 'linera-react-client';
-import {
-    useCachedActiveAuctions,
-    useCachedSettledAuctions,
-    useCachedAuctionsByCreator,
-    useCachedUserBalances,
-    useAacApp
-} from '@/hooks';
+
+import { useEffect, useRef } from 'react';
+import { useLineraClient } from 'linera-react-client';
+import { useAuctionStore } from '@/store/auction-store';
+import { pollingManager } from '@/lib/utils/polling-manager';
+import { useAacApp } from '@/hooks';
 import { getTokenList } from '@/config/app.token-store';
 
-export function EagerLoader({
-    children
-}: {
-    children: React.ReactNode;
-}) {
-    const { isConnected, walletAddress } = useLineraClient();
-    const aacApp = useAacApp();
+const POLLING = {
+  ACTIVE: 10_000,   // 10s - prices change frequently
+  BALANCES: 15_000, // 15s - balances can change from deposits/bids
+} as const;
 
-    // ============ Get Token Applications ============
-    const tokens = getTokenList();
+const PAGE_SIZE = 20;
 
-    // ============ Progressive Loading State ============
-    const [loadTier2, setLoadTier2] = useState(false); // Settled auctions
-    const [loadTier3, setLoadTier3] = useState(false); // User data
-    const [loadTier4, setLoadTier4] = useState(false); // Token balances
+export function EagerLoader({ children }: { children: React.ReactNode }) {
+  const { isConnected, walletAddress } = useLineraClient();
+  const aacApp = useAacApp();
+  const tokens = getTokenList();
 
-    // ============ Progressive Loading Timers ============
-    useEffect(() => {
-        // Tier 2: Load after 500ms
-        const tier2Timer = setTimeout(() => {
-            setLoadTier2(true);
-        }, 500);
+  const {
+    fetchActiveAuctions,
+    fetchSettledAuctions,
+    fetchAuctionsByCreator,
+    fetchUserBalances,
+    startPollingActiveAuctions,
+  } = useAuctionStore();
 
-        // Tier 3: Load after 1000ms (only if wallet connected)
-        const tier3Timer = setTimeout(() => {
-            if (isConnected) {
-                setLoadTier3(true);
-            }
-        }, 1000);
+  // Track cleanup functions
+  const activePollingCleanup = useRef<(() => void) | null>(null);
+  const balancePollingCleanup = useRef<(() => void) | null>(null);
+  const tier2Loaded = useRef(false);
+  const tier3Loaded = useRef(false);
 
-        // Tier 4: Load after 1500ms (only if wallet connected)
-        const tier4Timer = setTimeout(() => {
-            if (isConnected) {
-                setLoadTier4(true);
-            }
-        }, 1500);
+  // ============ TIER 1: Active Auctions (Immediate + Polling) ============
+  useEffect(() => {
+    if (!aacApp.app) return;
 
-        return () => {
-            clearTimeout(tier2Timer);
-            clearTimeout(tier3Timer);
-            clearTimeout(tier4Timer);
-        };
-    }, [isConnected]);
+    // Initial fetch
+    fetchActiveAuctions(0, PAGE_SIZE, aacApp.app);
 
-    // Update Tier 3 and 4 when wallet connects
-    useEffect(() => {
-        if (isConnected) {
-            // If user connects wallet after initial load, trigger Tier 3/4 after short delay
-            const tier3Delay = setTimeout(() => setLoadTier3(true), 100);
-            const tier4Delay = setTimeout(() => setLoadTier4(true), 600);
+    // Start polling
+    activePollingCleanup.current = startPollingActiveAuctions(0, PAGE_SIZE, aacApp.app, POLLING.ACTIVE);
 
-            return () => {
-                clearTimeout(tier3Delay);
-                clearTimeout(tier4Delay);
-            };
-        }
-    }, [isConnected]);
+    return () => {
+      activePollingCleanup.current?.();
+      activePollingCleanup.current = null;
+    };
+  }, [aacApp.app, fetchActiveAuctions, startPollingActiveAuctions]);
 
-    // ============ TIER 1: CRITICAL (T=0) - Homepage Must-Haves ============
-    // Load active auctions immediately - critical for homepage
-    // IMPORTANT: limit must match active-auction page (20) to avoid conflicts
-    useCachedActiveAuctions({
-        aacApp: aacApp.app,
-        limit: 20,
-        offset: 0,
-        skip: false,
-        enablePolling: true,
-    });
+  // ============ TIER 2: Settled Auctions (Delayed 500ms, no polling) ============
+  useEffect(() => {
+    if (!aacApp.app || tier2Loaded.current) return;
 
-    // ============ TIER 2: IMPORTANT (T=500ms) - Visible Tabs ============
-    // Load settled auctions after initial render
-    useCachedSettledAuctions({
-        aacApp: aacApp.app,
-        limit: 20,
-        offset: 0,
-        skip: !loadTier2,
-        enablePolling: loadTier2,
-    });
+    const timer = setTimeout(() => {
+      tier2Loaded.current = true;
+      fetchSettledAuctions(0, PAGE_SIZE, aacApp.app!);
+    }, 500);
 
-    // ============ TIER 3: USER DATA (T=1000ms) - Personalization ============
-    // Load user's created auctions (wallet-gated)
-    useCachedAuctionsByCreator({
-        creator: walletAddress ?? '',
-        aacApp: aacApp.app,
-        limit: 20,
-        offset: 0,
-        skip: !walletAddress || !loadTier3,
-        enablePolling: !!walletAddress && loadTier3,
-    });
+    return () => clearTimeout(timer);
+  }, [aacApp.app, fetchSettledAuctions]);
 
-    // Load user's created auctions (wallet-gated)
-    useCachedUserBalances({
-        address: walletAddress ?? '',
-        tokenApps: tokens.map(t => t.appId),
-        aacApp: aacApp.app,
-        skip: !walletAddress || !loadTier3
-    })
+  // ============ TIER 3: User Data (Wallet-gated, delayed 1000ms) ============
+  useEffect(() => {
+    // Cleanup previous polling when wallet changes/disconnects
+    if (balancePollingCleanup.current) {
+      balancePollingCleanup.current();
+      balancePollingCleanup.current = null;
+    }
 
-    // ============ TIER 4: NICE-TO-HAVE (T=1500ms) - Background Updates ============
-    // Load balances and token info for all supported tokens
-    // todo: add other non-critical fetches
+    if (!aacApp.app || !isConnected || !walletAddress) {
+      tier3Loaded.current = false;
+      return;
+    }
 
-    return (
-        children
-    )
+    if (tier3Loaded.current) return;
+
+    const tokenAppIds = tokens.map(t => t.appId);
+
+    const timer = setTimeout(() => {
+      tier3Loaded.current = true;
+
+      // Initial fetches
+      fetchAuctionsByCreator(walletAddress, aacApp.app!);
+      fetchUserBalances(walletAddress, tokenAppIds, aacApp.app!);
+
+      // Start polling for user balances
+      balancePollingCleanup.current = pollingManager.subscribe(
+        `user-balances-${walletAddress}`,
+        () => fetchUserBalances(walletAddress, tokenAppIds, aacApp.app!),
+        POLLING.BALANCES
+      );
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      balancePollingCleanup.current?.();
+      balancePollingCleanup.current = null;
+    };
+  }, [aacApp.app, isConnected, walletAddress, tokens, fetchAuctionsByCreator, fetchUserBalances]);
+
+  return <>{children}</>;
 }

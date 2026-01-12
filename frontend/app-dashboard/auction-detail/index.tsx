@@ -1,5 +1,6 @@
 'use client';	
 
+import { useCallback } from 'react';
 import { cn } from '@/lib/utils';	
 import { toast } from 'sonner';	
 import { useParams, useRouter } from 'next/navigation';	
@@ -30,7 +31,8 @@ export default function AuctionDetailPage() {
   const auctionId = params?.auctionId as string || '';	
   const aacApp = useAacApp();	
 
-  // Fetch auction details	
+  // Fetch auction details - NO POLLING here, EagerLoader handles list polling
+  // This fetches individual auction which isn't covered by EagerLoader
   const {	
     auction,	
     loading,	
@@ -39,18 +41,24 @@ export default function AuctionDetailPage() {
   } = useCachedAuctionSummary({	
     auctionId,	
     aacApp: aacApp.app,	
-    enablePolling: true,	
+    enablePolling: true, // Keep polling for individual auction detail
+    pollInterval: 10_000, // 10s
     skip: !auctionId || !aacApp.app	
   });	
 
-  // Fetch user's commitment	
+  // Fetch user's commitment - no polling needed, refetch on success
   const { totalQuantity } = useCachedUserBidRecord({	
     auctionId,	
     aacApp: aacApp.app,	
     skip: !auctionId || !aacApp.app?.wallet	
   });	
 
-  const handleShare = () => {	
+  // Memoize callbacks to prevent child re-renders
+  const handleSuccessCallback = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  const handleShare = useCallback(() => {	
     if (navigator.share) {	
       navigator.share({	
         title: auction?.itemName || 'Auction',	
@@ -60,11 +68,11 @@ export default function AuctionDetailPage() {
       navigator.clipboard.writeText(window.location.href);	
       toast.success('Link copied to clipboard');	
     }	
-  };	
+  }, [auction?.itemName]);
 
-  const handleBack = () => {	
+  const handleBack = useCallback(() => {	
     router.push('/');	
-  };	
+  }, [router]);
 
   // Initial Loading state	
   if (loading) {	
@@ -333,12 +341,8 @@ export default function AuctionDetailPage() {
           <DetailSidebarActions	
             auction={auction}	
             aacApp={aacApp.app}	
-            onBidSuccess={() => {	
-              refetch();	
-            }}	
-            onClaimSuccess={() => {	
-              refetch();	
-            }}	
+            onBidSuccess={handleSuccessCallback}
+            onClaimSuccess={handleSuccessCallback}
           />	
 
           {/* User's Commitment */}	
@@ -365,11 +369,16 @@ export default function AuctionDetailPage() {
 
           {/* Bid History - Scrollable */}	
           <Card>	
-            <CardHeader className="pb-3">	
-              <CardTitle className="text-base">Bid History</CardTitle>	
-              <p className="text-xs text-muted-foreground mt-1">Sorted: Recent to oldest</p>	
+            <CardHeader className="pb-2 px-3">	
+              <CardTitle className="text-sm">Bid History</CardTitle>	
+              <p className="text-[10px] text-muted-foreground">Recent → Oldest</p>	
             </CardHeader>	
-            <div className="max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">	
+            <div className="max-h-[400px] overflow-y-auto 
+              [&::-webkit-scrollbar]:w-1.5 
+              [&::-webkit-scrollbar-track]:bg-transparent 
+              [&::-webkit-scrollbar-thumb]:bg-border 
+              [&::-webkit-scrollbar-thumb]:rounded-full
+              hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30">	
               <BidHistory	
                 auctionId={auctionId}	
                 currentUserWalletAddress={aacApp.app?.wallet?.getAddress()}	
@@ -381,4 +390,4 @@ export default function AuctionDetailPage() {
       </div>	
     </div>	
   );	
-}	
+}

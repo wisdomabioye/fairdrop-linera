@@ -42,7 +42,7 @@ export default function AuctionDetailPage() {
   } = useCachedAuctionSummary({
     auctionId,
     aacApp: aacApp.app,
-    enablePolling: true,
+    enablePolling: false,
     skip: !auctionId || !aacApp.app
   });
 

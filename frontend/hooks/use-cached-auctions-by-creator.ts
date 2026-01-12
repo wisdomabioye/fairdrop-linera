@@ -1,183 +1,100 @@
 /**
  * useCachedAuctionsByCreator Hook
  *
- * Optimized hook for accessing auctions created by a specific user with intelligent caching.
- *
- * Features:
- * - Reads from centralized store (instant)
- * - Auto-fetches if data is missing or stale
- * - Optional polling with custom interval
- * - Stale-while-revalidate: shows cached data while fetching fresh data
- *
- * Usage:
- * ```tsx
- * const { auctions, loading, error, refetch } = useCachedAuctionsByCreator({
- *   creator: userAddress,
- *   offset: 0,
- *   limit: 20,
- *   indexerApp
- * });
- * ```
+ * Reads creator's auctions from centralized store with auto-fetch on stale/missing data.
+ * 
+ * NOTE: Polling is managed by EagerLoader, not this hook.
+ * This hook only reads from cache and triggers initial fetch if needed.
  */
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useSyncStatus } from '@/providers';
 import type { ApplicationClient } from 'linera-react-client';
 import type { AuctionSummary } from '@/lib/gql/types';
 
 export interface UseCachedAuctionsByCreatorOptions {
-    /** Creator's chain address */
-    creator: string;
-    /** Pagination offset (TEMPORARY: ignored, returns all) */
-    offset: number;
-    /** Pagination limit (TEMPORARY: ignored, returns all) */
-    limit: number;
-    /** The AAC (Auction Authority Chain) application client */
-    aacApp: ApplicationClient | null;
-    /** Enable automatic polling (default: false) */
-    enablePolling?: boolean;
-    /** Polling interval in milliseconds (default: 30000ms / 30 seconds) */
-    pollInterval?: number;
-    /** Skip fetching (useful when conditionally loading) */
-    skip?: boolean;
+  creator: string;
+  aacApp: ApplicationClient | null;
+  skip?: boolean;
 }
 
 export interface UseCachedAuctionsByCreatorResult {
-    /** List of auctions created by this creator */
-    auctions: AuctionSummary[] | null;
-    /** Is initial loading? (only true on very first fetch) */
-    loading: boolean;
-    /** Is currently fetching? (may be true while showing cached data) */
-    isFetching: boolean;
-    /** Any errors */
-    error: Error | null;
-    /** Fetch status: 'idle' | 'loading' | 'success' | 'error' */
-    status: 'idle' | 'loading' | 'success' | 'error';
-    /** Is cached data stale? */
-    isStale: boolean;
-    /** Manually refetch auctions */
-    refetch: () => Promise<void>;
+  auctions: AuctionSummary[] | null;
+  loading: boolean;
+  isFetching: boolean;
+  error: Error | null;
+  status: 'idle' | 'loading' | 'success' | 'error';
+  isStale: boolean;
+  refetch: () => Promise<void>;
 }
 
 export function useCachedAuctionsByCreator(
-    options: UseCachedAuctionsByCreatorOptions
+  options: UseCachedAuctionsByCreatorOptions
 ): UseCachedAuctionsByCreatorResult {
-    const {
-        creator,
-        // offset,  // TEMPORARY: not used, AAC returns all creator's auctions
-        // limit,   // TEMPORARY: not used, AAC returns all creator's auctions
-        aacApp,
-        enablePolling = false,
-        pollInterval = 10000,
-        skip = false
-    } = options;
+  const { creator, aacApp, skip = false } = options;
 
-    // Get sync status
-    const { isPublicClientSyncing } = useSyncStatus();
+  const { isPublicClientSyncing } = useSyncStatus();
 
-    // Subscribe to store
-    const {
-        auctionsByCreator,
-        allAuctionsCache,
-        fetchAuctionsByCreator,
-        isStale: checkIsStale
-    } = useAuctionStore();
+  const {
+    auctionsByCreator,
+    allAuctionsCache,
+    fetchAuctionsByCreator,
+    isStale: checkIsStale
+  } = useAuctionStore();
 
-    // Local state for polling interval
-    const [_pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-    
-    // Track if we've ever successfully loaded auctions for this creator
-    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // Use ref to track first load (no re-renders)
+  const hasLoadedOnce = useRef(false);
 
-    // Get auctions for this specific creator
-    const creatorAuctions = creator ? auctionsByCreator.get(creator) ?? null : null;
+  // Get auctions for this specific creator
+  const creatorEntry = creator ? auctionsByCreator.get(creator) : null;
 
-    // Derived state - map IDs to full auction data from normalized cache
-    const auctions = creatorAuctions?.auctionIds
-        ? creatorAuctions.auctionIds
-            .map(id => allAuctionsCache.get(id)?.data)
-            .filter(Boolean) as AuctionSummary[]
-        : null;
-    const status = creatorAuctions?.status ?? 'idle';
-    const isFetching = status === 'loading';
-    const error = creatorAuctions?.error ?? null;
-    const isStale = checkIsStale('auctionsByCreator', creator);
+  // Derive auctions from normalized cache
+  const auctions = creatorEntry?.auctionIds
+    ? creatorEntry.auctionIds
+        .map(id => allAuctionsCache.get(id)?.data)
+        .filter(Boolean) as AuctionSummary[]
+    : null;
 
-    // Update hasLoadedOnce when we get successful data
-    useEffect(() => {
-        if ((status === 'success' || auctions) && !hasLoadedOnce) {
-            setHasLoadedOnce(true);
-        }
-    }, [status, auctions, hasLoadedOnce]);
+  const status = creatorEntry?.status ?? 'idle';
+  const isFetching = status === 'loading';
+  const error = creatorEntry?.error ?? null;
+  const isStale = checkIsStale('auctionsByCreator', creator);
 
-    // CRITICAL: Only show loading on first load (before any data has been loaded)
-    // Once data has been fetched once, never show full loading skeleton again
-    // - First load: show skeleton
-    // - Refetching with cached data: show data with isFetching indicator
-    const loading = (
-        (status === 'loading' || (status === 'idle' && !skip && !!aacApp && !!creator))
-        && !hasLoadedOnce
-    );
+  // Track first successful load
+  if ((status === 'success' || auctions) && !hasLoadedOnce.current) {
+    hasLoadedOnce.current = true;
+  }
 
-    /**
-     * Fetch auctions by creator
-     */
-    const refetch = useCallback(async () => {
-        if (!aacApp || skip || !creator || isPublicClientSyncing) return;
+  const loading =
+    (status === 'loading' || (status === 'idle' && !skip && !!aacApp && !!creator)) &&
+    !hasLoadedOnce.current;
 
-        try {
-            // TEMPORARY: offset and limit not passed - AAC returns all creator's auctions
-            await fetchAuctionsByCreator(creator, aacApp);
-        } catch (err) {
-            console.error('[useCachedAuctionsByCreator] Refetch failed:', err);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [aacApp, skip, creator, isPublicClientSyncing]);
+  const refetch = useCallback(async () => {
+    if (!aacApp || skip || !creator || isPublicClientSyncing) return;
+    try {
+      await fetchAuctionsByCreator(creator, aacApp);
+    } catch (err) {
+      console.error('[useCachedAuctionsByCreator] Refetch failed:', err);
+    }
+  }, [aacApp, skip, creator, isPublicClientSyncing, fetchAuctionsByCreator]);
 
-    /**
-     * Initial fetch and refetch on stale
-     */
-    useEffect(() => {
-        if (skip || !aacApp || !creator || isPublicClientSyncing) return;
+  // Initial fetch
+  useEffect(() => {
+    if (skip || !aacApp || !creator || isPublicClientSyncing) return;
 
-        // Fetch if no data exists OR data is stale AND not currently loading
-        if ((!creatorAuctions || isStale) && !isFetching) {
-            refetch();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skip, aacApp, creator, isPublicClientSyncing, isStale]);
+    if ((!creatorEntry || isStale) && !isFetching) {
+      refetch();
+    }
+  }, [skip, aacApp, creator, isPublicClientSyncing, creatorEntry, isStale, isFetching, refetch]);
 
-    /**
-     * Setup polling if enabled
-     */
-    useEffect(() => {
-        if (!enablePolling || skip || !aacApp || !creator) {
-            return;
-        }
-
-        // Start polling using setInterval
-        const interval = setInterval(() => {
-            refetch();
-        }, pollInterval);
-
-        setPollingInterval(interval);
-
-        // Cleanup
-        return () => {
-            clearInterval(interval);
-            setPollingInterval(null);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enablePolling, skip, creator, pollInterval]);
-
-    return {
-        auctions,
-        loading,
-        isFetching,
-        error,
-        status,
-        isStale,
-        refetch
-    };
+  return {
+    auctions,
+    loading,
+    isFetching,
+    error,
+    status,
+    isStale,
+    refetch,
+  };
 }

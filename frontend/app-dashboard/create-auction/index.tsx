@@ -24,9 +24,7 @@ export default function CreatorAuctions() {
 
   const { auctions, loading } = useCachedAuctionsByCreator({
     aacApp: aacApp.app,
-    offset: 0,
-    limit: 20,
-    creator: address ?? ''
+    creator: address ?? '',
   });
 
   if (!isConnected) {

@@ -43,8 +43,8 @@ import {
 const AUCTION_DATA_TTL = 6000; // 6s (polling: 5s) - auction data changes frequently
 const AUCTION_LIST_TTL = 12000; // 12s (polling: 10s) - auction lists
 const BID_HISTORY_TTL = 6000; // 6s (polling: 5s) - bid history
-const USER_BID_TTL = 10000; // 10s - user commitments (no default polling)
-const USER_BALANCES_TTL = 10000; // 10s - user balances on AAC (deposits/withdrawals)
+const USER_BID_TTL = 30000; // 30s - user commitments (no default polling)
+const USER_BALANCES_TTL = 15000; // 15s - user balances on AAC (deposits/withdrawals)
 
 // Store types
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -382,7 +382,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
-                console.log('AllAuctions' , result)
+                // console.log('AllAuctions' , result)
                 const { data } = JSON.parse(result) as {
                     data: { allAuctions: AuctionWithId[] | null }
                 };
@@ -673,7 +673,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionsByCreator(creator))
                 );
-                console.log('AuctionsByCreator (AAC)', result);
+                // console.log('AuctionsByCreator (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { auctionsByCreator: AuctionWithId[] | null }
@@ -769,7 +769,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.BidHistory(auctionId, offset, limit))
                 );
-                console.log('BidHistory (AAC)', result);
+                // console.log('BidHistory (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { bidHistory: BidRecord[] | null }
@@ -854,7 +854,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     JSON.stringify(AAC_QUERY.UserBids(address, Number(auctionId)))
                 );
 
-                console.log('MyCommitmentForAuction:', JSON.parse(result));
+                // console.log('MyCommitmentForAuction:', JSON.parse(result));
 
                 const { data } = JSON.parse(result) as {
                     data: { userBids: BidRecord[] | null }

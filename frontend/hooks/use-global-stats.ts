@@ -15,9 +15,8 @@ interface GlobalStats {
 export function useGlobalStats() {
   const { auctions, loading, error } = useCachedActiveAuctions({
     offset: 0,
-    limit: 100,
+    limit: 20,
     aacApp: null,
-    enablePolling: false,
   });
 
   const stats: GlobalStats = {

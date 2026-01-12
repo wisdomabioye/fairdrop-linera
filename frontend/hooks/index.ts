@@ -53,6 +53,9 @@ export type {
 // Mutation hooks
 export { useAuctionMutations } from './use-auction-mutations';
 export type {
+    MutationType,
+    MutationSuccessEvent,
+    MutationErrorEvent,
     UseAuctionMutationsOptions,
     UseAuctionMutationsResult
 } from './use-auction-mutations';

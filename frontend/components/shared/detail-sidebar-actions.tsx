@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -16,6 +17,18 @@ export interface DetailSidebarActionsProps {
   onClaimSuccess?: () => void;
 }
 
+// Memoized BidForm wrapper - only re-renders when auction ID changes
+const MemoizedBidForm = memo(BidForm, (prevProps, nextProps) => {
+  // Only re-render if these key values actually changed
+  return (
+    prevProps.auction.auctionId === nextProps.auction.auctionId &&
+    prevProps.auction.currentPrice === nextProps.auction.currentPrice &&
+    prevProps.auction.sold === nextProps.auction.sold &&
+    prevProps.auction.status === nextProps.auction.status &&
+    prevProps.auction.totalBids === nextProps.auction.totalBids
+  );
+});
+
 /**
  * Status-aware sidebar actions component
  * - Active: Shows bid form
@@ -31,7 +44,7 @@ export function DetailSidebarActions({
   switch (auction.status) {
     case AuctionStatus.Active:
       return (
-        <BidForm
+        <MemoizedBidForm
           auction={auction}
           onSuccess={onBidSuccess}
         />

@@ -18,8 +18,6 @@ export function useCreatorStats() {
   const { auctions, loading, error } = useCachedAuctionsByCreator({
     creator: address || '',
     aacApp: null,
-    limit: 20,
-    offset: 0
   });
 
   const stats: CreatorStats = {

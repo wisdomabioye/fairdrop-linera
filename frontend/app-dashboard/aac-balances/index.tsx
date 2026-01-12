@@ -21,7 +21,8 @@ export default function AACBalances() {
   const tokens = getTokenList();
   const aacApp = useAacApp();
   
-  // Fetch balances for all tokens
+  // Fetch balances - NO polling here, EagerLoader handles it
+  // Just read from cache
   const {
     balances,
     loading,
@@ -33,6 +34,7 @@ export default function AACBalances() {
     tokenApps: tokens.map(t => t.appId),
     aacApp: aacApp.app,
     skip: !address || !aacApp.app
+    // No enablePolling - EagerLoader handles background updates
   });
 
   /** Not first load, i.e already loaded */
