@@ -24,7 +24,7 @@ import { useSyncStatus } from '@/providers';
 import { type ApplicationClient, useWalletConnection } from 'linera-react-client';
 import type { BidRecord } from '@/lib/gql/types';
 
-export interface UseCachedMyCommitmentOptions {
+export interface UseCachedUserBidRecordOptions {
     /** Auction ID */
     auctionId: string;
     /** The UIC (User Interaction Chain) application client */
@@ -33,13 +33,13 @@ export interface UseCachedMyCommitmentOptions {
     skip?: boolean;
 }
 
-export interface UseCachedMyCommitmentResult {
+export interface UseCachedUserBidRecordResult {
     /** User's total committed quantity */
     totalQuantity: number | null;
     /** Total Amount Paid */
     totalPaid: number | null;
     /** User bid data for this auction */
-    commitment: BidRecord[] | null;
+    userBidRecord: BidRecord[] | null;
     /** Is initial loading? (only true on very first fetch) */
     loading: boolean;
     /** Is currently fetching? (may be true while showing cached data) */
@@ -54,9 +54,9 @@ export interface UseCachedMyCommitmentResult {
     refetch: () => Promise<void>;
 }
 
-export function useCachedMyCommitment(
-    options: UseCachedMyCommitmentOptions
-): UseCachedMyCommitmentResult {
+export function useCachedUserBidRecord(
+    options: UseCachedUserBidRecordOptions
+): UseCachedUserBidRecordResult {
     const {
         auctionId,
         aacApp,
@@ -81,7 +81,7 @@ export function useCachedMyCommitment(
     const entry = auctionMap?.get(address);
 
     // Derived state
-    const commitment = entry?.data ?? null;
+    const userBidRecord = entry?.data ?? null;
     const status = entry?.status ?? 'idle';
     const isFetching = status === 'loading';
     const error = entry?.error ?? null;
@@ -89,10 +89,10 @@ export function useCachedMyCommitment(
 
     // Update hasLoadedOnce when we get successful data
     useEffect(() => {
-        if ((status === 'success' || commitment) && !hasLoadedOnce) {
+        if ((status === 'success' || userBidRecord) && !hasLoadedOnce) {
             setHasLoadedOnce(true);
         }
-    }, [status, commitment, hasLoadedOnce]);
+    }, [status, userBidRecord, hasLoadedOnce]);
 
     // CRITICAL: Only show loading on first load (before any data has been loaded)
     // Once data has been fetched once, never show full loading skeleton again
@@ -135,9 +135,9 @@ export function useCachedMyCommitment(
     }, [skip, aacApp, address, auctionId, isClientSyncing, isStale]);
 
     return {
-        totalQuantity: commitment?.reduce((prev, curr) => prev + curr.quantity, 0) ?? 0,
-        totalPaid: commitment?.reduce((prev, curr) => prev + curr.amountPaid, 0) ?? 0,
-        commitment,
+        totalQuantity: userBidRecord?.reduce((prev, curr) => prev + curr.quantity, 0) ?? 0,
+        totalPaid: userBidRecord?.reduce((prev, curr) => prev + curr.amountPaid, 0) ?? 0,
+        userBidRecord,
         loading,
         isFetching,
         error,

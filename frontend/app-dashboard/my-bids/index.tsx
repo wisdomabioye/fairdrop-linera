@@ -3,7 +3,7 @@
 import { TrendingUp } from 'lucide-react';
 import { type ApplicationClient, useWalletConnection, useLineraApplication } from 'linera-react-client';
 import { WalletConnectionPrompt } from '@/components/wallet/wallet-connection-prompt';
-import { useCachedAuctionSummary, useCachedMyCommitment } from '@/hooks';
+import { useCachedAuctionSummary, useCachedUserBidRecord } from '@/hooks';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { ViewToggle } from '@/components/dashboard/filter/view-toggle';
 import { EmptyState } from '@/components/loading/empty-state';
@@ -14,7 +14,7 @@ export default function MyBids() {
   const aacApp = useLineraApplication(AAC_APP_ID);
   const { isConnected } = useWalletConnection();
 
-  const { commitment: userBidRecord, loading } = useCachedMyCommitment({
+  const { userBidRecord, loading } = useCachedUserBidRecord({
     aacApp: aacApp.app,
     auctionId: '0'
   });

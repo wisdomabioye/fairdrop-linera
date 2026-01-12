@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WalletConnectButton } from '@/components/wallet';
 import { useSyncStatus } from '@/providers';
-import { useCachedMyCommitment } from '@/hooks/use-cached-my-bids';
+import { useCachedUserBidRecord } from '@/hooks/use-cached-my-bids';
 import { useAuctionMutations } from '@/hooks/use-auction-mutations';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
 import { getTokenByAppId } from '@/config/app.token-store';
@@ -38,13 +38,13 @@ export function ClaimForm({
   const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Fetch user's commitment
   const {
-    commitment,
+    userBidRecord,
     totalQuantity = 0,
     totalPaid = 0,
     loading,
     error: fetchError,
     isFetching
-  } = useCachedMyCommitment({
+  } = useCachedUserBidRecord({
     auctionId: auction.auctionId.toString(),
     aacApp,
     skip: !auction || !aacApp
@@ -151,7 +151,7 @@ export function ClaimForm({
   }
 
   // State 5: No commitment - user didn't participate
-  if (!commitment?.length) {
+  if (!userBidRecord?.length) {
     return (
       <Card>
         <CardHeader>
@@ -169,7 +169,7 @@ export function ClaimForm({
     );
   }
 
-  const claimed = commitment.filter(c => c.claimed).length === 0;
+  const claimed = userBidRecord.filter(c => c.claimed).length === 0;
   const hasAllocation = (totalQuantity || 0) > 0;
   const hasRefund = totalPaid && totalPaid > 0;
   const pricePerItem = (totalQuantity || 0) / (totalPaid || 0)
@@ -241,7 +241,7 @@ export function ClaimForm({
             <span className="font-semibold">{totalQuantity}</span>
           </div>
 
-          {commitment && totalQuantity && (
+          {userBidRecord && totalQuantity && (
             <>
               <Separator />
               <div className="space-y-2">

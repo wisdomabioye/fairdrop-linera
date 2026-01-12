@@ -32,10 +32,10 @@ export type {
     UseCachedBidHistoryResult
 } from './use-cached-bid-bistory';
 
-export { useCachedMyCommitment } from './use-cached-my-bids';
+export { useCachedUserBidRecord } from './use-cached-my-bids';
 export type {
-    UseCachedMyCommitmentOptions,
-    UseCachedMyCommitmentResult
+    UseCachedUserBidRecordOptions,
+    UseCachedUserBidRecordResult
 } from './use-cached-my-bids';
 
 export { useCachedSettledAuctions } from './use-cached-settled-auctions';

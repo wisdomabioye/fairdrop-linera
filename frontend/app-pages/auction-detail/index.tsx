@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Package, Share2 } from 'lucide-react';
 import { useWalletConnection } from 'linera-react-client';
-import { useCachedAuctionSummary, useCachedMyCommitment, useAacApp } from '@/hooks';
+import { useCachedAuctionSummary, useCachedUserBidRecord, useAacApp } from '@/hooks';
 import { BidHistory } from '@/components/auction/bid-history';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,7 +47,7 @@ export default function AuctionDetailPage() {
   });
 
   // Fetch user's commitment (for active auctions display)
-  const { commitment, totalQuantity } = useCachedMyCommitment({
+  const { userBidRecord, totalQuantity } = useCachedUserBidRecord({
     auctionId,
     aacApp: aacApp.app,
     skip: !auctionId || !aacApp.app
@@ -249,7 +249,7 @@ export default function AuctionDetailPage() {
           />
 
           {/* User's Commitment (for active auctions) */}
-          {auction.status === AuctionStatus.Active && commitment && !!totalQuantity && totalQuantity > 0 && (
+          {auction.status === AuctionStatus.Active && userBidRecord && !!totalQuantity && totalQuantity > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Your Bids</CardTitle>

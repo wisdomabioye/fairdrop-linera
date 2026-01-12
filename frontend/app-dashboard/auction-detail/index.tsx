@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';	
 import { useParams, useRouter } from 'next/navigation';	
 import { ArrowLeft, Share2, Clock, TrendingDown, Package2, Users, Zap, Trophy } from 'lucide-react';	
-import { useAacApp, useCachedAuctionSummary, useCachedMyCommitment } from '@/hooks';	
+import { useAacApp, useCachedAuctionSummary, useCachedUserBidRecord } from '@/hooks';	
 import { BidHistory } from '@/components/auction/bid-history';	
 import { Button } from '@/components/ui/button';	
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';	
@@ -44,7 +44,7 @@ export default function AuctionDetailPage() {
   });	
 
   // Fetch user's commitment	
-  const { totalQuantity } = useCachedMyCommitment({	
+  const { totalQuantity } = useCachedUserBidRecord({	
     auctionId,	
     aacApp: aacApp.app,	
     skip: !auctionId || !aacApp.app?.wallet	

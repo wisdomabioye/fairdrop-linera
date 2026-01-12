@@ -1,4 +1,4 @@
-import { useCachedMyCommitment, useAacApp } from '@/hooks';
+import { useCachedUserBidRecord, useAacApp } from '@/hooks';
 
 interface PersonalStats {
   activeBidsCount: number;
@@ -11,7 +11,7 @@ interface PersonalStats {
 export function usePersonalStats() {
   const aacApp = useAacApp();
 
-  const { commitment: userBidRecord, loading, error } = useCachedMyCommitment({
+  const { userBidRecord, loading, error } = useCachedUserBidRecord({
     aacApp: aacApp.app,
     auctionId: '0'
   });

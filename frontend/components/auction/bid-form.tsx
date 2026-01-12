@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Spinner } from '@/components/ui/spinner';
 import { useWalletConnection } from 'linera-react-client';
 import { useSyncStatus } from '@/providers';
-import { useAuctionMutations, useCachedMyCommitment, useAacApp } from '@/hooks';
+import { useAuctionMutations, useCachedUserBidRecord, useAacApp } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import { getTokenByAppId } from '@/config/app.token-store';
 import {
@@ -40,7 +40,7 @@ export function BidForm({
   const [quantity, setQuantity] = useState(1);
 
   // Fetch user's current commitment
-  const { totalQuantity, loading: loadingCommitment } = useCachedMyCommitment({
+  const { totalQuantity, loading: loadingBidRecord } = useCachedUserBidRecord({
     auctionId: auction.auctionId.toString(),
     aacApp: aacApp.app,
     skip: !aacApp.app
@@ -280,7 +280,7 @@ export function BidForm({
           </div>
 
           {/* Current Commitment */}
-          {loadingCommitment ? (
+          {loadingBidRecord ? (
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Spinner className="h-4 w-4" />
               <span>Loading your commitment...</span>
