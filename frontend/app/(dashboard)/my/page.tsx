@@ -1,12 +1,7 @@
 
 
-
+import { ComingSoon } from '@/components/loading';
 
 export default function MyBidSummary() {
-
-    return (
-        <div>
-            MyBidSummary
-        </div>
-    )
+    return <ComingSoon title="My Bid Summary" />;
 }
