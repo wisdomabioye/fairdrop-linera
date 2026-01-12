@@ -1,10 +1,9 @@
 /**
  * useCachedBidHistory Hook
  *
- * Reads bid history from centralized store with auto-fetch and optional polling.
+ * Reads bid history from centralized store with auto-fetch.
  * 
- * NOTE: This hook manages its own polling for individual auction bid history.
- * Bid history is per-auction and needs its own polling when viewing auction details.
+ * NOTE: Polling is OFF by default. Enable explicitly if needed.
  */
 
 import { useEffect, useCallback, useRef } from 'react';
@@ -18,6 +17,7 @@ export interface UseCachedBidHistoryOptions {
   offset: number;
   limit: number;
   aacApp: ApplicationClient | null;
+  /** Enable polling - OFF by default */
   enablePolling?: boolean;
   pollInterval?: number;
   skip?: boolean;
@@ -41,8 +41,8 @@ export function useCachedBidHistory(
     offset,
     limit,
     aacApp,
-    enablePolling = false,
-    pollInterval = 5000,
+    enablePolling = false, // OFF by default
+    pollInterval = 10000,  // 10s if enabled
     skip = false
   } = options;
 
@@ -55,11 +55,9 @@ export function useCachedBidHistory(
     startPollingBidHistory
   } = useAuctionStore();
 
-  // Use refs to avoid re-renders
   const hasLoadedOnce = useRef(false);
   const pollingUnsubscribe = useRef<(() => void) | null>(null);
 
-  // Get cached entry
   const entry = bidHistory.get(auctionId);
   const bids = entry?.data ?? null;
   const status = entry?.status ?? 'idle';
@@ -67,7 +65,6 @@ export function useCachedBidHistory(
   const error = entry?.error ?? null;
   const isStale = checkIsStale('bidHistory', auctionId);
 
-  // Track first successful load
   if ((status === 'success' || bids) && !hasLoadedOnce.current) {
     hasLoadedOnce.current = true;
   }
@@ -85,28 +82,29 @@ export function useCachedBidHistory(
     }
   }, [aacApp, skip, isPublicClientSyncing, auctionId, offset, limit, fetchBidHistory]);
 
-  // Initial fetch
+  // Initial fetch only - no automatic refetch on stale
   useEffect(() => {
     if (skip || !aacApp || isPublicClientSyncing) return;
 
-    if ((!entry || isStale) && !isFetching) {
+    // Only fetch if no data at all (not on stale)
+    if (!entry && !isFetching) {
       refetch();
     }
-  }, [skip, aacApp, isStale, isPublicClientSyncing, entry, isFetching, refetch]);
+  }, [skip, aacApp, isPublicClientSyncing, entry, isFetching, refetch]);
 
-  // Polling setup
+  // Polling setup - only if explicitly enabled
   useEffect(() => {
-    // Cleanup previous polling
+    // Cleanup previous
     if (pollingUnsubscribe.current) {
       pollingUnsubscribe.current();
       pollingUnsubscribe.current = null;
     }
 
+    // Only start if explicitly enabled
     if (!enablePolling || !aacApp || skip) {
       return;
     }
 
-    // Start new polling
     pollingUnsubscribe.current = startPollingBidHistory(auctionId, offset, limit, aacApp, pollInterval);
 
     return () => {

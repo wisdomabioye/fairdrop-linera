@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Minus, Plus, TrendingDown } from 'lucide-react';
+import { useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useWalletConnection } from 'linera-react-client';
 import { useSyncStatus } from '@/providers';
-import { useAuctionMutations, useCachedUserBidRecord, useAacApp, useCachedUserBalances } from '@/hooks';
+import { useAuctionMutations, useCachedUserBidRecord, useAacApp } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import { getTokenByAppId } from '@/config/app.token-store';
 import {
@@ -39,14 +38,12 @@ export function BidForm({
   const { isWalletClientSyncing } = useSyncStatus();
   const [quantity, setQuantity] = useState(1);
 
-  // Fetch user's current commitment
-  const { totalQuantity, loading: loadingBidRecord } = useCachedUserBidRecord({
+  const { totalQuantity } = useCachedUserBidRecord({
     auctionId: auction.auctionId.toString(),
     aacApp: aacApp.app,
     skip: !aacApp.app
   });
 
-  // Mutation hook for placing bids
   const {
     buy,
     isBuying,
@@ -55,138 +52,76 @@ export function BidForm({
     aacApp: aacApp.app,
     onSuccess: (event) => {
       if (event.type === 'buy') {
-        const { quantity, auctionId } = event.data;
-        toast.success('Bid placed successfully!', {
-          description: `You bid ${quantity} unit(s) on ${auction.itemName}`
-        });
-
-        if (onSuccess) {
-          onSuccess(auctionId, quantity);
-        }
+        toast.success(`Bid placed for ${event.data.quantity} unit(s)!`);
+        setQuantity(1);
+        onSuccess?.(event.data.auctionId, event.data.quantity);
       }
     },
     onError: (event) => {
       if (event.type === 'buy') {
-        toast.error('Bid failed', {
-          description: event.error.message
-        });
+        toast.error('Bid failed', { description: event.error.message });
       }
     }
   });
 
   const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
-  // Calculate values
-  const availableSupply = auction.maxBidAmount;
-  const totalCost = calculateBidCost(quantity, auction.currentPrice);
+  const maxQuantity = auction.maxBidAmount;
   const currentCommitment = totalQuantity || 0;
-  const totalCommitmentAfterBid = currentCommitment + quantity;
+  const remainingLimit = maxQuantity - currentCommitment;
+  const effectiveMax = Math.min(remainingLimit, auction.totalSupply - auction.sold);
+  const totalCost = calculateBidCost(quantity, auction.currentPrice);
 
-  // Validation
-  const isAuctionActive = auction.status === AuctionStatus.Active; // AuctionStatus.Active
-  const isQuantityValid = quantity >= 1 && quantity <= availableSupply;
+  const isAuctionActive = auction.status === AuctionStatus.Active;
+  const isQuantityValid = quantity >= 1 && quantity <= effectiveMax;
   const canSubmit = isAuctionActive && isQuantityValid && aacApp.app && !isBuying;
 
-  const handleIncrement = () => {
-    if (quantity < availableSupply) {
-      setQuantity(quantity + 1);
-    }
-  };
-
-  const handleDecrement = () => {
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
-    }
-  };
-
+  const handleIncrement = () => setQuantity(q => Math.min(q + 1, effectiveMax));
+  const handleDecrement = () => setQuantity(q => Math.max(q - 1, 1));
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
-    if (!isNaN(value) && value >= 1 && value <= availableSupply) {
-      setQuantity(value);
+    if (!isNaN(value) && value >= 1) {
+      setQuantity(Math.min(value, effectiveMax));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!canSubmit) return;
-
     const success = await buy(auction.auctionId, quantity);
-    if (success) {
-      setQuantity(1); // Reset quantity after successful bid
-    }
+    if (success) setQuantity(1);
   };
 
-  // Wallet connection guard - show before checking auction status
+  // Wallet connection guard
   if (!isConnected) {
     return (
-      <Card className={compact ? '' : undefined}>
-        <CardHeader>
-          <CardTitle>Place Your Bid</CardTitle>
-          <CardDescription>
-            Connect your wallet to participate in this auction
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6 space-y-4">
-          <div className="text-center space-y-4">
-            <p className="text-muted-foreground">
-              You need to connect your wallet to place bids on auctions.
-            </p>
-            <Button
-              onClick={connect}
-              disabled={isConnecting}
-              variant="default"
-              className="w-full"
-            >
-              {isConnecting ? (
-                <>
-                  <Spinner className="h-4 w-4 mr-2" />
-                  Connecting...
-                </>
-              ) : (
-                'Connect Wallet'
-              )}
-            </Button>
-          </div>
+      <Card className={compact ? 'border-0 shadow-none' : undefined}>
+        <CardContent className="p-4 text-center space-y-3">
+          <p className="text-xs text-muted-foreground">Connect wallet to bid</p>
+          <Button onClick={connect} disabled={isConnecting} size="sm" className="w-full">
+            {isConnecting ? <><Spinner className="h-3 w-3 mr-1" />Connecting...</> : 'Connect Wallet'}
+          </Button>
         </CardContent>
       </Card>
     );
   }
 
+  // Inactive auction states
   if (!isAuctionActive) {
-    let message: string;
-    let description: string | undefined;
-
-    switch (auction.status) {
-      case AuctionStatus.Scheduled:
-        message = 'Auction Not Started';
-        description = `Bidding opens ${formatAbsoluteTime(auction.startTime)}`;
-        break;
-      case AuctionStatus.Settled:
-        message = 'Auction Settled';
-        description = auction.clearingPrice
-          ? `Final clearing price: ${formatTokenAmount(auction.clearingPrice, 18, 4)}`
-          : 'Settlement in progress';
-        break;
-      case AuctionStatus.Cancelled:
-        message = 'Auction Cancelled';
-        description = 'This auction has been cancelled by the creator.';
-        break;
-      default:
-        message = 'This auction is no longer active';
-        description = undefined;
+    let statusMessage = 'Auction unavailable';
+    if (auction.status === AuctionStatus.Scheduled) {
+      statusMessage = `Opens ${formatAbsoluteTime(auction.startTime)}`;
+    } else if (auction.status === AuctionStatus.Settled) {
+      statusMessage = auction.clearingPrice 
+        ? `Settled at ${formatTokenAmount(auction.clearingPrice, 18, 4)}` 
+        : 'Auction ended';
+    } else if (auction.status === AuctionStatus.Cancelled) {
+      statusMessage = 'Auction cancelled';
     }
 
     return (
-      <Card className={compact ? '' : undefined}>
-        <CardContent className="p-6 space-y-3 text-center">
-          <p className="text-lg font-semibold text-muted-foreground">
-            {message}
-          </p>
-          {description && (
-            <p className="text-sm text-muted-foreground/80">
-              {description}
-            </p>
-          )}
+      <Card className={compact ? 'border-0 shadow-none' : undefined}>
+        <CardContent className="p-4 text-center">
+          <p className="text-xs text-muted-foreground">{statusMessage}</p>
         </CardContent>
       </Card>
     );
@@ -195,157 +130,100 @@ export function BidForm({
   return (
     <Card className={compact ? 'border-0 shadow-none' : undefined}>
       {!compact && (
-        <CardHeader>
-          <CardTitle>Place Your Bid</CardTitle>
-          <CardDescription>
-            {auction.itemName} • {formatTimeRemaining(auction.endTime)} remaining
-          </CardDescription>
+        <CardHeader className="pb-1 pt-3 px-4">
+          <CardTitle className="text-sm font-medium truncate">{auction.itemName}</CardTitle>
+          <p className="text-[10px] text-muted-foreground">
+            {formatTimeRemaining(auction.endTime)} left
+          </p>
         </CardHeader>
       )}
 
-      <CardContent className={cn(compact ? 'p-0' : 'space-y-6')}>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Current Price */}
-          <div className="rounded-lg bg-primary/5 p-4 border border-primary/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <TrendingDown className="h-4 w-4" />
-                <span>Current Price</span>
-              </div>
-              <div className="text-2xl font-bold text-primary">
-                {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol}
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Price decreases over time • You'll pay the clearing price at settlement
-            </p>
-          </div>
-
-          {/* Available Supply */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Available Supply</span>
-            <span className="font-medium">
-              {availableSupply} / {auction.totalSupply} remaining
-            </span>
-          </div>
-
-          {/* Quantity Input */}
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleDecrement}
-                disabled={quantity <= 1 || isBuying}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-
-              <Input
-                id="quantity"
-                type="number"
-                min={1}
-                max={availableSupply}
-                value={quantity}
-                onChange={handleQuantityChange}
-                disabled={isBuying}
-                className="text-center text-lg font-semibold"
-              />
-
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleIncrement}
-                disabled={quantity >= availableSupply || isBuying}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Total Cost Calculation */}
-          <div className="rounded-lg bg-muted p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Estimated Cost</span>
-              <span className="text-lg font-bold">
-                {formatTokenAmount(totalCost, 18, 4)}
+      <CardContent className={compact ? 'p-0' : 'px-4 pb-4 pt-2'}>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Price */}
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">Price</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {formatTokenAmount(auction.currentPrice, 18, 2)}
+              <span className="text-sm font-normal text-muted-foreground ml-1">
+                {paymentToken.symbol}
               </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {quantity} × {formatTokenAmount(auction.currentPrice, 18, 4)} {paymentToken.symbol} = {formatTokenAmount(totalCost, 18, 4)} {paymentToken.symbol}
             </p>
           </div>
 
-          {/* Current Commitment */}
-          {loadingBidRecord ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Spinner className="h-4 w-4" />
-              <span>Loading your commitment...</span>
-            </div>
-          ) : currentCommitment > 0 ? (
-            <div className="border-t pt-4 space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Your Current Bid</span>
-                <span className="font-medium">{currentCommitment} units</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Total After This Bid</span>
-                <span className="font-semibold">{totalCommitmentAfterBid} units</span>
-              </div>
-            </div>
-          ) : null}
+          {/* Quantity Selector */}
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+              onClick={handleDecrement}
+              disabled={quantity <= 1 || isBuying}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
 
-          {/* Error Message */}
+            <Input
+              type="number"
+              value={quantity}
+              onChange={handleQuantityChange}
+              disabled={isBuying}
+              min={1}
+              max={effectiveMax}
+              className="w-16 h-12 text-center text-xl font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+              onClick={handleIncrement}
+              disabled={quantity >= effectiveMax || isBuying}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Limit hint */}
+          <p className="text-[9px] text-center text-muted-foreground">
+            Max: {effectiveMax}{currentCommitment > 0 && ` · ${currentCommitment} bid`}
+          </p>
+
+          {/* Total */}
+          <div className="text-center py-1.5 border-t">
+            <p className="text-lg font-semibold">
+              {formatTokenAmount(totalCost, 18, 2)} {paymentToken.symbol}
+            </p>
+          </div>
+
+          {/* Error */}
           {mutationError && (
-            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-              <p className="text-sm text-destructive">
-                {
-                  mutationError.message.indexOf(':') > -1 ?
-                  mutationError.message?.substring(0, mutationError.message.indexOf(':'))
-                  :
-                  mutationError.message
-                }
-              </p>
-            </div>
+            <p className="text-[10px] text-center text-destructive">
+              {mutationError.message.split(':')[0]}
+            </p>
           )}
 
-          {/* Action Buttons */}
+          {/* Submit */}
           <div className="flex gap-2">
             {onCancel && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-                disabled={isBuying}
-                className="flex-1"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isBuying} className="flex-1">
                 Cancel
               </Button>
             )}
             <Button
               type="submit"
+              size="sm"
               disabled={!canSubmit || isWalletClientSyncing}
-              className={cn('gap-2', onCancel ? 'flex-1' : 'w-full')}
+              className={cn('gap-1', onCancel ? 'flex-1' : 'w-full')}
             >
-              {
-              isWalletClientSyncing ?
-              (
-                <>
-                  <Spinner className="h-4 w-4" />
-                  Client is Syncing...
-                </>
-              )
-              :
-              isBuying ? (
-                <>
-                  <Spinner className="h-4 w-4" />
-                  Placing Bid...
-                </>
+              {isWalletClientSyncing ? (
+                <><Spinner className="h-3 w-3" />Syncing</>
+              ) : isBuying ? (
+                <><Spinner className="h-3 w-3" />Bidding</>
               ) : (
-                'Place Bid'
+                `Bid ${quantity} for ${formatTokenAmount(totalCost, 18, 2)}`
               )}
             </Button>
           </div>

@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { AppLogo } from '@/components/layout/logo';
 import { useUIStore } from '@/store/ui-store';
 import { navigation } from './nav-link';
+import { APP_ROUTES } from '@/config/app.route';
 
 interface DashboardSidebarProps {
   className?: string;
@@ -146,7 +147,7 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
           )}
 
           {/* Create Auction - Prominent Button */}
-          <Link href="/create-auction">
+          <Link href={APP_ROUTES.creatorCreate}>
             <Button
               className={cn(
                 'w-full gap-2 shadow-md hover:shadow-lg transition-all',
@@ -160,7 +161,7 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
           </Link>
 
           {/* Faucet Link */}
-          <Link href="/faucet">
+          <Link href={APP_ROUTES.faucet}>
             <div
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
