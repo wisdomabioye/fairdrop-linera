@@ -11,7 +11,7 @@ import { ViewToggle } from '@/components/dashboard/filter/view-toggle';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { AuctionTable } from '@/components/auction/auction-table';
 import { BidDialog } from '@/components/auction/bid-dialog';
-import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
+import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
 import { useCachedActiveAuctions, useCachedGlobalStats, useAacApp } from '@/hooks';
@@ -91,9 +91,13 @@ export default function DashboardOverview() {
         <ViewToggle />
       </div>
 
-      {/* Loading State */}
-      {loading && !auctions?.length && (
-        <AuctionSkeletonGrid count={8} />
+      {/* Loading State, auction must be loaded */}
+      {loading || !auctions?.length && (
+        viewMode === 'grid' ? (
+          <AuctionSkeletonGrid count={8} />
+        ) : (
+          <AuctionSkeletonTable count={8} />
+        )
       )}
 
       {/* Error State */}

@@ -7,12 +7,14 @@ import { useCachedAuctionSummary, useCachedUserBidRecord } from '@/hooks';
 import { AuctionCard } from '@/components/auction/auction-card';
 import { ViewToggle } from '@/components/dashboard/filter/view-toggle';
 import { EmptyState } from '@/components/loading/empty-state';
-import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
+import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/auction-skeleton';
 import { AAC_APP_ID } from '@/config/app.config';
+import { useUIStore } from '@/store/ui-store';
 
 export default function MyBids() {
   const aacApp = useLineraApplication(AAC_APP_ID);
   const { isConnected } = useWalletConnection();
+  const { viewMode } = useUIStore();
 
   const { userBidRecord, loading } = useCachedUserBidRecord({
     aacApp: aacApp.app,
@@ -44,7 +46,13 @@ export default function MyBids() {
       </div>
 
       {/* Loading State */}
-      {loading && <AuctionSkeletonGrid count={4} />}
+      {loading && (
+        viewMode === 'grid' ? (
+          <AuctionSkeletonGrid count={4} />
+        ) : (
+          <AuctionSkeletonTable count={4} />
+        )
+      )}
 
       {/* Empty State */}
       {!loading && userBidRecord?.length === 0 && (
