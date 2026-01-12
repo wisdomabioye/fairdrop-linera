@@ -53,6 +53,7 @@ export interface UseCachedUserBalancesResult {
     refetch: () => Promise<void>;
 }
 
+/** For Balances on AAC */
 export function useCachedUserBalances(
     options: UseCachedUserBalancesOptions
 ): UseCachedUserBalancesResult {
