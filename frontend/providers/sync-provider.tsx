@@ -1,225 +1,289 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { createContext, useContext, useEffect, useReducer, useRef, useCallback } from 'react';
 import { useAuctionStore } from '@/store/auction-store';
 import { useChain } from '@/hooks/use-chain';
 import { useTokenStore } from '@/store/token-store';
 
+// ============ Types ============
 export interface SyncStatus {
-    /** True if either wallet or public client is syncing */
-    isClientSyncing: boolean;
-    /** True if public client is syncing */
-    isPublicClientSyncing: boolean;
-    /** True if wallet client is syncing */
-    isWalletClientSyncing: boolean;
+  isClientSyncing: boolean;
+  isPublicClientSyncing: boolean;
+  isWalletClientSyncing: boolean;
 }
 
 export interface SyncProviderOptions {
-    /** Whether to enable sync tracking (default: true) */
-    enabled?: boolean;
-    /** Debounce timeout in milliseconds (default: 3000) */
-    debounceTimeout?: number;
+  enabled?: boolean;
+  debounceTimeout?: number;
 }
 
+// ============ State & Actions ============
+interface SyncState {
+  isPublicSyncing: boolean;
+  isWalletSyncing: boolean;
+  hasCompletedFirstPublicSync: boolean;
+  hasCompletedFirstWalletSync: boolean;
+}
+
+type SyncAction =
+  | { type: 'PUBLIC_SYNC_START' }
+  | { type: 'PUBLIC_SYNC_END' }
+  | { type: 'WALLET_SYNC_START' }
+  | { type: 'WALLET_SYNC_END' }
+  | { type: 'WALLET_DISCONNECTED' };
+
+const initialState: SyncState = {
+  isPublicSyncing: false,
+  isWalletSyncing: false,
+  hasCompletedFirstPublicSync: false,
+  hasCompletedFirstWalletSync: false,
+};
+
+function syncReducer(state: SyncState, action: SyncAction): SyncState {
+  switch (action.type) {
+    case 'PUBLIC_SYNC_START':
+      return { ...state, isPublicSyncing: true };
+
+    case 'PUBLIC_SYNC_END':
+      return {
+        ...state,
+        isPublicSyncing: false,
+        hasCompletedFirstPublicSync: true,
+      };
+
+    case 'WALLET_SYNC_START':
+      return { ...state, isWalletSyncing: true };
+
+    case 'WALLET_SYNC_END':
+      return {
+        ...state,
+        isWalletSyncing: false,
+        hasCompletedFirstWalletSync: true,
+      };
+
+    case 'WALLET_DISCONNECTED':
+      // Reset wallet sync state but keep first-sync flags
+      return {
+        ...state,
+        isWalletSyncing: false,
+      };
+
+    default:
+      return state;
+  }
+}
+
+// ============ Context ============
 const SyncContext = createContext<SyncStatus | undefined>(undefined);
 
+// ============ Provider ============
 export function SyncProvider({
-    children,
-    // enabled = true,
-    debounceTimeout = 3000,
+  children,
+  debounceTimeout = 2000,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 } & SyncProviderOptions) {
-    const { publicChain, walletChain, isConnected, isInitialized } = useChain();
-    const { invalidateAll } = useAuctionStore();
-    const { invalidateAll: invalidateAllFungibleData } = useTokenStore()
-    const [isWalletClientSyncing, setIsWalletClientSyncing] = useState(false);
-    const [isPublicClientSyncing, setIsPublicClientSyncing] = useState(false);
+  const { publicChain, walletChain, isConnected, isInitialized } = useChain();
+  const { invalidateAll } = useAuctionStore();
+  const { invalidateAll: invalidateAllFungibleData } = useTokenStore();
 
-    // Refs to track debounce timers
-    const walletTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const publicTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [state, dispatch] = useReducer(syncReducer, initialState);
 
-    // Refs to track previous sync state for detecting transitions
-    const prevWalletSyncingRef = useRef(false); 
-    const prevPublicSyncingRef = useRef(false);
+  // Refs for timers
+  const walletTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const publicTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const invalidationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Track if this is the first sync completion (skip invalidation on initial load)
-    const hasCompletedFirstPublicSyncRef = useRef(false);
-    const hasCompletedFirstWalletSyncRef = useRef(false);
+  // Track previous state for detecting transitions
+  const prevStateRef = useRef(state);
 
-    const isClientSyncing = isPublicClientSyncing || isWalletClientSyncing;
+  // Clear all timers helper
+  const clearWalletTimer = useCallback(() => {
+    if (walletTimerRef.current) {
+      clearTimeout(walletTimerRef.current);
+      walletTimerRef.current = null;
+    }
+  }, []);
 
-    /**
-     * Set initial syncing state when wallet client becomes available
-     */
-    useEffect(() => {
-        if (isInitialized && isConnected) {
-            console.log('[SyncProvider] Wallet client available, assuming initial sync');
-            setIsWalletClientSyncing(true);
+  const clearPublicTimer = useCallback(() => {
+    if (publicTimerRef.current) {
+      clearTimeout(publicTimerRef.current);
+      publicTimerRef.current = null;
+    }
+  }, []);
 
-            // Clear existing timer
-            if (walletTimerRef.current) {
-                clearTimeout(walletTimerRef.current);
-            }
+  const clearInvalidationTimer = useCallback(() => {
+    if (invalidationTimerRef.current) {
+      clearTimeout(invalidationTimerRef.current);
+      invalidationTimerRef.current = null;
+    }
+  }, []);
 
-            // Set debounce timer to clear initial sync state
-            walletTimerRef.current = setTimeout(() => {
-                console.log('[SyncProvider] Initial sync settled');
-                setIsWalletClientSyncing(false);
-            }, debounceTimeout);
+  /**
+   * Debounced invalidation - only invalidate once even if both clients sync
+   */
+  const scheduleInvalidation = useCallback(() => {
+    clearInvalidationTimer();
 
-        }
-    }, [isInitialized, debounceTimeout, isConnected]);
+    invalidationTimerRef.current = setTimeout(() => {
+      console.log('[SyncProvider] Executing debounced cache invalidation');
+      invalidateAll();
+      invalidateAllFungibleData();
+    }, 100); // Small delay to batch simultaneous sync completions
+  }, [clearInvalidationTimer, invalidateAll, invalidateAllFungibleData]);
 
+  /**
+   * Handle sync completion - detect transitions and invalidate
+   */
+  useEffect(() => {
+    const prev = prevStateRef.current;
 
-    /**
-     * Set initial syncing state when public client becomes available
-     */
-    useEffect(() => {
-        if (isInitialized) {
-            console.log('[SyncProvider] Public client available, assuming initial sync');
-            setIsPublicClientSyncing(true);
+    // Detect public sync completion (was syncing, now not)
+    if (prev.isPublicSyncing && !state.isPublicSyncing) {
+      if (state.hasCompletedFirstPublicSync && prev.hasCompletedFirstPublicSync) {
+        // Not first sync, schedule invalidation
+        console.log('[SyncProvider] Public sync completed');
+        scheduleInvalidation();
+      } else {
+        console.log('[SyncProvider] Public first sync completed - skipping invalidation');
+      }
+    }
 
-            // Clear existing timer
-            if (publicTimerRef.current) {
-                clearTimeout(publicTimerRef.current);
-            }
+    // Detect wallet sync completion (was syncing, now not)
+    if (prev.isWalletSyncing && !state.isWalletSyncing) {
+      if (state.hasCompletedFirstWalletSync && prev.hasCompletedFirstWalletSync) {
+        // Not first sync, schedule invalidation
+        console.log('[SyncProvider] Wallet sync completed');
+        scheduleInvalidation();
+      } else {
+        console.log('[SyncProvider] Wallet first sync completed - skipping invalidation');
+      }
+    }
 
-            // Set debounce timer to clear initial sync state
-            publicTimerRef.current = setTimeout(() => {
-                console.log('[SyncProvider] Initial sync settled');
-                setIsPublicClientSyncing(false);
-            }, debounceTimeout);
-        }
-    }, [isInitialized, debounceTimeout]);
+    prevStateRef.current = state;
+  }, [state, scheduleInvalidation]);
 
-    /**
-     * Handle sync completion - call invalidateAll when syncing stops
-     * Skip invalidation on first sync to prevent double-fetch on initial page load
-     */
-    useEffect(() => {
-        // Detect public client sync completion
-        if (prevWalletSyncingRef.current && !isWalletClientSyncing) {
-            if (!hasCompletedFirstWalletSyncRef.current) {
-                console.log('[SyncProvider] Wallet client first sync completed - skipping cache invalidation');
-                hasCompletedFirstWalletSyncRef.current = true;
-            } else {
-                console.log('[SyncProvider] Wallet client sync completed, invalidating caches');
-                invalidateAll();
-                invalidateAllFungibleData();
-            }
-        }
-        prevWalletSyncingRef.current = isWalletClientSyncing;
+  /**
+   * Handle wallet disconnect - clear timer and reset state
+   */
+  useEffect(() => {
+    if (!isConnected && prevStateRef.current.isWalletSyncing) {
+      console.log('[SyncProvider] Wallet disconnected while syncing');
+      clearWalletTimer();
+      dispatch({ type: 'WALLET_DISCONNECTED' });
+    }
+  }, [isConnected, clearWalletTimer]);
 
-        if (prevPublicSyncingRef.current && !isPublicClientSyncing) {
-            if (!hasCompletedFirstPublicSyncRef.current) {
-                console.log('[SyncProvider] Public client first sync completed - skipping cache invalidation');
-                hasCompletedFirstPublicSyncRef.current = true;
-            } else {
-                console.log('[SyncProvider] Public client sync completed, invalidating caches');
-                invalidateAll();
-                invalidateAllFungibleData();
-            }
-        }
-        prevPublicSyncingRef.current = isPublicClientSyncing;
-    }, [isPublicClientSyncing, isWalletClientSyncing, invalidateAll, invalidateAllFungibleData]);
+  /**
+   * Initial public sync on mount
+   */
+  useEffect(() => {
+    if (isInitialized && !state.hasCompletedFirstPublicSync) {
+      console.log('[SyncProvider] Public client initializing, starting sync');
+      dispatch({ type: 'PUBLIC_SYNC_START' });
 
-    /**
-     * Handle wallet client notifications
-     */
-    const handleWalletNotification = useCallback(() => {
-        console.log('[SyncProvider] Wallet client notification received');
+      clearPublicTimer();
+      publicTimerRef.current = setTimeout(() => {
+        dispatch({ type: 'PUBLIC_SYNC_END' });
+      }, debounceTimeout);
+    }
+  }, [isInitialized, state.hasCompletedFirstPublicSync, clearPublicTimer, debounceTimeout]);
 
-        // Set syncing state
-        setIsWalletClientSyncing(true);
+  /**
+   * Initial wallet sync on connect
+   */
+  useEffect(() => {
+    if (isInitialized && isConnected && !state.hasCompletedFirstWalletSync) {
+      console.log('[SyncProvider] Wallet connected, starting sync');
+      dispatch({ type: 'WALLET_SYNC_START' });
 
-        // Clear existing timer
-        if (walletTimerRef.current) {
-            clearTimeout(walletTimerRef.current);
-        }
+      clearWalletTimer();
+      walletTimerRef.current = setTimeout(() => {
+        dispatch({ type: 'WALLET_SYNC_END' });
+      }, debounceTimeout);
+    }
+  }, [isInitialized, isConnected, state.hasCompletedFirstWalletSync, clearWalletTimer, debounceTimeout]);
 
-        // Set new debounce timer
-        walletTimerRef.current = setTimeout(() => {
-            console.log('[SyncProvider] Wallet client sync settled');
-            setIsWalletClientSyncing(false);
-        }, debounceTimeout);
-    }, [debounceTimeout]);
+  /**
+   * Handle wallet notifications
+   */
+  const handleWalletNotification = useCallback(() => {
+    console.debug('[SyncProvider] Wallet notification received');
+    dispatch({ type: 'WALLET_SYNC_START' });
 
+    clearWalletTimer();
+    walletTimerRef.current = setTimeout(() => {
+      dispatch({ type: 'WALLET_SYNC_END' });
+    }, debounceTimeout);
+  }, [debounceTimeout, clearWalletTimer]);
 
-    /**
-     * Handle public client notifications
-     */
-    const handlePublicNotification = useCallback(() => {
-        console.log('[SyncProvider] Public client notification received');
+  /**
+   * Handle public notifications
+   */
+  const handlePublicNotification = useCallback(() => {
+    console.debug('[SyncProvider] Public notification received');
+    dispatch({ type: 'PUBLIC_SYNC_START' });
 
-        // Set syncing state
-        setIsPublicClientSyncing(true);
+    clearPublicTimer();
+    publicTimerRef.current = setTimeout(() => {
+      dispatch({ type: 'PUBLIC_SYNC_END' });
+    }, debounceTimeout);
+  }, [debounceTimeout, clearPublicTimer]);
 
-        // Clear existing timer
-        if (publicTimerRef.current) {
-            clearTimeout(publicTimerRef.current);
-        }
+  /**
+   * Subscribe to wallet notifications with proper cleanup
+   */
+  useEffect(() => {
+    if (!walletChain || !isConnected) return;
 
-        // Set new debounce timer
-        publicTimerRef.current = setTimeout(() => {
-            console.log('[SyncProvider] Public client sync settled');
-            setIsPublicClientSyncing(false);
-        }, debounceTimeout);
-    }, [debounceTimeout]);
+    console.log('[SyncProvider] Subscribing to wallet notifications');
+    walletChain.onNotification(handleWalletNotification);
 
-    /**
-     * Subscribe to wallet client notifications
-     */
-    useEffect(() => {
-        if (!walletChain) {
-            return;
-        }
-
-        console.log('[SyncProvider] Setting up wallet client notification listener');
-
-        // Subscribe to notifications
-        walletChain.onNotification(handleWalletNotification);
-
-        // Cleanup
-        return () => {
-            console.log('[SyncProvider] Cleaning up wallet client notification listener');
-            if (walletTimerRef.current) {
-                clearTimeout(walletTimerRef.current);
-            }
-        };
-    }, [walletChain, handleWalletNotification]);
-
-    /**
-     * Subscribe to public client notifications
-     */
-    useEffect(() => {
-        if (!publicChain) {
-            return;
-        }
-
-        console.log('[SyncProvider] Setting up public client notification listener');
-
-        // Subscribe to notifications
-        publicChain.onNotification(handlePublicNotification);
-
-        // Cleanup
-        return () => {
-            console.log('[SyncProvider] Cleaning up public client notification listener');
-            if (publicTimerRef.current) {
-                clearTimeout(publicTimerRef.current);
-            }
-        };
-    }, [publicChain, handlePublicNotification]);
-
-    const value: SyncStatus = {
-        isClientSyncing,
-        isPublicClientSyncing,
-        isWalletClientSyncing
+    return () => {
+      console.log('[SyncProvider] Unsubscribing from wallet notifications');
+      // Note: If walletChain has offNotification, call it here:
+      // walletChain.offNotification?.(handleWalletNotification);
+      clearWalletTimer();
     };
+  }, [walletChain, isConnected, handleWalletNotification, clearWalletTimer]);
 
-    return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
+  /**
+   * Subscribe to public notifications with proper cleanup
+   */
+  useEffect(() => {
+    if (!publicChain) return;
+
+    console.log('[SyncProvider] Subscribing to public notifications');
+    publicChain.onNotification(handlePublicNotification);
+
+    return () => {
+      console.log('[SyncProvider] Unsubscribing from public notifications');
+      // Note: If publicChain has offNotification, call it here:
+      // publicChain.offNotification?.(handlePublicNotification);
+      clearPublicTimer();
+    };
+  }, [publicChain, handlePublicNotification, clearPublicTimer]);
+
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
+    return () => {
+      clearWalletTimer();
+      clearPublicTimer();
+      clearInvalidationTimer();
+    };
+  }, [clearWalletTimer, clearPublicTimer, clearInvalidationTimer]);
+
+  const value: SyncStatus = {
+    isClientSyncing: state.isPublicSyncing || state.isWalletSyncing,
+    isPublicClientSyncing: state.isPublicSyncing,
+    isWalletClientSyncing: state.isWalletSyncing,
+  };
+
+  return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }
+
 
 /**
  * Hook to access sync status
