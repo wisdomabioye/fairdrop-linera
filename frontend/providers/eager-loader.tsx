@@ -37,6 +37,8 @@ export function EagerLoader({ children }: { children: React.ReactNode }) {
     fetchAuctionsByCreator,
     fetchUserBalances,
     startPollingActiveAuctions,
+    fetchGlobalStats,
+    startPollingGlobalStats,
   } = useAuctionStore();
 
   // Track cleanup functions
@@ -111,6 +113,21 @@ export function EagerLoader({ children }: { children: React.ReactNode }) {
       balancePollingCleanup.current = null;
     };
   }, [aacApp.app, isConnected, walletAddress, tokens, fetchAuctionsByCreator, fetchUserBalances]);
+
+  // Eager load and poll global stats
+  useEffect(() => {
+    if (!aacApp.app) return;
+
+    // Initial fetch
+    fetchGlobalStats(aacApp.app);
+
+    // Start polling (every 30s)
+    const unsubscribe = startPollingGlobalStats(aacApp.app, 30_000);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [aacApp.app, fetchGlobalStats, startPollingGlobalStats]);
 
   return <>{children}</>;
 }

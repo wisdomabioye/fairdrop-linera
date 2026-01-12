@@ -28,7 +28,8 @@ import {
     type SubscriptionInfo,
     transformAuctionWithId,
     transformBidRecord,
-    AuctionStatus
+    AuctionStatus,
+    type AuctionGlobalStats
 } from '@/lib/gql/types';
 import type { ApplicationClient } from 'linera-react-client';
 import {
@@ -45,6 +46,7 @@ const AUCTION_LIST_TTL = 12000; // 12s (polling: 10s) - auction lists
 const BID_HISTORY_TTL = 6000; // 6s (polling: 5s) - bid history
 const USER_BID_TTL = 30000; // 30s - user commitments (no default polling)
 const USER_BALANCES_TTL = 15000; // 15s - user balances on AAC (deposits/withdrawals)
+const GLOBAL_STATS_TTL = 30000; // 30s - global stats (changes infrequently)
 
 // Store types
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -104,6 +106,16 @@ export interface UserBalancesCacheEntry {
 }
 
 /**
+ * Cache entry for global stats
+ */
+export interface GlobalStatsCacheEntry {
+    data: AuctionGlobalStats | null;
+    timestamp: number;
+    status: FetchStatus;
+    error: Error | null;
+}
+
+/**
  * Metadata for all auctions fetch operations
  */
 export interface AllAuctionsMetadata {
@@ -136,6 +148,7 @@ export interface AuctionStore {
     bidHistory: Map<string, BidHistoryCacheEntry>; // auctionId -> bids
     userBids: Map<string, Map<string, UserBidsCacheEntry>>; // auctionId -> address -> userBids
     userBalances: Map<string, UserBalancesCacheEntry>; // address -> balances (multiple tokens)
+    globalStats: GlobalStatsCacheEntry | null; // global auction stats
 
     // ============ Indexer Actions ============
     initializeIndexer: (
@@ -156,6 +169,7 @@ export interface AuctionStore {
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchUserBids: (auctionId: string, address: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient, force?: boolean) => Promise<void>;
+    fetchGlobalStats: (aacApp: ApplicationClient, force?: boolean) => Promise<void>;
 
     // ============ Internal Fetch Methods ============
     _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<string[]>;
@@ -168,6 +182,7 @@ export interface AuctionStore {
     invalidateBidHistory: (auctionId: string) => void;
     invalidateUserBids: (auctionId: string, address?: string) => void;
     invalidateUserBalances: (address: string) => void;
+    invalidateGlobalStats: () => void;
     invalidateAll: () => void;
 
     // ============ Combined Invalidate + Refetch Actions ============
@@ -177,16 +192,18 @@ export interface AuctionStore {
     invalidateAndRefreshBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshUserBids: (auctionId: string, address: string, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient) => Promise<void>;
+    invalidateAndRefreshGlobalStats: (aacApp: ApplicationClient) => Promise<void>;
 
     // ============ Polling Actions ============
     // TEMPORARY: Using AAC app while indexer event streaming is fixed
     startPollingAuction: (auctionId: string, aacApp: ApplicationClient, interval?: number) => () => void;
     startPollingActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient, interval?: number) => () => void;
     startPollingBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, interval?: number) => () => void;
+    startPollingGlobalStats: (aacApp: ApplicationClient, interval?: number) => () => void;
 
     // ============ Utility Actions ============
     isStale: (
-        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids' | 'userBalances',
+        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids' | 'userBalances' | 'globalStats',
         key?: string
     ) => boolean;
 }
@@ -211,6 +228,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     bidHistory: new Map(),
     userBids: new Map(),
     userBalances: new Map(),
+    globalStats: null,
 
     // ============ Indexer Initialization ============
     initializeIndexer: async (indexerChainId, aacChain, auctionApp, indexerApp) => {
@@ -1008,6 +1026,68 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
+    /**
+     * Fetch global auction stats
+     */
+    fetchGlobalStats: async (aacApp, force = false) => {
+        const key = 'global-stats';
+
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().globalStats;
+            if (cached && cached.status === 'success' && cached.data) {
+                const age = Date.now() - cached.timestamp;
+                if (age < GLOBAL_STATS_TTL) {
+                    return; // Cache hit, no API call needed
+                }
+            }
+        }
+
+        await queryDeduplicator.deduplicate(key, async () => {
+            // Set loading state
+            set((state) => ({
+                globalStats: {
+                    data: state.globalStats?.data ?? null,
+                    timestamp: state.globalStats?.timestamp ?? Date.now(),
+                    status: 'loading',
+                    error: null,
+                }
+            }));
+
+            try {
+                const result = await aacApp.public.query<string>(
+                    JSON.stringify(AAC_QUERY.GlobalStats())
+                );
+
+                const { data } = JSON.parse(result) as {
+                    data: { globalStats: AuctionGlobalStats | null }
+                };
+
+                set({
+                    globalStats: {
+                        data: data.globalStats,
+                        timestamp: Date.now(),
+                        status: 'success',
+                        error: null,
+                    }
+                });
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch global stats');
+
+                set((state) => ({
+                    globalStats: {
+                        data: state.globalStats?.data ?? null,
+                        timestamp: state.globalStats?.timestamp ?? Date.now(),
+                        status: 'error',
+                        error,
+                    }
+                }));
+
+                throw error;
+            }
+        });
+    },
+
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId) => {
         set((state) => {
@@ -1129,6 +1209,15 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
+    invalidateGlobalStats: () => {
+        set((state) => ({
+            globalStats: state.globalStats ? {
+                ...state.globalStats,
+                timestamp: 0
+            } : null
+        }));
+    },
+
     invalidateAll: () => {
         set((state) => {
             // Mark all auctions as stale (timestamp = 0) instead of deleting
@@ -1179,6 +1268,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 newUserBalances.set(address, { ...value, timestamp: 0 });
             });
 
+            // Mark global stats as stale
+            const newGlobalStats = state.globalStats
+                ? { ...state.globalStats, timestamp: 0 }
+                : null;
+
             return {
                 auctions: newAuctions,
                 allAuctionsCache: newAllAuctions,
@@ -1192,6 +1286,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 bidHistory: newBidHistory,
                 userBids: newUserBids,
                 userBalances: newUserBalances,
+                globalStats: newGlobalStats,
             };
         });
     },
@@ -1299,6 +1394,22 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         await get().fetchUserBalances(address, tokenApps, aacApp, true);
     },
 
+    /**
+     * Invalidate and force refresh global stats
+     */
+    invalidateAndRefreshGlobalStats: async (aacApp) => {
+        const key = 'global-stats';
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache
+        get().invalidateGlobalStats();
+
+        // Force fresh fetch
+        await get().fetchGlobalStats(aacApp, true);
+    },
+
     // ============ Polling Actions ============
     startPollingAuction: (auctionId, aacApp, interval = 5000) => {
         const key = `auction-${auctionId}`;
@@ -1327,6 +1438,16 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         return pollingManager.subscribe(
             key,
             () => get().fetchBidHistory(auctionId, offset, limit, aacApp),
+            interval
+        );
+    },
+
+    startPollingGlobalStats: (aacApp, interval = 30000) => {
+        const key = 'global-stats';
+
+        return pollingManager.subscribe(
+            key,
+            () => get().fetchGlobalStats(aacApp),
             interval
         );
     },
@@ -1378,6 +1499,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const entry = get().userBalances.get(key);
                 if (!entry || entry.status === 'idle') return true;
                 return now - entry.timestamp > USER_BALANCES_TTL;
+            }
+            case 'globalStats': {
+                const entry = get().globalStats;
+                if (!entry || entry.status === 'idle') return true;
+                return now - entry.timestamp > GLOBAL_STATS_TTL;
             }
 
             default:

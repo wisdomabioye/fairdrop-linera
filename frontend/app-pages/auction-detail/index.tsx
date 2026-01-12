@@ -159,7 +159,6 @@ export default function AuctionDetailPage() {
                 {/* Status-aware price display */}
                 <DetailPriceDisplay
                   auction={auction}
-                  currentPrice={auction.currentPrice}
                   isEndingNow={isEndingVerySoon(auction.endTime)}
                 />
 

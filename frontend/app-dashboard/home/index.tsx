@@ -14,7 +14,7 @@ import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
-import { useCachedActiveAuctions, useGlobalStats, useAacApp } from '@/hooks';
+import { useCachedActiveAuctions, useCachedGlobalStats, useAacApp } from '@/hooks';
 import { useUIStore } from '@/store/ui-store';
 
 import type { AuctionSummary } from '@/lib/gql/types';
@@ -35,7 +35,9 @@ export default function DashboardOverview() {
     auction: null,
   });
 
-  const { stats, loading: statsLoading } = useGlobalStats();
+  const { stats, loading: statsLoading } = useCachedGlobalStats({
+    aacApp: aacApp.app,
+  });
 
   const {
     auctions,
@@ -74,21 +76,12 @@ export default function DashboardOverview() {
         </Button>
       </div>
 
-      {/* Global Stats */}
-      <GlobalStatsBar
-        activeAuctionsCount={stats.activeAuctionsCount}
-        totalVolume={stats.totalVolume}
-        totalBidders={stats.totalBidders}
-        totalBidsCount={stats.totalBidsCount}
-        avgPrice={stats.avgPrice}
-        floorPrice={stats.floorPrice}
-        startPrice={stats.startPrice}
-        loading={statsLoading}
-      />
+      {/* Global Stats - Pass stats object directly */}
+      <GlobalStatsBar stats={stats} loading={statsLoading} />
 
       {/* Filters & View Toggle */}
       <div className="flex items-center justify-between">
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="ending-soon">Ending Soon</TabsTrigger>

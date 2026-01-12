@@ -82,6 +82,10 @@ export type {
 
 export { usePersistedAuctionForm } from './use-persisted-auction-form';
 export { useAacApp } from './use-aac-app';
-export { useGlobalStats } from './use-global-stats';
 export { usePersonalStats } from './use-personal-stats';
-export { useCreatorStats } from './use-creator-stats'
+export { useCreatorStats } from './use-creator-stats';
+export {
+    useCachedGlobalStats,
+    type UseCachedGlobalStatsOptions,
+    type UseCachedGlobalStatsResult
+} from './use-cached-global-stats';
