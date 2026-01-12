@@ -23,7 +23,7 @@ export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
       // View mode
-      viewMode: 'grid',
+      viewMode: 'list',
       setViewMode: (mode) => set({ viewMode: mode }),
 
       // Sidebar
