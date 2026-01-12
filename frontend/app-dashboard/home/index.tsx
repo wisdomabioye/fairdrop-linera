@@ -18,6 +18,7 @@ import { useCachedActiveAuctions, useGlobalStats, useAacApp } from '@/hooks';
 import { useUIStore } from '@/store/ui-store';
 
 import type { AuctionSummary } from '@/lib/gql/types';
+import { APP_ROUTES } from '@/config/app.route';
 
 export default function DashboardOverview() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function DashboardOverview() {
             Descending-price auctions with uniform clearing
           </p>
         </div>
-        <Button onClick={() => router.push('/create-auction')} className="gap-2">
+        <Button onClick={() => router.push(APP_ROUTES.creatorCreate)} className="gap-2">
           <Plus className="h-4 w-4" />
           Create Auction
         </Button>
