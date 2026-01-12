@@ -1,4 +1,4 @@
-import CreateAuctionPage from '@/app-pages/create-auction';
+import CreateAuctionPage from '@/app-dashboard/create-auction';
 
 export const dynamic = 'force-static';
 export const revalidate = false;
