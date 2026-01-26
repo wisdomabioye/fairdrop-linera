@@ -1,13 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { APP_ROUTES } from '@/config/app.route';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
-import { calculateCurrentPrice, formatTokenAmount, formatTimeRemaining } from '@/lib/utils/auction-utils';
+import { formatTokenAmount, formatTimeRemaining } from '@/lib/utils/auction-utils';
 import { getTokenByAppId } from '@/config/app.token-store';
 
 interface AuctionTableProps {
@@ -105,7 +104,10 @@ function AuctionTableRow({ auction, onBidClick, onClaimClick, onViewDetails }: A
       <td className="px-4 py-4">
         <div className="flex items-center gap-3">
           <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-            {auction.image ? (
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+              <span className="text-2xl">📦</span>
+            </div>
+            {/* {auction.image ? (
               <Image
                 src={auction.image}
                 alt={auction.itemName}
@@ -116,7 +118,7 @@ function AuctionTableRow({ auction, onBidClick, onClaimClick, onViewDetails }: A
               <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                 <span className="text-2xl">📦</span>
               </div>
-            )}
+            )} */}
           </div>
           <div>
             <p className="font-medium text-sm">{auction.itemName}</p>

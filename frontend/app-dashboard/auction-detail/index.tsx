@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';	
 import { useParams, useRouter } from 'next/navigation';	
 import { ArrowLeft, Share2, Clock, TrendingDown, Package2, Users, Zap, Trophy } from 'lucide-react';	
-import { useAacApp, useCachedAuctionSummary, useCachedUserBidRecord } from '@/hooks';	
+import { useAacApp, useCachedAuctionSummary, useCachedUserBidRecord, useAuctionImage } from '@/hooks';	
 import { BidHistory } from '@/components/auction/bid-history';	
 import { Button } from '@/components/ui/button';	
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';	
@@ -48,10 +48,17 @@ export default function AuctionDetailPage() {
   });	
 
   // Fetch user's commitment - no polling needed, refetch on success
-  const { totalQuantity } = useCachedUserBidRecord({	
-    auctionId,	
-    aacApp: aacApp.app,	
-    skip: !auctionId || !aacApp.app?.wallet	
+  const { totalQuantity } = useCachedUserBidRecord({
+    auctionId,
+    aacApp: aacApp.app,
+    skip: !auctionId || !aacApp.app?.wallet
+  });
+
+  // Fetch auction image from blob storage (cached permanently)
+  const { imageUrl, loading: imageLoading } = useAuctionImage({
+    auctionId,
+    aacApp: aacApp.app,
+    skip: !auctionId || !aacApp.app
   });	
 
 
@@ -157,24 +164,39 @@ export default function AuctionDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">	
         {/* Main Content */}	
         <div className="lg:col-span-2 space-y-6">	
-          {/* Auction Visual */}	
-          <Card className="overflow-hidden">	
-            <div className="relative w-full h-[400px] bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center group">	
-              <div className="absolute inset-0 bg-grid-white/5" />	
-              <Package2 className="h-32 w-32 text-muted-foreground/20 group-hover:scale-110 transition-transform duration-500" />	
+          {/* Auction Visual */}
+          <Card className="overflow-hidden">
+            <div className="relative w-full h-[400px] bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center group">
+              {imageUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={imageUrl}
+                  alt={auction.itemName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-grid-white/5" />
+                  {imageLoading ? (
+                    <Skeleton className="h-32 w-32 rounded-lg" />
+                  ) : (
+                    <Package2 className="h-32 w-32 text-muted-foreground/20 group-hover:scale-110 transition-transform duration-500" />
+                  )}
+                </>
+              )}
 
-              {/* Floating Stats */}	
-              <div className="absolute bottom-4 left-4 right-4 flex gap-2">	
-                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">	
-                  <p className="text-xs text-muted-foreground mb-1">Supply</p>	
-                  <p className="text-lg font-bold">{auction.sold.toLocaleString()} / {auction.totalSupply.toLocaleString()} {auctionTokenInfo.symbol}</p>	
-                </div>	
-                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">	
-                  <p className="text-xs text-muted-foreground mb-1">Bids</p>	
-                  <p className="text-lg font-bold">{auction.totalBids}</p>	
-                </div>	
-              </div>	
-            </div>	
+              {/* Floating Stats */}
+              <div className="absolute bottom-4 left-4 right-4 flex gap-2">
+                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">
+                  <p className="text-xs text-muted-foreground mb-1">Supply</p>
+                  <p className="text-lg font-bold">{auction.sold.toLocaleString()} / {auction.totalSupply.toLocaleString()} {auctionTokenInfo.symbol}</p>
+                </div>
+                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">
+                  <p className="text-xs text-muted-foreground mb-1">Bids</p>
+                  <p className="text-lg font-bold">{auction.totalBids}</p>
+                </div>
+              </div>
+            </div>
           </Card>	
 
           {/* Key Stats Grid */}	

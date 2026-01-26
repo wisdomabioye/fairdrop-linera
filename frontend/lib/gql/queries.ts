@@ -16,6 +16,11 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
         return this.addFragment(queryBody);
     }
 
+    auctionImage(auction_id: number): this {
+        const queryBody = `auctionImage(auctionId: ${auction_id})`;
+        return this.addFragment(queryBody);
+    }
+
     auctionInfo(auction_id: number): this {
         const queryBody = `auctionInfo(auctionId: ${auction_id}) {
                     auctionId
@@ -430,6 +435,12 @@ export const AAC_QUERY = {
     CurrentPrice (auction_id: number) {
         return {
             query: `query { currentPrice(auctionId: ${auction_id}) }`
+        }
+    },
+
+    AuctionImage (auction_id: number) {
+        return {
+            query: `query { auctionImage(auctionId: ${auction_id}) }`
         }
     },
 

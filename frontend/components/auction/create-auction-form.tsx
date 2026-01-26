@@ -124,7 +124,7 @@ export function CreateAuctionFormMultistep({
   const currentAACBalance = aacBalances?.get(formData.auctionTokenApp) ?? 0;
 
   // Mutation hook
-  const { createAuction, isCreating, uploadBlob, isUploadingBlob } = useAuctionMutations({
+  const { createAuction, isCreating } = useAuctionMutations({
     aacApp: aacApp.app,
     onSuccess: async (event) => {
       if (event.type === 'create') {
@@ -159,37 +159,16 @@ export function CreateAuctionFormMultistep({
 
 
   /**
-   * Upload auction image as a blob to the blockchain
-   * Converts file to base64 and uploads via the UploadBlob mutation
+   * Convert image file to data URL for preview
+   * Actual blob upload happens on submit via the contract
    */
   const UploadAuctionImage = async (file: File): Promise<string> => {
-    try {
-      // Convert file to base64
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // Remove data:mime;base64, prefix to get raw base64
-          const base64 = result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-
-      // Upload via blockchain mutation
-      const blobHash = await uploadBlob(base64Data);
-
-      if (!blobHash) {
-        throw new Error('Failed to upload image to blockchain');
-      }
-
-      console.log('[UploadAuctionImage] Blob hash:', blobHash);
-      return blobHash;
-    } catch (error) {
-      console.error('[UploadAuctionImage] Upload failed:', error);
-      throw new Error(error instanceof Error ? error.message : 'Failed to upload image');
-    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string); // data:image/png;base64,...
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -295,9 +274,14 @@ export function CreateAuctionFormMultistep({
     const startTime = millisecondsToMicroseconds(startDate.getTime());
     const endTime = millisecondsToMicroseconds(endDate.getTime());
 
+    // Extract base64 from data URL: "data:image/png;base64,ABC123" → "ABC123"
+    const imageBase64 = formData.image.includes(',')
+      ? formData.image.split(',')[1]
+      : formData.image;
+
     const params: AuctionParam = {
       itemName: formData.itemName.trim(),
-      image: formData.image.trim(),
+      image: imageBase64,
       maxBidAmount: Number(formData.maxBidAmount),
       totalSupply: Number(formData.totalSupply),
       startPrice: formData.startPrice,

@@ -5,12 +5,12 @@ mod state;
 use self::state::{AuctionData, AuctionState};
 use auction::{AuctionAbi, AuctionOperation, AuctionResponse};
 use fungible::{FungibleOperation, FungibleResponse, FungibleTokenAbi};
-use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, StreamUpdate, WithContractAbi};
+use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, DataBlobHash, StreamUpdate, WithContractAbi};
 use linera_sdk::views::{RootView, View};
 use linera_sdk::{Contract, ContractRuntime};
 use shared::events::{AuctionEvent, AUCTION_STREAM,};
 use shared::messages::AuctionMessage;
-use shared::types::{AuctionParams, BidRecord, AuctionStatus, AuctionParameters};
+use shared::types::{AuctionParams, AuctionParamsInput, BidRecord, AuctionStatus, AuctionParameters};
 
 pub struct AuctionContract {
     state: AuctionState,
@@ -53,7 +53,7 @@ impl Contract for AuctionContract {
         match operation {
             AuctionOperation::CreateAuction { params } => {
                 if current_chain == app_params.aac_chain {
-                    self.handle_create_auction(params.into()).await
+                    self.handle_create_auction(params).await
                 } else {
                     let message = AuctionMessage::CreateAuction { params };
 
@@ -273,26 +273,13 @@ impl Contract for AuctionContract {
                     AuctionResponse::Ok
                 }
             }
-
-            AuctionOperation::UploadBlob { data } => {
-                use base64::{Engine, engine::general_purpose};
-
-                let bytes = general_purpose::STANDARD
-                    .decode(&data)
-                    .expect("Invalid base64 data");
-
-                let blob_hash = self.runtime.create_data_blob(bytes);
-
-                AuctionResponse::BlobUploaded(format!("{:?}", blob_hash))
-            }
-
         }
     }
 
     async fn execute_message(&mut self, message: Self::Message) {
         match message {
             AuctionMessage::CreateAuction { params } => {
-                self.handle_create_auction(params.into()).await;
+                self.handle_create_auction(params).await;
             }
 
             AuctionMessage::CancelAuction { auction_id } => {
@@ -431,12 +418,12 @@ impl AuctionContract {
     // ═══════════════════════════════════════════════════════════
 
     /// Handle auction creation on AAC chain
-    async fn handle_create_auction(&mut self, params: AuctionParams) -> AuctionResponse {
+    async fn handle_create_auction(&mut self, input: AuctionParamsInput) -> AuctionResponse {
         let user_account = self.runtime.authenticated_signer().expect("Caller must be authenticated");
 
         // Validate both tokens are supported
-        let auction_token_app = self.validate_supported_token(params.auction_token_app);
-        let _payment_token_app = self.validate_supported_token(params.payment_token_app);
+        let auction_token_app = self.validate_supported_token(input.auction_token_app);
+        let _payment_token_app = self.validate_supported_token(input.payment_token_app);
 
         // Convert to untyped for state operations
         let auction_token_app_untyped = auction_token_app.forget_abi();
@@ -444,9 +431,9 @@ impl AuctionContract {
         // Validate creator has deposited auction tokens
         let creator_balance = self.get_balance(user_account, auction_token_app_untyped).await;
         assert!(
-            creator_balance >= params.total_supply,
+            creator_balance >= input.total_supply,
             "Insufficient auction token balance. Have: {}, Need: {}. Please deposit auction tokens first.",
-            creator_balance, params.total_supply
+            creator_balance, input.total_supply
         );
 
         // Lock auction tokens in app escrow
@@ -455,7 +442,7 @@ impl AuctionContract {
             user_account,
             app_escrow,
             auction_token_app_untyped,
-            params.total_supply,
+            input.total_supply,
             "lock_auction_tokens".to_string(),
         )
         .await
@@ -465,24 +452,35 @@ impl AuctionContract {
         let auction_id = *self.state.next_auction_id.get();
         self.state.next_auction_id.set(auction_id + 1);
 
-        // Upload image blob and get hash
-        let image_hash = self.upload_image_blob(params.image);
+        // Upload image blob and get hash (base64 string → DataBlobHash)
+        let image_blob_hash = self.upload_image_blob(&input.image);
 
-        // Create params with blob hash instead of raw image data
-        let params_with_hash = AuctionParams {
-            image: image_hash.clone(),
-            ..params
+        // Create AuctionParams with DataBlobHash
+        let params = AuctionParams {
+            item_name: input.item_name,
+            image: image_blob_hash,
+            total_supply: input.total_supply,
+            max_bid_amount: input.max_bid_amount,
+            start_price: input.start_price,
+            floor_price: input.floor_price,
+            price_decay_interval: input.price_decay_interval,
+            price_decay_amount: input.price_decay_amount,
+            start_time: input.start_time,
+            end_time: input.end_time,
+            creator: input.creator,
+            payment_token_app: input.payment_token_app,
+            auction_token_app: input.auction_token_app,
         };
 
-        let auction = AuctionData::new(params_with_hash.clone(), self.runtime.system_time());
+        let auction = AuctionData::new(params.clone(), self.runtime.system_time());
 
         self.state.auctions.insert(&auction_id, auction).unwrap();
 
-        // Emit creation event with full params
+        // Emit creation event (image as hex string for indexer)
         let event = AuctionEvent::AuctionCreated {
             auction_id,
-            item_name: params_with_hash.item_name.clone(),
-            image: image_hash,
+            item_name: params.item_name.clone(),
+            image: format!("{:?}", params.image),
             max_bid_amount: params.max_bid_amount,
             total_supply: params.total_supply,
             start_price: params.start_price,
@@ -1410,16 +1408,14 @@ impl AuctionContract {
     // Token Application Helpers
     // ═══════════════════════════════════════════════════════════
 
-    fn upload_image_blob(&mut self, image_base64: String) -> String {
+    fn upload_image_blob(&mut self, image_base64: &str) -> DataBlobHash {
         use base64::{Engine, engine::general_purpose};
 
         let bytes = general_purpose::STANDARD
-            .decode(&image_base64)
+            .decode(image_base64)
             .expect("Invalid base64 data");
 
-        let blob_hash = self.runtime.create_data_blob(bytes);
-
-        format!("{:?}", blob_hash)
+        self.runtime.create_data_blob(bytes)
     }
 
     /// Validate that a token application is supported

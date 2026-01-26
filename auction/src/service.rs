@@ -137,6 +137,24 @@ impl QueryRoot {
             data: auction,
         })
     }
+
+    /// Get auction image content by auction ID
+    /// Returns the raw image bytes from the blob storage
+    async fn auction_image(&self, auction_id: AuctionId) -> Result<Vec<u8>, String> {
+        let auction = self
+            .state
+            .auctions
+            .get(&auction_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Auction not found".to_string())?;
+
+        let blob_hash = auction.params.image;
+        let blob_content = self.runtime.read_data_blob(blob_hash);
+
+        Ok(blob_content)
+    }
+
     /// Get user's bids for a specific auction (AAC only)
     /// O(1) lookup using composite key (user, auction_id)
     async fn user_bids(

@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
-import { calculateCurrentPrice, isEndingVerySoon } from '@/lib/utils/auction-utils';
+import { isEndingVerySoon } from '@/lib/utils/auction-utils';
 import { cn } from '@/lib/utils';
 import { APP_ROUTES } from '@/config/app.route';
 import { AuctionCardImage } from './auction-card-image';

@@ -26,6 +26,12 @@ export type {
     UseCachedAuctionSummaryResult
 } from './use-cached-auction-summary';
 
+export { useAuctionImage } from './use-auction-image';
+export type {
+    UseAuctionImageOptions,
+    UseAuctionImageResult
+} from './use-auction-image';
+
 export { useCachedBidHistory } from './use-cached-bid-bistory';
 export type {
     UseCachedBidHistoryOptions,

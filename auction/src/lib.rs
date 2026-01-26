@@ -93,13 +93,7 @@ pub enum AuctionOperation {
         app_token_id: ApplicationId,
         amount: Amount,
         target_chain: ChainId,
-    },
-
-    /// Upload a blob (image data) and get its hash for use in CreateAuction
-    UploadBlob {
-        /// Base64-encoded blob data
-        data: String,
-    },
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

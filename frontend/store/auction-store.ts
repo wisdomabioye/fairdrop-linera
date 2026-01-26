@@ -116,6 +116,16 @@ export interface GlobalStatsCacheEntry {
 }
 
 /**
+ * Cache entry for auction images
+ * Images are immutable, so no TTL needed - cache forever once fetched
+ */
+export interface AuctionImageCacheEntry {
+    objectUrl: string | null;  // Blob object URL for efficient rendering
+    status: FetchStatus;
+    error: Error | null;
+}
+
+/**
  * Metadata for all auctions fetch operations
  */
 export interface AllAuctionsMetadata {
@@ -149,6 +159,7 @@ export interface AuctionStore {
     userBids: Map<string, Map<string, UserBidsCacheEntry>>; // auctionId -> address -> userBids
     userBalances: Map<string, UserBalancesCacheEntry>; // address -> balances (multiple tokens)
     globalStats: GlobalStatsCacheEntry | null; // global auction stats
+    auctionImages: Map<string, AuctionImageCacheEntry>; // auctionId -> image (immutable, no TTL)
 
     // ============ Indexer Actions ============
     initializeIndexer: (
@@ -163,6 +174,7 @@ export interface AuctionStore {
     // ============ Fetch Actions ============
     // TEMPORARY: Using AAC queries while indexer event streaming is fixed
     fetchAuctionSummary: (auctionId: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
+    fetchAuctionImage: (auctionId: string, aacApp: ApplicationClient) => Promise<string | null>;
     fetchActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchSettledAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
@@ -229,6 +241,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     userBids: new Map(),
     userBalances: new Map(),
     globalStats: null,
+    auctionImages: new Map(),
 
     // ============ Indexer Initialization ============
     initializeIndexer: async (indexerChainId, aacChain, auctionApp, indexerApp) => {
@@ -501,7 +514,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionInfo(auctionId))
                 );
-                // console.log('AuctionInfo', result);
+                console.log('AuctionInfo', result);
                 const parsed = JSON.parse(result) as {
                     data: { auctionInfo: AuctionWithId | null } | null
                 };
@@ -551,6 +564,99 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 });
 
                 throw error;
+            }
+        });
+    },
+
+    /**
+     * Fetch auction image from blob storage
+     * Images are immutable - fetch once, cache forever (no TTL)
+     * Returns object URL for efficient rendering, or null if not found
+     */
+    fetchAuctionImage: async (auctionId, aacApp): Promise<string | null> => {
+        const stringKey = String(auctionId);
+
+        // Check cache first - images never expire
+        const cached = get().auctionImages.get(stringKey);
+        if (cached && cached.status === 'success' && cached.objectUrl) {
+            return cached.objectUrl;
+        }
+
+        // If already loading, wait for it (deduplication)
+        if (cached?.status === 'loading') {
+            // Return null for now, the hook will get updated when fetch completes
+            return null;
+        }
+
+        const key = `auction-image-${stringKey}`;
+
+        return await queryDeduplicator.deduplicate(key, async () => {
+            // Set loading state
+            set((state) => {
+                const newImages = new Map(state.auctionImages);
+                newImages.set(stringKey, {
+                    objectUrl: null,
+                    status: 'loading',
+                    error: null,
+                });
+                return { auctionImages: newImages };
+            });
+
+            try {
+                const result = await aacApp.public.query<string>(
+                    JSON.stringify(AAC_QUERY.AuctionImage(Number(auctionId)))
+                );
+
+                const { data } = JSON.parse(result) as {
+                    data: { auctionImage: number[] | null }
+                };
+
+                if (!data.auctionImage || data.auctionImage.length === 0) {
+                    // No image found
+                    set((state) => {
+                        const newImages = new Map(state.auctionImages);
+                        newImages.set(stringKey, {
+                            objectUrl: null,
+                            status: 'success',
+                            error: null,
+                        });
+                        return { auctionImages: newImages };
+                    });
+                    return null;
+                }
+
+                // Convert number[] to Uint8Array, then to Blob, then to object URL
+                const uint8Array = new Uint8Array(data.auctionImage);
+                const blob = new Blob([uint8Array]); // Browser detects MIME from magic bytes
+                const objectUrl = URL.createObjectURL(blob);
+
+                set((state) => {
+                    const newImages = new Map(state.auctionImages);
+                    newImages.set(stringKey, {
+                        objectUrl,
+                        status: 'success',
+                        error: null,
+                    });
+                    return { auctionImages: newImages };
+                });
+
+                return objectUrl;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch auction image');
+
+                set((state) => {
+                    const newImages = new Map(state.auctionImages);
+                    newImages.set(stringKey, {
+                        objectUrl: null,
+                        status: 'error',
+                        error,
+                    });
+                    return { auctionImages: newImages };
+                });
+
+                // Don't throw - just return null for images
+                console.error('[fetchAuctionImage] Error:', error);
+                return null;
             }
         });
     },
@@ -691,7 +797,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AuctionsByCreator(creator))
                 );
-                // console.log('AuctionsByCreator (AAC)', result);
+                console.log('AuctionsByCreator (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { auctionsByCreator: AuctionWithId[] | null }
