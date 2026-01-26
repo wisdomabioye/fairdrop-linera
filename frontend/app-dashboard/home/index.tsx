@@ -92,7 +92,7 @@ export default function DashboardOverview() {
       </div>
 
       {/* Loading State, auction must be loaded */}
-      {loading || !auctions?.length && (
+      {loading && (
         viewMode === 'grid' ? (
           <AuctionSkeletonGrid count={8} />
         ) : (
@@ -116,7 +116,7 @@ export default function DashboardOverview() {
           description="Be the first to create an auction!"
           icon={<Plus className="h-12 w-12" />}
           action={
-            <Button onClick={() => router.push('/create-auction')} className="gap-2">
+            <Button onClick={() => router.push(APP_ROUTES.creatorCreate)} className="gap-2">
               <Plus className="h-4 w-4" />
               Create Auction
             </Button>

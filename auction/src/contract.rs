@@ -283,9 +283,7 @@ impl Contract for AuctionContract {
 
                 let blob_hash = self.runtime.create_data_blob(bytes);
 
-                AuctionResponse::BlobUploaded {
-                    blob_hash
-                }
+                AuctionResponse::BlobUploaded(format!("{:?}", blob_hash))
             }
 
         }
@@ -467,15 +465,24 @@ impl AuctionContract {
         let auction_id = *self.state.next_auction_id.get();
         self.state.next_auction_id.set(auction_id + 1);
 
-        let auction = AuctionData::new(params.clone(), self.runtime.system_time());
+        // Upload image blob and get hash
+        let image_hash = self.upload_image_blob(params.image);
+
+        // Create params with blob hash instead of raw image data
+        let params_with_hash = AuctionParams {
+            image: image_hash.clone(),
+            ..params
+        };
+
+        let auction = AuctionData::new(params_with_hash.clone(), self.runtime.system_time());
 
         self.state.auctions.insert(&auction_id, auction).unwrap();
 
         // Emit creation event with full params
         let event = AuctionEvent::AuctionCreated {
             auction_id,
-            item_name: params.item_name.clone(),
-            image: params.image.clone(),
+            item_name: params_with_hash.item_name.clone(),
+            image: image_hash,
             max_bid_amount: params.max_bid_amount,
             total_supply: params.total_supply,
             start_price: params.start_price,
@@ -490,7 +497,7 @@ impl AuctionContract {
         };
         self.runtime.emit(AUCTION_STREAM.into(), &event);
 
-        AuctionResponse::AuctionCreated { auction_id }
+        AuctionResponse::AuctionCreated(auction_id)
     }
 
     /// Handle auction cancellation by creator (before start, AAC only)
@@ -685,15 +692,7 @@ impl AuctionContract {
             self.settle_auction(auction_id).await;
         }
 
-        AuctionResponse::BidPlaced { 
-            auction_id, 
-            bid_id: bid.bid_id, 
-            user_account: bidder, 
-            quantity: bid.quantity, 
-            amount_paid: bid.amount_paid, 
-            timestamp: bid.timestamp, 
-            claimed: bid.claimed 
-        }
+        AuctionResponse::BidPlaced(auction_id, bid.bid_id)
     }
 
     /// Settle auction (manual claim-based settlement - no auto-messaging)
@@ -1410,6 +1409,18 @@ impl AuctionContract {
     // ═══════════════════════════════════════════════════════════
     // Token Application Helpers
     // ═══════════════════════════════════════════════════════════
+
+    fn upload_image_blob(&mut self, image_base64: String) -> String {
+        use base64::{Engine, engine::general_purpose};
+
+        let bytes = general_purpose::STANDARD
+            .decode(&image_base64)
+            .expect("Invalid base64 data");
+
+        let blob_hash = self.runtime.create_data_blob(bytes);
+
+        format!("{:?}", blob_hash)
+    }
 
     /// Validate that a token application is supported
     fn validate_supported_token(&mut self, app_token_id: ApplicationId) -> ApplicationId<FungibleTokenAbi> {

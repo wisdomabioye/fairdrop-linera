@@ -1,5 +1,5 @@
 use async_graphql::{Request, Response};
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, DataBlobHash, Timestamp, ContractAbi, ServiceAbi};
+use linera_sdk::linera_base_types::{Amount, ApplicationId, ChainId, ContractAbi, ServiceAbi};
 use linera_sdk::graphql::GraphQLMutationRoot;
 use serde::{Deserialize, Serialize};
 use shared::types::{ AuctionParamsInput, AuctionId };
@@ -102,26 +102,10 @@ pub enum AuctionOperation {
     },
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum AuctionResponse {
-    #[default]
     Ok,
-
-    AuctionCreated {
-        auction_id: u64,
-    },
-
-    BidPlaced {
-        auction_id: AuctionId,
-        bid_id: u64,
-        user_account: AccountOwner,
-        quantity: Amount,
-        amount_paid: Amount,
-        timestamp: Timestamp,
-        claimed: bool,
-    },
-
-    BlobUploaded {
-        blob_hash: DataBlobHash,
-    },
+    AuctionCreated(u64),
+    BidPlaced(AuctionId, u64),
+    BlobUploaded(String),
 }

@@ -32,7 +32,7 @@ import { getTokenList } from '@/config/app.token-store';
 import { AAC_MUTATION } from '@/lib/gql/queries';
 import type { AuctionParam } from '@/lib/gql/types';
 
-export type MutationType = 'create' | 'buy' | 'claim' | 'deposit' | 'withdraw' | 'cancel' | 'withdrawProceed' | 'withdrawUnsoldToken' | 'prune';
+export type MutationType = 'create' | 'buy' | 'claim' | 'deposit' | 'withdraw' | 'cancel' | 'withdrawProceed' | 'withdrawUnsoldToken' | 'prune' | 'uploadBlob';
 
 /**
  * Discriminated union for mutation success events
@@ -47,7 +47,8 @@ export type MutationSuccessEvent =
     | { type: 'withdrawUnsoldToken'; data: { auctionId: number } }
     | { type: 'prune'; data: { auctionId: number } }
     | { type: 'deposit'; data: { appTokenId: string; amount: string } }
-    | { type: 'withdraw'; data: { appTokenId: string; amount: string; targetChain: string } };
+    | { type: 'withdraw'; data: { appTokenId: string; amount: string; targetChain: string } }
+    | { type: 'uploadBlob'; data: { blobHash: string } };
 
 /**
  * Discriminated union for mutation error events
@@ -86,6 +87,8 @@ export interface UseAuctionMutationsResult {
     deposit: (appTokenId: string, amount: string) => Promise<boolean>;
     /** Withdraw tokens from AAC */
     withdraw: (appTokenId: string, amount: string, targetChain: string) => Promise<boolean>;
+    /** Upload a blob and get its hash */
+    uploadBlob: (data: string) => Promise<string | null>;
     /** Trigger changes on Public Client */
     trigger: () => Promise<void>;
     // Loading states
@@ -107,6 +110,8 @@ export interface UseAuctionMutationsResult {
     isDepositing: boolean;
     /** Is withdrawal in progress? */
     isWithdrawing: boolean;
+    /** Is blob upload in progress? */
+    isUploadingBlob: boolean;
 
     // Error state
     /** Last mutation error */
@@ -124,7 +129,7 @@ export function useAuctionMutations(
     const { address } = useWalletConnection();
     const { walletChainId } = useLineraClient();
     // Get sync status
-    const { isWalletClientSyncing } = useSyncStatus();
+    const { isWalletClientSyncing, isClientSyncing } = useSyncStatus();
 
     // Get store actions for cache invalidation and refresh
     const {
@@ -151,6 +156,7 @@ export function useAuctionMutations(
     const [isPruning, setIsPruning] = useState(false);
     const [isDepositing, setIsDepositing] = useState(false);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
+    const [isUploadingBlob, setIsUploadingBlob] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
     const trigger = useCallback(
@@ -708,6 +714,65 @@ export function useAuctionMutations(
         [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
+    /**
+     * Upload a blob (image) and get its hash
+     * @param data Base64-encoded blob data
+     * @returns The blob hash string, or null if upload failed
+     */
+    const uploadBlob = useCallback(
+        async (data: string): Promise<string | null> => {
+            if (!aacApp?.public) {
+                const err = new Error('Client not found');
+                setError(err);
+                onError?.({ type: 'uploadBlob', error: err });
+                return null;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.({ type: 'uploadBlob', error: err });
+                return null;
+            }
+
+            setIsUploadingBlob(true);
+            setError(null);
+
+            try {
+                const result = await aacApp?.public.systemMutate<string>(
+                    JSON.stringify(AAC_MUTATION.UploadBlob(data))
+                );
+
+                console.log('[useAuctionMutations] Upload blob result:', result);
+
+                const parsed = JSON.parse(result) as { data: { uploadBlob: string } | null, errors?: unknown[] };
+                
+                if (parsed.errors && parsed.errors.length > 0) {
+                    console.error('❌ GraphQL errors:', parsed.errors);
+                    throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
+                }
+
+                if (!parsed.data?.uploadBlob) {
+                    throw new Error('Blob upload returned null');
+                }
+
+                const blobHash = parsed.data.uploadBlob;
+
+                onSuccess?.({ type: 'uploadBlob', data: { blobHash } });
+                return blobHash;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to upload blob');
+                setError(error);
+                console.error('[useAuctionMutations] Upload blob failed:', error);
+                onError?.({ type: 'uploadBlob', error });
+                return null;
+            } finally {
+                setIsUploadingBlob(false);
+            }
+        },
+        [aacApp, address, onSuccess, onError, isWalletClientSyncing]
+    );
+
     return {
         createAuction,
         buy,
@@ -718,6 +783,7 @@ export function useAuctionMutations(
         pruneSettledAuction,
         deposit,
         withdraw,
+        uploadBlob,
         trigger,
         isCreating,
         isBuying,
@@ -728,6 +794,7 @@ export function useAuctionMutations(
         isPruning,
         isDepositing,
         isWithdrawing,
+        isUploadingBlob,
         error
     };
 }

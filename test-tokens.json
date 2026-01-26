@@ -1,0 +1,21 @@
+[
+    {
+        "name": "LN USD",
+        "symbol": "LUSD"
+    }, {
+        "name": "fUSD Token",
+        "symbol": "fUSD"
+    }, {
+        "name": "xUSD Token",
+        "symbol": "xUSD"
+    }, {
+        "name": "SPleen Token",
+        "symbol": "SPL"
+    }, {
+        "name": "DIGI Token",
+        "symbol": "DIGI"
+    }, {
+        "name": "Fair Token",
+        "symbol": "FAIR"
+    }
+]
