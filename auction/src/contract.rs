@@ -274,6 +274,20 @@ impl Contract for AuctionContract {
                 }
             }
 
+            AuctionOperation::UploadBlob { data } => {
+                use base64::{Engine, engine::general_purpose};
+
+                let bytes = general_purpose::STANDARD
+                    .decode(&data)
+                    .expect("Invalid base64 data");
+
+                let blob_hash = self.runtime.create_data_blob(bytes);
+
+                AuctionResponse::BlobUploaded {
+                    blob_hash
+                }
+            }
+
         }
     }
 

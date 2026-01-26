@@ -708,6 +708,12 @@ export const AAC_MUTATION = {
         return {
             query: `mutation { withdraw(appTokenId: ${formatGraphQLValue(app_token_id)}, amount: ${formatGraphQLValue(amount)}, targetChain: ${formatGraphQLValue(target_chain)}) }`
         }
+    },
+
+    UploadBlob (data: string) {
+        return {
+            query: `mutation { uploadBlob(data: ${formatGraphQLValue(data)}) }`
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 use async_graphql::{Request, Response};
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp, ContractAbi, ServiceAbi};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, DataBlobHash, Timestamp, ContractAbi, ServiceAbi};
 use linera_sdk::graphql::GraphQLMutationRoot;
 use serde::{Deserialize, Serialize};
 use shared::types::{ AuctionParamsInput, AuctionId };
@@ -94,6 +94,12 @@ pub enum AuctionOperation {
         amount: Amount,
         target_chain: ChainId,
     },
+
+    /// Upload a blob (image data) and get its hash for use in CreateAuction
+    UploadBlob {
+        /// Base64-encoded blob data
+        data: String,
+    },
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -113,5 +119,9 @@ pub enum AuctionResponse {
         amount_paid: Amount,
         timestamp: Timestamp,
         claimed: bool,
+    },
+
+    BlobUploaded {
+        blob_hash: DataBlobHash,
     },
 }
