@@ -165,11 +165,11 @@ export function useAuctionMutations(
                 await aacApp?.public?.systemMutate<string>(
                     JSON.stringify(AAC_MUTATION.Trigger())
                 );
-                const result = await aacApp?.public?.systemMutate<string>(
-                    JSON.stringify(AAC_MUTATION.Trigger())
-                );
+                // const result = await aacApp?.public?.systemMutate<string>(
+                //     JSON.stringify(AAC_MUTATION.Trigger())
+                // );
 
-                console.log('[useAuctionMutations] Trigger:', result);
+                // console.log('[useAuctionMutations] Trigger:', result);
 
             } catch (err) {
                 console.error('[useAuctionMutations] Trigger failed:', err);
@@ -205,7 +205,7 @@ export function useAuctionMutations(
                     JSON.stringify(AAC_MUTATION.CreateAuction(params)), 
                     { owner: address }
                 );
-                console.log('📥 CreateAuction raw result:', result);
+                // console.log('📥 CreateAuction raw result:', result);
 
                 const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
                 // console.log('📊 Parsed result:', parsed);
@@ -272,18 +272,17 @@ export function useAuctionMutations(
             setError(null);
 
             try {
-                const result = await aacApp.wallet.mutate<string>(
+                await aacApp.wallet.mutate<string>(
                     JSON.stringify(AAC_MUTATION.Buy(auctionId.toString(), quantity.toString())),
                     { owner: address }
                 );
 
-                console.log('[useAuctionMutations] Buy result:', result);
+                // console.log('[useAuctionMutations] Buy result:', result);
 
                 // Trigger publicClient
                 await trigger();
-
                 const tokenApps = getTokenList().map(token => token.appId);
-                await trigger();
+
                 // Invalidate and force refresh affected caches
                 await invalidateAndRefreshAuction(auctionId.toString(), aacApp);
                 await invalidateAndRefreshUserBids(auctionId.toString(), address, aacApp);
