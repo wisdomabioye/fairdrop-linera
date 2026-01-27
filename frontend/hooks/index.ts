@@ -44,6 +44,13 @@ export type {
     UseCachedUserBidRecordResult
 } from './use-cached-my-bids';
 
+export type {
+    UseCachedAllUserBidsResult,
+    UseCachedAllUserBidsOptions
+} from './use-cached-all-user-bids';
+
+export { useCachedAllUserBids } from './use-cached-all-user-bids';
+
 export { useCachedSettledAuctions } from './use-cached-settled-auctions';
 export type {
     UseCachedSettledAuctionsOptions,
