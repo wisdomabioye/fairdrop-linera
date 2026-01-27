@@ -173,6 +173,40 @@ impl QueryRoot {
         Ok(bids)
     }
 
+    /// Get all bids placed by a user across all auctions (AAC only)
+    /// Returns bids sorted by bid_id (chronological order)
+    /// Note: This iterates all entries in user_auction_bids and filters by user.
+    /// For large maps, this is O(n). Indexer will provide optimized queries in the future.
+    async fn all_user_bids(&self, user: AccountOwner) -> Result<Vec<BidRecord>, String> {
+        let indices = self
+            .state
+            .user_auction_bids
+            .indices()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let mut all_bids = Vec::new();
+
+        for (owner, auction_id) in indices {
+            if owner == user {
+                if let Some(bids) = self
+                    .state
+                    .user_auction_bids
+                    .get(&(owner, auction_id))
+                    .await
+                    .map_err(|e| e.to_string())?
+                {
+                    all_bids.extend(bids);
+                }
+            }
+        }
+
+        // Sort by bid_id (chronological order)
+        all_bids.sort_by_key(|bid| bid.bid_id);
+
+        Ok(all_bids)
+    }
+
     // ─────────────────────────────────────────────────────────
     // Temporary Indexer Replacement Queries (AAC only)
     // TODO: These will be replaced by dedicated Indexer service once event streaming is stable

@@ -157,6 +157,7 @@ export interface AuctionStore {
     auctionsByCreator: Map<string, AuctionListCacheEntry>; // creator -> auctions
     bidHistory: Map<string, BidHistoryCacheEntry>; // auctionId -> bids
     userBids: Map<string, Map<string, UserBidsCacheEntry>>; // auctionId -> address -> userBids
+    allUserBids: Map<string, UserBidsCacheEntry>; // address -> all user bids across all auctions
     userBalances: Map<string, UserBalancesCacheEntry>; // address -> balances (multiple tokens)
     globalStats: GlobalStatsCacheEntry | null; // global auction stats
     auctionImages: Map<string, AuctionImageCacheEntry>; // auctionId -> image (immutable, no TTL)
@@ -180,6 +181,7 @@ export interface AuctionStore {
     fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchUserBids: (auctionId: string, address: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
+    fetchAllUserBids: (address: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchGlobalStats: (aacApp: ApplicationClient, force?: boolean) => Promise<void>;
 
@@ -193,6 +195,7 @@ export interface AuctionStore {
     invalidateAuctionsByCreator: (creator: string) => void;
     invalidateBidHistory: (auctionId: string) => void;
     invalidateUserBids: (auctionId: string, address?: string) => void;
+    invalidateAllUserBids: (address: string) => void;
     invalidateUserBalances: (address: string) => void;
     invalidateGlobalStats: () => void;
     invalidateAll: () => void;
@@ -203,6 +206,7 @@ export interface AuctionStore {
     invalidateAndRefreshAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshUserBids: (auctionId: string, address: string, aacApp: ApplicationClient) => Promise<void>;
+    invalidateAndRefreshAllUserBids: (address: string, aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient) => Promise<void>;
     invalidateAndRefreshGlobalStats: (aacApp: ApplicationClient) => Promise<void>;
 
@@ -215,7 +219,7 @@ export interface AuctionStore {
 
     // ============ Utility Actions ============
     isStale: (
-        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids' | 'userBalances' | 'globalStats',
+        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids' | 'allUserBids' | 'userBalances' | 'globalStats',
         key?: string
     ) => boolean;
 }
@@ -239,6 +243,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     auctionsByCreator: new Map(),
     bidHistory: new Map(),
     userBids: new Map(),
+    allUserBids: new Map(),
     userBalances: new Map(),
     globalStats: null,
     auctionImages: new Map(),
@@ -1021,6 +1026,89 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     /**
+     * Fetch all bids placed by a user across all auctions
+     * Uses AAC_QUERY.AllUserBids for a single request
+     */
+    fetchAllUserBids: async (address, aacApp, force = false) => {
+        // Validate address to prevent undefined keys in cache
+        if (!address) {
+            console.warn('[fetchAllUserBids] address is required');
+            return;
+        }
+
+        const key = `all-user-bids-${address}`;
+
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().allUserBids.get(address);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < USER_BID_TTL) {
+                    return; // Cache hit, no API call needed
+                }
+            }
+        }
+
+        await queryDeduplicator.deduplicate(key, async () => {
+            set((state) => {
+                const newMap = new Map(state.allUserBids);
+                const existing = newMap.get(address);
+
+                newMap.set(address, {
+                    data: existing?.data ?? null,
+                    timestamp: existing?.timestamp ?? Date.now(),
+                    status: 'loading',
+                    error: null,
+                });
+                return { allUserBids: newMap };
+            });
+
+            try {
+                if (!aacApp) {
+                    throw new Error('Wallet is not connected');
+                }
+
+                const result = await aacApp.public.query<string>(
+                    JSON.stringify(AAC_QUERY.AllUserBids(address))
+                );
+
+                const { data } = JSON.parse(result) as {
+                    data: { allUserBids: BidRecord[] | null }
+                };
+
+                set((state) => {
+                    const newMap = new Map(state.allUserBids);
+
+                    newMap.set(address, {
+                        data: (data.allUserBids || [])?.map(transformBidRecord),
+                        timestamp: Date.now(),
+                        status: 'success',
+                        error: null,
+                    });
+                    return { allUserBids: newMap };
+                });
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch all user bids');
+
+                set((state) => {
+                    const newMap = new Map(state.allUserBids);
+                    const existing = newMap.get(address);
+
+                    newMap.set(address, {
+                        data: existing?.data ?? null,
+                        timestamp: existing?.timestamp ?? Date.now(),
+                        status: 'error',
+                        error,
+                    });
+                    return { allUserBids: newMap };
+                });
+
+                throw error;
+            }
+        });
+    },
+
+    /**
      * Fetch user balances for multiple tokens in a single batched request
      * Uses AAC_QUERY.UserBalances to reduce N requests → 1 request
      */
@@ -1299,6 +1387,22 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
+    invalidateAllUserBids: (address) => {
+        set((state) => {
+            const newMap = new Map(state.allUserBids);
+            const existing = newMap.get(address);
+
+            if (existing) {
+                newMap.set(address, {
+                    ...existing,
+                    timestamp: 0
+                });
+            }
+
+            return { allUserBids: newMap };
+        });
+    },
+
     invalidateUserBalances: (address) => {
         set((state) => {
             const newMap = new Map(state.userBalances);
@@ -1368,6 +1472,12 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 newUserBids.set(auctionId, newAuctionMap);
             });
 
+            // Mark all user bids as stale
+            const newAllUserBids = new Map(state.allUserBids);
+            newAllUserBids.forEach((value, address) => {
+                newAllUserBids.set(address, { ...value, timestamp: 0 });
+            });
+
             // Mark user balances as stale
             const newUserBalances = new Map(state.userBalances);
             newUserBalances.forEach((value, address) => {
@@ -1391,6 +1501,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 auctionsByCreator: newAuctionsByCreator,
                 bidHistory: newBidHistory,
                 userBids: newUserBids,
+                allUserBids: newAllUserBids,
                 userBalances: newUserBalances,
                 globalStats: newGlobalStats,
             };
@@ -1481,6 +1592,23 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
         // Force fresh fetch
         await get().fetchUserBids(auctionId, address, aacApp, true);
+    },
+
+    /**
+     * Invalidate and force refresh all user bids across all auctions
+     * Clears deduplicator, invalidates cache, and forces fresh fetch
+     */
+    invalidateAndRefreshAllUserBids: async (address, aacApp) => {
+        const key = `all-user-bids-${address}`;
+
+        // Clear any in-flight requests for this resource
+        queryDeduplicator.clear(key);
+
+        // Invalidate cache (keeps existing data visible, marks as stale)
+        get().invalidateAllUserBids(address);
+
+        // Force fresh fetch
+        await get().fetchAllUserBids(address, aacApp, true);
     },
 
     /**
@@ -1597,6 +1725,12 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const auctionMap = get().userBids.get(auctionId);
                 if (!auctionMap || !address) return true;
                 const entry = auctionMap.get(address);
+                if (!entry || entry.status === 'idle') return true;
+                return now - entry.timestamp > USER_BID_TTL;
+            }
+            case 'allUserBids': {
+                if (!key) return true;
+                const entry = get().allUserBids.get(key);
                 if (!entry || entry.status === 'idle') return true;
                 return now - entry.timestamp > USER_BID_TTL;
             }

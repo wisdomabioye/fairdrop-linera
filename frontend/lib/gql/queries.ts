@@ -146,6 +146,19 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
         return this.addFragment(queryBody);
     }
 
+    allUserBids(user: string): this {
+        const queryBody = `allUserBids(user: ${formatGraphQLValue(user)}) {
+                    bidId
+                    auctionId
+                    userAccount
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }`;
+        return this.addFragment(queryBody);
+    }
+
     userBalance (user: string, token_app: string): this {
         const queryBody = `userBalance(user: ${formatGraphQLValue(user)}, tokenApp: ${formatGraphQLValue(token_app)})`;
         
@@ -580,6 +593,22 @@ export const AAC_QUERY = {
         return {
             query: `query {
                 userBids(user: ${formatGraphQLValue(user)}, auctionId: ${auction_id}) {
+                    bidId
+                    auctionId
+                    userAccount
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }
+            }`
+        }
+    },
+
+    AllUserBids (user: string) {
+        return {
+            query: `query {
+                allUserBids(user: ${formatGraphQLValue(user)}) {
                     bidId
                     auctionId
                     userAccount
