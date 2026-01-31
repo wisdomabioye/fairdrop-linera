@@ -3,8 +3,7 @@
  *
  * Reads user balances from centralized store with auto-fetch on stale/missing data.
  * Uses batched query for all tokens at once.
- * 
- * NOTE: Polling is managed by EagerLoader, not this hook.
+ * Supports optional polling (enabled by default).
  */
 
 import { useEffect, useCallback, useRef } from 'react';
@@ -17,6 +16,10 @@ export interface UseCachedUserBalancesOptions {
   tokenApps: string[];
   aacApp: ApplicationClient | null;
   skip?: boolean;
+  /** Enable polling - ON by default */
+  enablePolling?: boolean;
+  /** Polling interval in ms (default: 15000) */
+  pollInterval?: number;
 }
 
 export interface UseCachedUserBalancesResult {
@@ -32,18 +35,27 @@ export interface UseCachedUserBalancesResult {
 export function useCachedUserBalances(
   options: UseCachedUserBalancesOptions
 ): UseCachedUserBalancesResult {
-  const { address, tokenApps, aacApp, skip = false } = options;
+  const {
+    address,
+    tokenApps,
+    aacApp,
+    skip = false,
+    enablePolling = true,
+    pollInterval = 15000
+  } = options;
 
   const { isPublicClientSyncing } = useSyncStatus();
 
   const {
     userBalances,
     invalidateAndRefreshUserBalances,
+    startPollingUserBalances,
     isStale: checkIsStale
   } = useAuctionStore();
 
   // Use ref to track first load (no re-renders)
   const hasLoadedOnce = useRef(false);
+  const pollingUnsubscribe = useRef<(() => void) | null>(null);
 
   // Get cached entry
   const entry = userBalances.get(address);
@@ -79,6 +91,28 @@ export function useCachedUserBalances(
       refetch();
     }
   }, [skip, aacApp, isStale, isPublicClientSyncing, tokenApps.length, entry, isFetching, refetch]);
+
+  // Polling setup - enabled by default
+  useEffect(() => {
+    // Cleanup previous
+    if (pollingUnsubscribe.current) {
+      pollingUnsubscribe.current();
+      pollingUnsubscribe.current = null;
+    }
+
+    if (!enablePolling || !aacApp || !address || skip || tokenApps.length === 0) {
+      return;
+    }
+
+    pollingUnsubscribe.current = startPollingUserBalances(address, tokenApps, aacApp, pollInterval);
+
+    return () => {
+      if (pollingUnsubscribe.current) {
+        pollingUnsubscribe.current();
+        pollingUnsubscribe.current = null;
+      }
+    };
+  }, [enablePolling, skip, aacApp, address, tokenApps, pollInterval, startPollingUserBalances]);
 
   return {
     balances,

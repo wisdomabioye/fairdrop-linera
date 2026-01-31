@@ -176,9 +176,9 @@ export interface AuctionStore {
     // TEMPORARY: Using AAC queries while indexer event streaming is fixed
     fetchAuctionSummary: (auctionId: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchAuctionImage: (auctionId: string, aacApp: ApplicationClient) => Promise<string | null>;
-    fetchActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
+    fetchActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchSettledAuctions: (offset: number, limit: number, aacApp: ApplicationClient) => Promise<void>;
-    fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient) => Promise<void>;
+    fetchAuctionsByCreator: (creator: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchUserBids: (auctionId: string, address: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
     fetchAllUserBids: (address: string, aacApp: ApplicationClient, force?: boolean) => Promise<void>;
@@ -212,10 +212,12 @@ export interface AuctionStore {
 
     // ============ Polling Actions ============
     // TEMPORARY: Using AAC app while indexer event streaming is fixed
-    startPollingAuction: (auctionId: string, aacApp: ApplicationClient, interval?: number) => () => void;
-    startPollingActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient, interval?: number) => () => void;
-    startPollingBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, interval?: number) => () => void;
-    startPollingGlobalStats: (aacApp: ApplicationClient, interval?: number) => () => void;
+    startPollingAuction: (auctionId: string, aacApp: ApplicationClient, interval?: number, force?: boolean) => () => void;
+    startPollingActiveAuctions: (offset: number, limit: number, aacApp: ApplicationClient, interval?: number, force?: boolean) => () => void;
+    startPollingAuctionsByCreator: (creator: string, aacApp: ApplicationClient, interval?: number, force?: boolean) => () => void;
+    startPollingBidHistory: (auctionId: string, offset: number, limit: number, aacApp: ApplicationClient, interval?: number, force?: boolean) => () => void;
+    startPollingGlobalStats: (aacApp: ApplicationClient, interval?: number, force?: boolean) => () => void;
+    startPollingUserBalances: (address: string, tokenApps: string[], aacApp: ApplicationClient, interval?: number, force?: boolean) => () => void;
 
     // ============ Utility Actions ============
     isStale: (
@@ -666,7 +668,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         });
     },
 
-    fetchActiveAuctions: async (offset, limit, aacApp) => {
+    fetchActiveAuctions: async (offset, limit, aacApp, force) => {
         // Set loading state
         set((state) => ({
             activeAuctions: {
@@ -681,7 +683,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
         try {
             // Fetch auctions and get the IDs that were fetched
-            const fetchedIds = await get()._fetchAllAuctionsInternal(offset, limit, aacApp);
+            const fetchedIds = await get()._fetchAllAuctionsInternal(offset, limit, aacApp, force);
 
             // Filter ONLY the fetched IDs by status (not the entire cache)
             const activeAuctionIds = fetchedIds.filter(id => {
@@ -773,7 +775,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         }
     },
 
-    fetchAuctionsByCreator: async (creator, aacApp) => {
+    fetchAuctionsByCreator: async (creator, aacApp, force = false) => {
         // TEMPORARY: Skip indexer check - using AAC directly
         // TEMPORARY: No offset/limit - returns all creator's auctions
         // if (!get().indexerInitialized) {
@@ -781,6 +783,17 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         // }
 
         const key = `auctions-by-creator-${creator}`;
+
+        // Check cache first (skip if forced)
+        if (!force) {
+            const cached = get().auctionsByCreator.get(creator);
+            if (cached && cached.status === 'success') {
+                const age = Date.now() - cached.timestamp;
+                if (age < 12000) { // 12s TTL (same as AUCTION_LIST_TTL)
+                    return; // Cache hit, no API call needed
+                }
+            }
+        }
 
         await queryDeduplicator.deduplicate(key, async () => {
             set((state) => {
@@ -1645,43 +1658,62 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     },
 
     // ============ Polling Actions ============
-    startPollingAuction: (auctionId, aacApp, interval = 5000) => {
+    startPollingAuction: (auctionId, aacApp, interval = 5000, force = true) => {
         const key = `auction-${auctionId}`;
 
         return pollingManager.subscribe(
             key,
-            () => get().fetchAuctionSummary(auctionId, aacApp),
+            () => get().fetchAuctionSummary(auctionId, aacApp, force),
             interval
         );
     },
 
-    startPollingActiveAuctions: (offset, limit, aacApp, interval = 10000) => {
+    startPollingActiveAuctions: (offset, limit, aacApp, interval = 10000, force = true) => {
         const key = `active-auctions-${offset}-${limit}`;
 
         return pollingManager.subscribe(
             key,
-            () => get().fetchActiveAuctions(offset, limit, aacApp),
+            () => get().fetchActiveAuctions(offset, limit, aacApp, force),
             interval
         );
     },
 
-    // ============ Polling Actions ============
-    startPollingBidHistory: (auctionId, offset, limit, aacApp, interval = 5000) => {
+    startPollingAuctionsByCreator: (creator, aacApp, interval = 10000, force = true) => {
+        const key = `auctions-by-creator-${creator}`;
+
+        return pollingManager.subscribe(
+            key,
+            () => get().fetchAuctionsByCreator(creator, aacApp, force),
+            interval
+        );
+    },
+
+    startPollingBidHistory: (auctionId, offset, limit, aacApp, interval = 5000, force = true) => {
         const key = `bid-history-${auctionId}-${offset}-${limit}`;
 
         return pollingManager.subscribe(
             key,
-            () => get().fetchBidHistory(auctionId, offset, limit, aacApp),
+            () => get().fetchBidHistory(auctionId, offset, limit, aacApp, force),
             interval
         );
     },
 
-    startPollingGlobalStats: (aacApp, interval = 30000) => {
+    startPollingGlobalStats: (aacApp, interval = 30000, force = true) => {
         const key = 'global-stats';
 
         return pollingManager.subscribe(
             key,
-            () => get().fetchGlobalStats(aacApp),
+            () => get().fetchGlobalStats(aacApp, force),
+            interval
+        );
+    },
+
+    startPollingUserBalances: (address, tokenApps, aacApp, interval = 15000, force = true) => {
+        const key = `user-balances-${address}`;
+
+        return pollingManager.subscribe(
+            key,
+            () => get().fetchUserBalances(address, tokenApps, aacApp, force),
             interval
         );
     },

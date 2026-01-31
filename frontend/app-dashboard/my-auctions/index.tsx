@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/loading/empty-state';
 import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/auction-skeleton';
 import { useCachedAuctionsByCreator, useAacApp } from '@/hooks';
 import { useUIStore } from '@/store/ui-store';
+import { APP_ROUTES } from '@/config/app.route';
 
 export default function MyAuctionsPage() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function MyAuctionsPage() {
             {auctions?.length || 0} {auctions?.length === 1 ? 'auction' : 'auctions'} created
           </p>
         </div>
-        <Button onClick={() => router.push('/create-auction')} className="gap-2">
+        <Button onClick={() => router.push(APP_ROUTES.creatorCreate)} className="gap-2">
           <Plus className="h-4 w-4" />
           Create Auction
         </Button>
