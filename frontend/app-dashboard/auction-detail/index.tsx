@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';	
 import { useParams, useRouter } from 'next/navigation';	
 import { ArrowLeft, Share2, Clock, TrendingDown, Package2, Users, Zap, Trophy } from 'lucide-react';	
-import { useAacApp, useCachedAuctionSummary, useCachedUserBidRecord, useAuctionImage } from '@/hooks';	
+import { useAacApp, useAuctionDetail, useAuctionImage } from '@/hooks';	
+import { useBatchPolling } from '@/providers';
 import { BidHistory } from '@/components/auction/bid-history';	
 import { Button } from '@/components/ui/button';	
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';	
@@ -28,31 +29,28 @@ import { getTokenByAppId } from '@/config/app.token-store';
 
 export default function AuctionDetailPage() {	
   const router = useRouter();	
+  const aacApp = useAacApp();	
   const params = useParams();	
   const auctionId = params?.auctionId as string || '';	
-  const aacApp = useAacApp();	
 
-  // Fetch auction details - NO POLLING here, EagerLoader handles list polling
-  // This fetches individual auction which isn't covered by EagerLoader
   const {	
     auction,	
     loading,	
     error,	
     refetch	
-  } = useCachedAuctionSummary({	
+  } = useAuctionDetail({	
     auctionId,	
     aacApp: aacApp.app,	
-    enablePolling: true, // Keep polling for individual auction detail
-    pollInterval: 10_000, // 10s
+    enablePolling: true,
+    pollInterval: 15_000, // 10s
     skip: !auctionId || !aacApp.app	
   });	
 
-  // Fetch user's commitment - no polling needed, refetch on success
-  const { totalQuantity } = useCachedUserBidRecord({
-    auctionId,
-    aacApp: aacApp.app,
-    skip: !auctionId || !aacApp.app?.wallet
-  });
+  const { 
+    userPortfolio: { getBidsByAuctionId },
+  } = useBatchPolling();
+
+  const { totalQuantity } = getBidsByAuctionId(auctionId);
 
   // Fetch auction image from blob storage (cached permanently)
   const { imageUrl, loading: imageLoading } = useAuctionImage({
@@ -60,7 +58,6 @@ export default function AuctionDetailPage() {
     aacApp: aacApp.app,
     skip: !auctionId || !aacApp.app
   });	
-
 
   const handleShare = useCallback(() => {	
     if (navigator.share) {	

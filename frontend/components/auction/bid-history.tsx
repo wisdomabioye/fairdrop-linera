@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
-import { useCachedBidHistory, useAacApp } from '@/hooks';
+import { useAuctionDetail } from '@/hooks';
 import {
   truncateAddress,
   formatTokenAmount,
@@ -93,22 +93,19 @@ export function BidHistory({
   compact = false,
   currentUserWalletAddress
 }: BidHistoryProps) {
-  const aacApp = useAacApp();
   const [offset, setOffset] = useState(0);
 
-  const {
-    bids,
+  const {	
+    bidHistory,	
     loading,
     isFetching,
-    error,
-  } = useCachedBidHistory({
-    auctionId,
-    offset,
-    limit,
-    aacApp: aacApp.app,
-    enablePolling: false,
-    skip: !aacApp.app
-  });
+    error,	
+  } = useAuctionDetail({	
+    auctionId,	
+    aacApp: null,	
+    skip: true	
+  });	
+  
 
   // Memoize lowercase wallet address to avoid recalculating on each row
   const normalizedUserAddress = useMemo(
@@ -126,9 +123,9 @@ export function BidHistory({
 
   // Sort bids: latest first
   const sortedBids = useMemo(() => {
-    if (!bids) return [];
-    return [...bids].sort((a, b) => b.timestamp - a.timestamp);
-  }, [bids]);
+    if (!bidHistory) return [];
+    return [...bidHistory].sort((a, b) => b.timestamp - a.timestamp);
+  }, [bidHistory]);
 
   const handleLoadMore = () => setOffset(offset + limit);
   const handleLoadPrevious = () => setOffset(Math.max(0, offset - limit));

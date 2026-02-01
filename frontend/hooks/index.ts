@@ -102,3 +102,21 @@ export {
     type UseCachedGlobalStatsOptions,
     type UseCachedGlobalStatsResult
 } from './use-cached-global-stats';
+
+export { useAuctionDetail } from './use-auction-detail';
+export type {
+    UseAuctionDetailOptions,
+    UseAuctionDetailResult
+} from './use-auction-detail';
+
+export { useDashboard } from './use-dashboard';
+export type {
+    UseDashboardOptions,
+    UseDashboardResult
+} from './use-dashboard';
+
+export { useUserPortfolio } from './use-user-portfolio';
+export type {
+    UseUserPortfolioOptions,
+    UseUserPortfolioResult
+} from './use-user-portfolio';

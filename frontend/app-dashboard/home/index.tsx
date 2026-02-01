@@ -14,15 +14,14 @@ import { BidDialog } from '@/components/auction/bid-dialog';
 import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/auction-skeleton';
 import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
-import { useCachedActiveAuctions, useCachedGlobalStats, useAacApp } from '@/hooks';
 import { useUIStore } from '@/store/ui-store';
 
 import type { AuctionSummary } from '@/lib/gql/types';
 import { APP_ROUTES } from '@/config/app.route';
+import { useBatchPolling } from '@/providers';
 
 export default function DashboardOverview() {
   const router = useRouter();
-  const aacApp = useAacApp();
   const { walletAddress } = useLineraClient();
   const { viewMode } = useUIStore();
   const [filter, setFilter] = useState<'all' | 'ending-soon' | 'settled'>('all');
@@ -35,24 +34,22 @@ export default function DashboardOverview() {
     auction: null,
   });
 
-  const { stats, loading: statsLoading } = useCachedGlobalStats({
-    aacApp: aacApp.app,
-  });
+  const { 
+    dashboardData: {
+      activeAuctions,
+      globalStats,
+      loading,
+      isFetching,
+      error,
+      // status,
+      // isStale,
+      refetch
+    }
+  } = useBatchPolling();
 
-  const {
-    auctions,
-    loading,
-    isFetching,
-    error,
-    refetch,
-  } = useCachedActiveAuctions({
-    offset: 0,
-    limit: 20,
-    aacApp: aacApp.app,
-  });
 
   const handleBidClick = (auctionId: number) => {
-    const auction = auctions?.find(a => a.auctionId === auctionId);
+    const auction = activeAuctions?.find(a => a.auctionId === auctionId);
     if (auction) {
       setBidDialog({ open: true, auction });
     }
@@ -77,7 +74,7 @@ export default function DashboardOverview() {
       </div>
 
       {/* Global Stats - Pass stats object directly */}
-      <GlobalStatsBar stats={stats} loading={statsLoading} />
+      <GlobalStatsBar stats={globalStats} loading={loading} />
 
       {/* Filters & View Toggle */}
       <div className="flex items-center justify-between">
@@ -101,7 +98,7 @@ export default function DashboardOverview() {
       )}
 
       {/* Error State */}
-      {error && !auctions?.length && (
+      {error && !activeAuctions?.length && (
         <ErrorState
           error={error}
           onRetry={refetch}
@@ -110,7 +107,7 @@ export default function DashboardOverview() {
       )}
 
       {/* Empty State */}
-      {!loading && !error && auctions && auctions.length === 0 && (
+      {!loading && !error && activeAuctions && activeAuctions.length === 0 && (
         <EmptyState
           title="No auctions found"
           description="Be the first to create an auction!"
@@ -125,11 +122,11 @@ export default function DashboardOverview() {
       )}
 
       {/* Auctions Display */}
-      {auctions && auctions.length > 0 && (
+      {activeAuctions && activeAuctions.length > 0 && (
         <>
           {viewMode === 'grid' ? (
             <div className="grid gap-6 justify-start [grid-template-columns:repeat(auto-fill,minmax(345px,350px))]">
-              {auctions.map((auction) => (
+              {activeAuctions.map((auction) => (
                 <AuctionCard
                   key={auction.auctionId}
                   auction={auction}
@@ -140,7 +137,7 @@ export default function DashboardOverview() {
             </div>
           ) : (
             <AuctionTable
-              auctions={auctions}
+              auctions={activeAuctions}
               onBidClick={handleBidClick}
             />
           )}

@@ -85,6 +85,7 @@ export function DateTimePicker({
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           className={cn(
             'w-full justify-start text-left font-normal',

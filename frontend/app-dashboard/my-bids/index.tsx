@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, RefreshCw, Check, Clock, ExternalLink, Timer, Ban } from 'lucide-react';
-import { toast } from 'sonner';
 import { useWalletConnection, useLineraApplication } from 'linera-react-client';
 import { WalletConnectionPrompt } from '@/components/wallet/wallet-connection-prompt';
 import { EmptyState } from '@/components/loading/empty-state';
@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useCachedAllUserBids, useAuctionMutations } from '@/hooks';
+import { useAuctionMutations } from '@/hooks';
+import { useBatchPolling } from '@/providers';
 import { useAuctionStore } from '@/store/auction-store';
 import { formatRelativeTime, formatTokenAmount } from '@/lib/utils/auction-utils';
 import { AuctionStatus, type BidRecord } from '@/lib/gql/types';
@@ -77,13 +78,14 @@ function BidStatusBadge({
 
 export default function MyBids() {
   const aacApp = useLineraApplication(AAC_APP_ID);
-  const { isConnected, address } = useWalletConnection();
+  const { isConnected } = useWalletConnection();
   const [claimingBidId, setClaimingBidId] = useState<number | null>(null);
 
-  const { allUserBids, loading, isFetching, refetch } = useCachedAllUserBids({
-    aacApp: aacApp.app,
-    skip: !address
-  });
+  const { 
+    userPortfolio: {
+      allUserBids, loading, isFetching, refetch
+    }
+  } = useBatchPolling();
 
   const {
     allAuctionsCache,

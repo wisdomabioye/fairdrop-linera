@@ -1,4 +1,4 @@
-import { useCachedUserBidRecord, useAacApp } from '@/hooks';
+import { useBatchPolling } from '@/providers';
 
 interface PersonalStats {
   activeBidsCount: number;
@@ -9,15 +9,17 @@ interface PersonalStats {
 }
 
 export function usePersonalStats() {
-  const aacApp = useAacApp();
+  const { 
+    userPortfolio: {
+      allUserBids, 
+      loading, 
+      error
+    }
+  } = useBatchPolling();
 
-  const { userBidRecord, loading, error } = useCachedUserBidRecord({
-    aacApp: aacApp.app,
-    auctionId: '0'
-  });
 
   const stats: PersonalStats = {
-    activeBidsCount: userBidRecord?.length || 0,
+    activeBidsCount: allUserBids?.length || 0,
     wonAuctionsCount: 0, // TODO: Filter won commitments
     totalSpent: '0', // TODO: Sum spent amounts
     totalMinimumRefund: '0', // TODO: Calculate unclaimed bids - current price
@@ -28,7 +30,7 @@ export function usePersonalStats() {
     stats,
     loading,
     error,
-    hasActivity: (userBidRecord?.length || 0) > 0,
+    hasActivity: (allUserBids?.length || 0) > 0,
   };
 }
 	

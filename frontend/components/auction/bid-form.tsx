@@ -7,10 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useWalletConnection } from 'linera-react-client';
-import { useSyncStatus } from '@/providers';
-import { useAuctionMutations, useCachedUserBidRecord, useAacApp, useCachedUserBalances } from '@/hooks';
+import { useSyncStatus, useBatchPolling } from '@/providers';
+import { useAuctionMutations, useCachedUserBidRecord, useAacApp } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
-import { getTokenByAppId, getPaymentTokenList } from '@/config/app.token-store';
+import { getTokenByAppId } from '@/config/app.token-store';
 import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
 import {
   formatTimeRemaining,
@@ -35,7 +35,7 @@ export function BidForm({
   compact = false
 }: BidFormProps) {
   const aacApp = useAacApp();
-  const { isConnected, isConnecting, connect, address } = useWalletConnection();
+  const { isConnected, isConnecting, connect } = useWalletConnection();
   const { isWalletClientSyncing } = useSyncStatus();
   const [quantity, setQuantity] = useState(1);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
@@ -43,20 +43,18 @@ export function BidForm({
   const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
 
   // Fetch user's AAC balance
-  const { balances, loading: balanceLoading } = useCachedUserBalances({
-    address: address || '',
-    tokenApps: getPaymentTokenList().map(p => p.appId),
-    aacApp: aacApp.app,
-    skip: !address || !aacApp.app
-  });
+  const { 
+    userPortfolio: {
+      balances,
+      getBidsByAuctionId,
+      loading: balanceLoading
+    }
+  } = useBatchPolling();
+
   const userBalance = balances?.get(auction.paymentTokenApp) ?? 0;
 
   // Fetch user's current commitment
-  const { totalQuantity } = useCachedUserBidRecord({
-    auctionId: auction.auctionId.toString(),
-    aacApp: aacApp.app,
-    skip: !aacApp.app
-  });
+  const {totalQuantity} = getBidsByAuctionId(auction.auctionId.toString());
 
   const {
     buy,

@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WalletConnectButton } from '@/components/wallet';
-import { useSyncStatus } from '@/providers';
+import { useBatchPolling, useSyncStatus } from '@/providers';
 import { useCachedUserBidRecord } from '@/hooks/use-cached-my-bids';
 import { useAuctionMutations } from '@/hooks/use-auction-mutations';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
@@ -37,18 +37,21 @@ export function ClaimForm({
   const { isClientSyncing } = useSyncStatus();
   const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Fetch user's commitment
+  const { 
+    userPortfolio: {
+      error: fetchError,
+      getBidsByAuctionId,
+      loading,
+      isFetching
+    }
+  } = useBatchPolling();
+
   const {
-    userBidRecord,
-    totalQuantity = 0,
-    totalPaid = 0,
-    loading,
-    error: fetchError,
-    isFetching
-  } = useCachedUserBidRecord({
-    auctionId: auction.auctionId.toString(),
-    aacApp,
-    skip: !auction || !aacApp
-  });
+    totalQuantity,
+    totalPaid,
+    bids: userBidRecord
+  } = getBidsByAuctionId(auction.auctionId.toString());
+
 
   const { claimSettlement, isClaiming, error: claimError } = useAuctionMutations({
     aacApp,

@@ -126,6 +126,34 @@ export interface AuctionImageCacheEntry {
 }
 
 /**
+ * Batch fetch metadata - tracks batch operation state
+ */
+export interface BatchFetchMetadata {
+    timestamp: number;
+    status: FetchStatus;
+    error: Error | null;
+}
+
+/**
+ * Batch fetch result types
+ */
+export interface AuctionDetailBatchResult {
+    auction: AuctionSummary | null;
+    bidHistory: BidRecord[] | null;
+}
+
+export interface UserPortfolioBatchResult {
+    allUserBids: BidRecord[] | null;
+    creatorAuctions: AuctionSummary[] | null;
+    balances: Map<string, number> | null;
+}
+
+export interface DashboardBatchResult {
+    activeAuctions: AuctionSummary[] | null;
+    globalStats: AuctionGlobalStats | null;
+}
+
+/**
  * Metadata for all auctions fetch operations
  */
 export interface AllAuctionsMetadata {
@@ -162,6 +190,11 @@ export interface AuctionStore {
     globalStats: GlobalStatsCacheEntry | null; // global auction stats
     auctionImages: Map<string, AuctionImageCacheEntry>; // auctionId -> image (immutable, no TTL)
 
+    // ============ Batch Fetch Metadata ============
+    batchAuctionDetail: Map<string, BatchFetchMetadata>; // auctionId -> batch metadata
+    batchUserPortfolio: Map<string, BatchFetchMetadata>; // address -> batch metadata
+    batchDashboard: BatchFetchMetadata | null;
+
     // ============ Indexer Actions ============
     initializeIndexer: (
         indexerChainId: string,
@@ -188,6 +221,67 @@ export interface AuctionStore {
     // ============ Internal Fetch Methods ============
     _fetchAllAuctionsInternal: (offset: number, limit: number, aacApp: ApplicationClient, force?: boolean) => Promise<string[]>;
 
+    // ============ Batch Fetch Actions ============
+    /**
+     * Fetch auction detail data in a single batched request
+     * Combines: auctionInfo + bidHistory
+     * Populates: auctions, allAuctionsCache, bidHistory caches
+     */
+    fetchAuctionDetailBatch: (
+        auctionId: string,
+        bidOffset: number,
+        bidLimit: number,
+        aacApp: ApplicationClient,
+        force?: boolean
+    ) => Promise<AuctionDetailBatchResult>;
+
+    /**
+     * Fetch user portfolio data in a single batched request
+     * Combines: allUserBids + auctionsByCreator + userBalances
+     * Populates: allUserBids, auctionsByCreator, allAuctionsCache, userBalances caches
+     */
+    fetchUserPortfolioBatch: (
+        address: string,
+        tokenApps: string[],
+        aacApp: ApplicationClient,
+        force?: boolean
+    ) => Promise<UserPortfolioBatchResult>;
+
+    /**
+     * Fetch dashboard data in a single batched request
+     * Combines: allAuctions + globalStats
+     * Populates: allAuctionsCache, activeAuctions, globalStats caches
+     */
+    fetchDashboardBatch: (
+        offset: number,
+        limit: number,
+        aacApp: ApplicationClient,
+        force?: boolean
+    ) => Promise<DashboardBatchResult>;
+
+    // ============ Batch Polling Actions ============
+    startPollingAuctionDetailBatch: (
+        auctionId: string,
+        bidOffset: number,
+        bidLimit: number,
+        aacApp: ApplicationClient,
+        interval?: number
+    ) => () => void;
+
+    startPollingUserPortfolioBatch: (
+        address: string,
+        tokenApps: string[],
+        aacApp: ApplicationClient,
+        interval?: number
+    ) => () => void;
+
+    startPollingDashboardBatch: (
+        offset: number,
+        limit: number,
+        aacApp: ApplicationClient,
+        interval?: number
+    ) => () => void;
+
     // ============ Invalidation Actions ============
     invalidateAuction: (auctionId: string) => void;
     invalidateActiveAuctions: () => void;
@@ -198,6 +292,9 @@ export interface AuctionStore {
     invalidateAllUserBids: (address: string) => void;
     invalidateUserBalances: (address: string) => void;
     invalidateGlobalStats: () => void;
+    invalidateAuctionDetailBatch: (auctionId: string) => void;
+    invalidateUserPortfolioBatch: (address: string) => void;
+    invalidateDashboardBatch: () => void;
     invalidateAll: () => void;
 
     // ============ Combined Invalidate + Refetch Actions ============
@@ -221,7 +318,7 @@ export interface AuctionStore {
 
     // ============ Utility Actions ============
     isStale: (
-        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids' | 'allUserBids' | 'userBalances' | 'globalStats',
+        type: 'auction' | 'activeAuctions' | 'settledAuctions' | 'auctionsByCreator' | 'bidHistory' | 'userBids' | 'allUserBids' | 'userBalances' | 'globalStats' | 'batchAuctionDetail' | 'batchUserPortfolio' | 'batchDashboard',
         key?: string
     ) => boolean;
 }
@@ -249,6 +346,11 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     userBalances: new Map(),
     globalStats: null,
     auctionImages: new Map(),
+
+    // Batch fetch metadata
+    batchAuctionDetail: new Map(),
+    batchUserPortfolio: new Map(),
+    batchDashboard: null,
 
     // ============ Indexer Initialization ============
     initializeIndexer: async (indexerChainId, aacChain, auctionApp, indexerApp) => {
@@ -420,7 +522,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AllAuctions(offset, limit))
                 );
-                // console.log('AllAuctions' , result)
+                console.log('AllAuctions' , result)
                 const { data } = JSON.parse(result) as {
                     data: { allAuctions: AuctionWithId[] | null }
                 };
@@ -911,7 +1013,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.BidHistory(auctionId, offset, limit))
                 );
-                // console.log('BidHistory (AAC)', result);
+                console.log('BidHistory (AAC)', result);
 
                 const { data } = JSON.parse(result) as {
                     data: { bidHistory: BidRecord[] | null }
@@ -996,7 +1098,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     JSON.stringify(AAC_QUERY.UserBids(address, Number(auctionId)))
                 );
 
-                // console.log('MyCommitmentForAuction:', JSON.parse(result));
+                console.log('MyCommitmentForAuction:', JSON.parse(result));
 
                 const { data } = JSON.parse(result) as {
                     data: { userBids: BidRecord[] | null }
@@ -1084,6 +1186,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const result = await aacApp.public.query<string>(
                     JSON.stringify(AAC_QUERY.AllUserBids(address))
                 );
+                
+                console.log('fetchAllUserBids', result)
 
                 const { data } = JSON.parse(result) as {
                     data: { allUserBids: BidRecord[] | null }
@@ -1176,7 +1280,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     JSON.stringify(AAC_QUERY.UserBalances(address, tokenApps))
                 );
 
-                // console.log('UserBalances (batched):', JSON.parse(result));
+                console.log('UserBalances', JSON.parse(result));
 
                 const { data } = JSON.parse(result) as {
                     data: { userBalances: Array<{ tokenApp: string; amount: string | number }> | null }
@@ -1270,6 +1374,8 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                     data: { globalStats: AuctionGlobalStats | null }
                 };
 
+                console.log('GlobalStats', data)
+
                 set({
                     globalStats: {
                         data: data.globalStats,
@@ -1293,6 +1399,475 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 throw error;
             }
         });
+    },
+
+    // ============ Batch Fetch Actions ============
+    /**
+     * Fetch auction detail data in a single batched request
+     * Combines: auctionInfo + bidHistory
+     */
+    fetchAuctionDetailBatch: async (auctionId, bidOffset, bidLimit, aacApp, force = false): Promise<AuctionDetailBatchResult> => {
+        const stringKey = String(auctionId);
+        const batchKey = `batch-auction-detail-${stringKey}`;
+
+        // Check if batch is fresh (unless forced)
+        if (!force) {
+            const batchMeta = get().batchAuctionDetail.get(stringKey);
+            if (batchMeta && batchMeta.status === 'success') {
+                const age = Date.now() - batchMeta.timestamp;
+                if (age < AUCTION_DATA_TTL) {
+                    // Return from existing caches
+                    const auction = get().auctions.get(stringKey)?.data ?? null;
+                    const bidHistory = get().bidHistory.get(stringKey)?.data ?? null;
+                    return { auction, bidHistory };
+                }
+            }
+        }
+
+        // Check if we already have data (for background refresh)
+        const existingMeta = get().batchAuctionDetail.get(stringKey);
+        const hasExistingData = existingMeta?.status === 'success';
+
+        return await queryDeduplicator.deduplicate(batchKey, async () => {
+            // Only set loading state if we don't have existing data
+            // This prevents UI flicker during background polls
+            if (!hasExistingData) {
+                set((state) => {
+                    const newBatchMeta = new Map(state.batchAuctionDetail);
+                    newBatchMeta.set(stringKey, {
+                        timestamp: state.batchAuctionDetail.get(stringKey)?.timestamp ?? Date.now(),
+                        status: 'loading',
+                        error: null,
+                    });
+                    return { batchAuctionDetail: newBatchMeta };
+                });
+            }
+
+            try {
+                // Build batched query
+                const batchQuery = AAC_QUERY.batch()
+                    .auctionInfo(Number(auctionId))
+                    .bidHistory(Number(auctionId), bidOffset, bidLimit)
+                    .build();
+
+                const result = await aacApp.public.query<string>(JSON.stringify(batchQuery));
+
+                console.log('fetchAuctionDetailBatch', result)
+
+                const { data } = JSON.parse(result) as {
+                    data: {
+                        auctionInfo: AuctionWithId | null;
+                        bidHistory: BidRecord[] | null;
+                    }
+                };
+
+                // Transform data
+                const auctionSummary = data.auctionInfo
+                    ? transformAuctionWithId(data.auctionInfo)
+                    : null;
+                const transformedBids = data.bidHistory?.map(transformBidRecord) ?? null;
+
+                const now = Date.now();
+
+                // Populate all caches in a single set call
+                set((state) => {
+                    const newAuctions = new Map(state.auctions);
+                    const newAllAuctions = new Map(state.allAuctionsCache);
+                    const newBidHistory = new Map(state.bidHistory);
+                    const newBatchMeta = new Map(state.batchAuctionDetail);
+
+                    // Update auction caches
+                    if (auctionSummary) {
+                        const auctionEntry: AuctionCacheEntry = {
+                            data: auctionSummary,
+                            timestamp: now,
+                            status: 'success',
+                            error: null,
+                        };
+                        newAuctions.set(stringKey, auctionEntry);
+                        newAllAuctions.set(stringKey, auctionEntry);
+                    }
+
+                    // Update bid history cache
+                    newBidHistory.set(stringKey, {
+                        data: transformedBids,
+                        timestamp: now,
+                        status: 'success',
+                        error: null,
+                    });
+
+                    // Update batch metadata
+                    newBatchMeta.set(stringKey, {
+                        timestamp: now,
+                        status: 'success',
+                        error: null,
+                    });
+
+                    return {
+                        auctions: newAuctions,
+                        allAuctionsCache: newAllAuctions,
+                        bidHistory: newBidHistory,
+                        batchAuctionDetail: newBatchMeta,
+                    };
+                });
+
+                return { auction: auctionSummary, bidHistory: transformedBids };
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch auction detail batch');
+
+                set((state) => {
+                    const newBatchMeta = new Map(state.batchAuctionDetail);
+                    newBatchMeta.set(stringKey, {
+                        timestamp: state.batchAuctionDetail.get(stringKey)?.timestamp ?? Date.now(),
+                        status: 'error',
+                        error,
+                    });
+                    return { batchAuctionDetail: newBatchMeta };
+                });
+
+                throw error;
+            }
+        });
+    },
+
+    /**
+     * Fetch user portfolio data in a single batched request
+     * Combines: allUserBids + auctionsByCreator + userBalances
+     */
+    fetchUserPortfolioBatch: async (address, tokenApps, aacApp, force = false): Promise<UserPortfolioBatchResult> => {
+        if (!address) {
+            console.warn('[fetchUserPortfolioBatch] address is required');
+            return { allUserBids: null, creatorAuctions: null, balances: null };
+        }
+
+        const batchKey = `batch-user-portfolio-${address}`;
+
+        // Check if batch is fresh (unless forced)
+        if (!force) {
+            const batchMeta = get().batchUserPortfolio.get(address);
+            if (batchMeta && batchMeta.status === 'success') {
+                const age = Date.now() - batchMeta.timestamp;
+                if (age < USER_BID_TTL) {
+                    // Return from existing caches
+                    const allUserBids = get().allUserBids.get(address)?.data ?? null;
+                    const creatorEntry = get().auctionsByCreator.get(address);
+                    const creatorAuctions = creatorEntry?.auctionIds
+                        ? creatorEntry.auctionIds
+                            .map(id => get().allAuctionsCache.get(id)?.data)
+                            .filter(Boolean) as AuctionSummary[]
+                        : null;
+                    const balances = get().userBalances.get(address)?.data ?? null;
+                    return { allUserBids, creatorAuctions, balances };
+                }
+            }
+        }
+
+        // Check if we already have data (for background refresh)
+        const existingMeta = get().batchUserPortfolio.get(address);
+        const hasExistingData = existingMeta?.status === 'success';
+
+        return await queryDeduplicator.deduplicate(batchKey, async () => {
+            // Only set loading state if we don't have existing data
+            // This prevents UI flicker during background polls
+            if (!hasExistingData) {
+                set((state) => {
+                    const newBatchMeta = new Map(state.batchUserPortfolio);
+                    newBatchMeta.set(address, {
+                        timestamp: state.batchUserPortfolio.get(address)?.timestamp ?? Date.now(),
+                        status: 'loading',
+                        error: null,
+                    });
+                    return { batchUserPortfolio: newBatchMeta };
+                });
+            }
+
+            try {
+                // Build batched query
+                const batchQuery = AAC_QUERY.batch()
+                    .allUserBids(address)
+                    .auctionsByCreator(address)
+                    .userBalances(address, tokenApps)
+                    .build();
+
+                const result = await aacApp.public.query<string>(JSON.stringify(batchQuery));
+
+                console.log('fetchUserPortfolioBatch', result)
+
+                const { data } = JSON.parse(result) as {
+                    data: {
+                        allUserBids: BidRecord[] | null;
+                        auctionsByCreator: AuctionWithId[] | null;
+                        userBalances: Array<{ tokenApp: string; amount: string | number }> | null;
+                    }
+                };
+
+                // Transform data
+                const transformedBids = data.allUserBids?.map(transformBidRecord) ?? null;
+                const creatorAuctions = (data.auctionsByCreator || []).map(transformAuctionWithId);
+
+                // Convert balances array to Map
+                const balancesMap = new Map<string, number>();
+                (data.userBalances || []).forEach(item => {
+                    const parsedAmount = typeof item.amount === 'string'
+                        ? parseFloat(item.amount) || 0
+                        : item.amount;
+                    balancesMap.set(item.tokenApp, parsedAmount);
+                });
+                // Ensure all requested tokens are in the map
+                tokenApps.forEach(tokenApp => {
+                    if (!balancesMap.has(tokenApp)) {
+                        balancesMap.set(tokenApp, 0);
+                    }
+                });
+
+                const now = Date.now();
+
+                // Populate all caches in a single set call
+                set((state) => {
+                    const newAllUserBids = new Map(state.allUserBids);
+                    const newAuctionsByCreator = new Map(state.auctionsByCreator);
+                    const newAllAuctionsCache = new Map(state.allAuctionsCache);
+                    const newUserBalances = new Map(state.userBalances);
+                    const newBatchMeta = new Map(state.batchUserPortfolio);
+
+                    // Update allUserBids cache
+                    newAllUserBids.set(address, {
+                        data: transformedBids,
+                        timestamp: now,
+                        status: 'success',
+                        error: null,
+                    });
+
+                    // Update auctionsByCreator cache and normalized auction cache
+                    const auctionIds = creatorAuctions.map(a => String(a.auctionId));
+                    creatorAuctions.forEach(auction => {
+                        newAllAuctionsCache.set(String(auction.auctionId), {
+                            data: auction,
+                            timestamp: now,
+                            status: 'success',
+                            error: null,
+                        });
+                    });
+                    newAuctionsByCreator.set(address, {
+                        auctionIds,
+                        timestamp: now,
+                        status: 'success',
+                        error: null,
+                        offset: 0,
+                        limit: 999,
+                    });
+
+                    // Update userBalances cache
+                    newUserBalances.set(address, {
+                        data: balancesMap,
+                        timestamp: now,
+                        status: 'success',
+                        error: null,
+                    });
+
+                    // Update batch metadata
+                    newBatchMeta.set(address, {
+                        timestamp: now,
+                        status: 'success',
+                        error: null,
+                    });
+
+                    return {
+                        allUserBids: newAllUserBids,
+                        auctionsByCreator: newAuctionsByCreator,
+                        allAuctionsCache: newAllAuctionsCache,
+                        userBalances: newUserBalances,
+                        batchUserPortfolio: newBatchMeta,
+                    };
+                });
+
+                return {
+                    allUserBids: transformedBids,
+                    creatorAuctions,
+                    balances: balancesMap,
+                };
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch user portfolio batch');
+
+                set((state) => {
+                    const newBatchMeta = new Map(state.batchUserPortfolio);
+                    newBatchMeta.set(address, {
+                        timestamp: state.batchUserPortfolio.get(address)?.timestamp ?? Date.now(),
+                        status: 'error',
+                        error,
+                    });
+                    return { batchUserPortfolio: newBatchMeta };
+                });
+
+                throw error;
+            }
+        });
+    },
+
+    /**
+     * Fetch dashboard data in a single batched request
+     * Combines: allAuctions + globalStats
+     */
+    fetchDashboardBatch: async (offset, limit, aacApp, force = false): Promise<DashboardBatchResult> => {
+        const batchKey = `batch-dashboard-${offset}-${limit}`;
+
+        // Check if batch is fresh (unless forced)
+        if (!force) {
+            const batchMeta = get().batchDashboard;
+            if (batchMeta && batchMeta.status === 'success') {
+                const age = Date.now() - batchMeta.timestamp;
+                if (age < AUCTION_LIST_TTL) {
+                    // Return from existing caches
+                    const activeAuctionIds = get().activeAuctions?.auctionIds ?? [];
+                    const activeAuctions = activeAuctionIds
+                        .map(id => get().allAuctionsCache.get(id)?.data)
+                        .filter(Boolean) as AuctionSummary[];
+                    const globalStats = get().globalStats?.data ?? null;
+                    return { activeAuctions, globalStats };
+                }
+            }
+        }
+
+        // Check if we already have data (for background refresh)
+        const existingMeta = get().batchDashboard;
+        const hasExistingData = existingMeta?.status === 'success';
+
+        return await queryDeduplicator.deduplicate(batchKey, async () => {
+            // Only set loading state if we don't have existing data
+            // This prevents UI flicker during background polls
+            if (!hasExistingData) {
+                set((state) => ({
+                    batchDashboard: {
+                        timestamp: state.batchDashboard?.timestamp ?? Date.now(),
+                        status: 'loading',
+                        error: null,
+                    }
+                }));
+            }
+
+            try {
+                // Build batched query
+                const batchQuery = AAC_QUERY.batch()
+                    .allAuctions(offset, limit)
+                    .globalStats()
+                    .build();
+
+                const result = await aacApp.public.query<string>(JSON.stringify(batchQuery));
+
+                console.log('fetchDashboardBatch', result)
+
+                const { data } = JSON.parse(result) as {
+                    data: {
+                        allAuctions: AuctionWithId[] | null;
+                        globalStats: AuctionGlobalStats | null;
+                    }
+                };
+
+                // Transform auctions
+                const allAuctions = (data.allAuctions || []).map(transformAuctionWithId);
+                const fetchedIds = allAuctions.map(a => String(a.auctionId));
+
+                // Filter active auctions
+                const activeAuctions = allAuctions.filter(auction =>
+                    auction.status === AuctionStatus.Active ||
+                    auction.status === AuctionStatus.Scheduled
+                );
+                const activeAuctionIds = activeAuctions.map(a => String(a.auctionId));
+
+                const now = Date.now();
+
+                // Populate all caches in a single set call
+                set((state) => {
+                    const newAllAuctionsCache = new Map(state.allAuctionsCache);
+
+                    // Populate normalized cache
+                    allAuctions.forEach(auction => {
+                        newAllAuctionsCache.set(String(auction.auctionId), {
+                            data: auction,
+                            timestamp: now,
+                            status: 'success',
+                            error: null,
+                        });
+                    });
+
+                    return {
+                        allAuctionsCache: newAllAuctionsCache,
+                        allAuctionsMeta: {
+                            lastFetchTime: now,
+                            status: 'success',
+                            error: null,
+                            offset,
+                            limit,
+                            fetchedIds,
+                        },
+                        activeAuctions: {
+                            auctionIds: activeAuctionIds,
+                            timestamp: now,
+                            status: 'success',
+                            error: null,
+                            offset,
+                            limit,
+                        },
+                        globalStats: {
+                            data: data.globalStats,
+                            timestamp: now,
+                            status: 'success',
+                            error: null,
+                        },
+                        batchDashboard: {
+                            timestamp: now,
+                            status: 'success',
+                            error: null,
+                        },
+                    };
+                });
+
+                return { activeAuctions, globalStats: data.globalStats };
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to fetch dashboard batch');
+
+                set((state) => ({
+                    batchDashboard: {
+                        timestamp: state.batchDashboard?.timestamp ?? Date.now(),
+                        status: 'error',
+                        error,
+                    }
+                }));
+
+                throw error;
+            }
+        });
+    },
+
+    // ============ Batch Polling Actions ============
+    startPollingAuctionDetailBatch: (auctionId, bidOffset, bidLimit, aacApp, interval = 5000) => {
+        const key = `batch-auction-detail-${auctionId}`;
+
+        return pollingManager.subscribe(
+            key,
+            async () => { await get().fetchAuctionDetailBatch(auctionId, bidOffset, bidLimit, aacApp, true); },
+            interval
+        );
+    },
+
+    startPollingUserPortfolioBatch: (address, tokenApps, aacApp, interval = 15000) => {
+        const key = `batch-user-portfolio-${address}`;
+
+        return pollingManager.subscribe(
+            key,
+            async () => { await get().fetchUserPortfolioBatch(address, tokenApps, aacApp, true); },
+            interval
+        );
+    },
+
+    startPollingDashboardBatch: (offset, limit, aacApp, interval = 10000) => {
+        const key = `batch-dashboard-${offset}-${limit}`;
+
+        return pollingManager.subscribe(
+            key,
+            async () => { await get().fetchDashboardBatch(offset, limit, aacApp, true); },
+            interval
+        );
     },
 
     // ============ Invalidation Actions ============
@@ -1439,6 +2014,48 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 timestamp: 0
             } : null
         }));
+    },
+
+    invalidateAuctionDetailBatch: (auctionId) => {
+        const stringKey = String(auctionId);
+        set((state) => {
+            const newBatchMeta = new Map(state.batchAuctionDetail);
+            const existing = newBatchMeta.get(stringKey);
+            if (existing) {
+                newBatchMeta.set(stringKey, { ...existing, timestamp: 0 });
+            }
+            return { batchAuctionDetail: newBatchMeta };
+        });
+        // Also invalidate underlying caches
+        get().invalidateAuction(auctionId);
+        get().invalidateBidHistory(auctionId);
+    },
+
+    invalidateUserPortfolioBatch: (address) => {
+        set((state) => {
+            const newBatchMeta = new Map(state.batchUserPortfolio);
+            const existing = newBatchMeta.get(address);
+            if (existing) {
+                newBatchMeta.set(address, { ...existing, timestamp: 0 });
+            }
+            return { batchUserPortfolio: newBatchMeta };
+        });
+        // Also invalidate underlying caches
+        get().invalidateAllUserBids(address);
+        get().invalidateAuctionsByCreator(address);
+        get().invalidateUserBalances(address);
+    },
+
+    invalidateDashboardBatch: () => {
+        set((state) => ({
+            batchDashboard: state.batchDashboard ? {
+                ...state.batchDashboard,
+                timestamp: 0
+            } : null
+        }));
+        // Also invalidate underlying caches
+        get().invalidateActiveAuctions();
+        get().invalidateGlobalStats();
     },
 
     invalidateAll: () => {
@@ -1776,6 +2393,23 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                 const entry = get().globalStats;
                 if (!entry || entry.status === 'idle') return true;
                 return now - entry.timestamp > GLOBAL_STATS_TTL;
+            }
+            case 'batchAuctionDetail': {
+                if (!key) return true;
+                const entry = get().batchAuctionDetail.get(key);
+                if (!entry || entry.status === 'idle') return true;
+                return now - entry.timestamp > AUCTION_DATA_TTL;
+            }
+            case 'batchUserPortfolio': {
+                if (!key) return true;
+                const entry = get().batchUserPortfolio.get(key);
+                if (!entry || entry.status === 'idle') return true;
+                return now - entry.timestamp > USER_BID_TTL;
+            }
+            case 'batchDashboard': {
+                const entry = get().batchDashboard;
+                if (!entry || entry.status === 'idle') return true;
+                return now - entry.timestamp > AUCTION_LIST_TTL;
             }
 
             default:

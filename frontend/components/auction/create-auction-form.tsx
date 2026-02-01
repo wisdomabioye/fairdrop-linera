@@ -14,9 +14,9 @@ import { Spinner } from '@/components/ui/spinner';
 import { 
   useAuctionMutations, 
   useAacApp, 
-  useCachedUserBalances, 
   usePersistedAuctionForm 
 } from '@/hooks';
+import { useSyncStatus, useBatchPolling } from '@/providers';
 import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import { TokenSelector } from '@/components/shared';
 import { ImageUpload } from '@/components/shared';
@@ -24,12 +24,10 @@ import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
 import { CreatorBalanceCheck } from './creator-balance-check';
 import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
-import { getAuctionTokenList, getPaymentTokenList, getTokenList, getTokenByAppId } from '@/config/app.token-store';
+import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { APP_ROUTES } from '@/config/app.route';
-import { useSyncStatus } from '@/providers';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
-
 
 export interface CreateAuctionFormProps {
   onSuccess?: (auctionId: string) => void | Promise<void>;
@@ -114,12 +112,11 @@ export function CreateAuctionFormMultistep({
   const auctionTokenList = getAuctionTokenList();
 
   // Fetch current AAC balance for deposit dialog
-  const { balances: aacBalances } = useCachedUserBalances({
-    address: address || '',
-    tokenApps: getTokenList().map(t => t.appId),
-    aacApp: aacApp.app,
-    skip: !address || !aacApp.app
-  });
+  const { 
+    userPortfolio: {
+      balances: aacBalances, 
+    }
+  } = useBatchPolling();
 
   const currentAACBalance = aacBalances?.get(formData.auctionTokenApp) ?? 0;
 

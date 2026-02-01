@@ -12,21 +12,20 @@ import { AuctionTable } from '@/components/auction/auction-table';
 import { ViewToggle } from '@/components/dashboard/filter/view-toggle';
 import { EmptyState } from '@/components/loading/empty-state';
 import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/auction-skeleton';
-import { useCachedAuctionsByCreator, useAacApp } from '@/hooks';
+import { useBatchPolling } from '@/providers';
 import { useUIStore } from '@/store/ui-store';
 import { APP_ROUTES } from '@/config/app.route';
 
 export default function MyAuctionsPage() {
   const router = useRouter();
-  const aacApp = useAacApp();
-  const { address, isConnected } = useWalletConnection();
+  const { isConnected } = useWalletConnection();
   const { viewMode } = useUIStore();
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'scheduled' | 'ended'>('all');
 
-  const { auctions, loading } = useCachedAuctionsByCreator({
-    aacApp: aacApp.app,
-    creator: address ?? '',
-  });
+  const { 
+    userPortfolio: { creatorAuctions, loading }
+  } = useBatchPolling();
+
 
   if (!isConnected) {
     return (
@@ -40,8 +39,8 @@ export default function MyAuctionsPage() {
   }
 
   const filteredAuctions = statusFilter === 'all'
-    ? auctions
-    : auctions?.filter(a => a.status?.toLowerCase() === statusFilter.toLowerCase());
+    ? creatorAuctions
+    : creatorAuctions?.filter(a => a.status?.toLowerCase() === statusFilter.toLowerCase());
 
   return (
     <div className="space-y-6">
@@ -50,7 +49,7 @@ export default function MyAuctionsPage() {
         <div>
           <h1 className="text-3xl font-bold">My Auctions</h1>
           <p className="text-muted-foreground mt-1">
-            {auctions?.length || 0} {auctions?.length === 1 ? 'auction' : 'auctions'} created
+            {creatorAuctions?.length || 0} {creatorAuctions?.length === 1 ? 'auction' : 'auctions'} created
           </p>
         </div>
         <Button onClick={() => router.push(APP_ROUTES.creatorCreate)} className="gap-2">
