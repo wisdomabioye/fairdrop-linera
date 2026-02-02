@@ -270,6 +270,8 @@ export function CreateAuctionFormMultistep({
     // Convert dates to microseconds
     const startTime = millisecondsToMicroseconds(startDate.getTime());
     const endTime = millisecondsToMicroseconds(endDate.getTime());
+    const _priceDecayMilliseconds = (formData.priceDecayInterval * 1000);
+    const priceDecayInterval = millisecondsToMicroseconds(_priceDecayMilliseconds)
 
     // Extract base64 from data URL: "data:image/png;base64,ABC123" → "ABC123"
     const imageBase64 = formData.image.includes(',')
@@ -284,7 +286,7 @@ export function CreateAuctionFormMultistep({
       startPrice: formData.startPrice,
       floorPrice: formData.floorPrice,
       priceDecayAmount: formData.priceDecayAmount,
-      priceDecayInterval: Number(formData.priceDecayInterval),
+      priceDecayInterval,
       startTime,
       endTime,
       creator: address!,

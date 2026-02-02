@@ -23,7 +23,8 @@ import {
   calculateSupplyPercentage,	
   formatTokenAmount,	
   formatAbsoluteTime,	
-  isEndingVerySoon	
+  isEndingVerySoon,	
+  microsecondsToMilliseconds
 } from '@/lib/utils/auction-utils';	
 import { getTokenByAppId } from '@/config/app.token-store';
 
@@ -34,7 +35,7 @@ export default function AuctionDetailPage() {
   const auctionId = params?.auctionId as string || '';	
 
   const {	
-    auction,	
+    auction,
     loading,	
     error,	
     refetch	
@@ -292,7 +293,7 @@ export default function AuctionDetailPage() {
                 <div className="space-y-1">	
                   <p className="text-muted-foreground">Price Decay</p>	
                   <p className="text-base font-mono">	
-                    -{formatTokenAmount(auction.priceDecayAmount, 18, 4)} {paymentTokenInfo.symbol} / {auction.priceDecayInterval}s	
+                    -{formatTokenAmount(auction.priceDecayAmount, 18, 4)} {paymentTokenInfo.symbol} / {microsecondsToMilliseconds(auction.priceDecayInterval/1000)}s	
                   </p>	
                 </div>	
                 <div className="space-y-1">	
