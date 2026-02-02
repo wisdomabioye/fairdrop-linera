@@ -91,7 +91,9 @@ impl QueryRoot {
                     auction.params.price_decay_amount,
                     auction.params.price_decay_interval,
                     auction.params.start_time,
+                    auction.params.end_time,
                     now,
+                    auction.status
                 )
             }
             AuctionStatus::Settled | AuctionStatus::Cancelled | AuctionStatus::Pruned => {
@@ -124,7 +126,9 @@ impl QueryRoot {
                     auction.params.price_decay_amount,
                     auction.params.price_decay_interval,
                     auction.params.start_time,
+                    auction.params.end_time,
                     now,
+                    auction.status
                 );
             }
             _ => {
@@ -137,6 +141,24 @@ impl QueryRoot {
             data: auction,
         })
     }
+
+    /// Get auction image content by auction ID
+    /// Returns the raw image bytes from the blob storage
+    async fn auction_image(&self, auction_id: AuctionId) -> Result<Vec<u8>, String> {
+        let auction = self
+            .state
+            .auctions
+            .get(&auction_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Auction not found".to_string())?;
+
+        let blob_hash = auction.params.image;
+        let blob_content = self.runtime.read_data_blob(blob_hash);
+
+        Ok(blob_content)
+    }
+
     /// Get user's bids for a specific auction (AAC only)
     /// O(1) lookup using composite key (user, auction_id)
     async fn user_bids(
@@ -153,6 +175,40 @@ impl QueryRoot {
             .unwrap_or_default();
 
         Ok(bids)
+    }
+
+    /// Get all bids placed by a user across all auctions (AAC only)
+    /// Returns bids sorted by bid_id (chronological order)
+    /// Note: This iterates all entries in user_auction_bids and filters by user.
+    /// For large maps, this is O(n). Indexer will provide optimized queries in the future.
+    async fn all_user_bids(&self, user: AccountOwner) -> Result<Vec<BidRecord>, String> {
+        let indices = self
+            .state
+            .user_auction_bids
+            .indices()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let mut all_bids = Vec::new();
+
+        for (owner, auction_id) in indices {
+            if owner == user {
+                if let Some(bids) = self
+                    .state
+                    .user_auction_bids
+                    .get(&(owner, auction_id))
+                    .await
+                    .map_err(|e| e.to_string())?
+                {
+                    all_bids.extend(bids);
+                }
+            }
+        }
+
+        // Sort by bid_id (chronological order)
+        all_bids.sort_by_key(|bid| bid.bid_id);
+
+        Ok(all_bids)
     }
 
     // ─────────────────────────────────────────────────────────
@@ -215,7 +271,9 @@ impl QueryRoot {
                             auction.params.price_decay_amount,
                             auction.params.price_decay_interval,
                             auction.params.start_time,
+                            auction.params.end_time,
                             now,
+                            auction.status
                         );
                     }
                     _ => {}
@@ -266,7 +324,9 @@ impl QueryRoot {
                                 auction.params.price_decay_amount,
                                 auction.params.price_decay_interval,
                                 auction.params.start_time,
+                                auction.params.end_time,
                                 now,
+                                auction.status
                             );
                         }
                         _ => {}

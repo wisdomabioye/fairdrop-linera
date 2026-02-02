@@ -2,7 +2,8 @@
 import { LineraProvider, LogLevel } from 'linera-react-client';
 import { PageLoading, ErrorFallback } from '@/components/loading';
 import { SyncProvider } from './sync-provider';
-import { EagerLoader } from './eager-loader';
+// import { EagerLoader } from './eager-loader';
+import { BatchPollingProvider } from './batch-polling';
 
 export function AppLineraProvider({ children }: {children: React.ReactNode}) {
 
@@ -10,7 +11,7 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
     <LineraProvider
       faucetUrl={process.env.NEXT_PUBLIC_FAUCET_URL!}
       readOnlyWallet={{
-        constantAddress: '0x0000000000000000000000000000000000000011'
+        constantAddress: '0x0000000000000000000000000000000000000013'
       }}
       fallback={<PageLoading />}
       errorFallback={() => <ErrorFallback />}
@@ -21,9 +22,11 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
       }}
     >
       <SyncProvider>
-        <EagerLoader>
+        {/* <EagerLoader> */}
+        <BatchPollingProvider>
           {children}
-        </EagerLoader>
+        </BatchPollingProvider>
+        {/* </EagerLoader> */}
       </SyncProvider>
     </LineraProvider>
   )

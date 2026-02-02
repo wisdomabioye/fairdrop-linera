@@ -28,11 +28,10 @@ import { useAuctionStore } from '@/store/auction-store';
 import { useTokenStore } from '@/store/token-store';
 import { useSyncStatus } from '@/providers';
 import { type ApplicationClient, useWalletConnection, useLineraClient } from 'linera-react-client';
-import { getTokenList } from '@/config/app.token-store';
 import { AAC_MUTATION } from '@/lib/gql/queries';
 import type { AuctionParam } from '@/lib/gql/types';
 
-export type MutationType = 'create' | 'buy' | 'claim' | 'deposit' | 'withdraw' | 'cancel' | 'withdrawProceed' | 'withdrawUnsoldToken' | 'prune';
+export type MutationType = 'create' | 'buy' | 'claim' | 'deposit' | 'withdraw' | 'cancel' | 'withdrawProceed' | 'withdrawUnsoldToken' | 'prune' | 'uploadBlob';
 
 /**
  * Discriminated union for mutation success events
@@ -47,7 +46,8 @@ export type MutationSuccessEvent =
     | { type: 'withdrawUnsoldToken'; data: { auctionId: number } }
     | { type: 'prune'; data: { auctionId: number } }
     | { type: 'deposit'; data: { appTokenId: string; amount: string } }
-    | { type: 'withdraw'; data: { appTokenId: string; amount: string; targetChain: string } };
+    | { type: 'withdraw'; data: { appTokenId: string; amount: string; targetChain: string } }
+    | { type: 'uploadBlob'; data: { blobHash: string } };
 
 /**
  * Discriminated union for mutation error events
@@ -86,6 +86,8 @@ export interface UseAuctionMutationsResult {
     deposit: (appTokenId: string, amount: string) => Promise<boolean>;
     /** Withdraw tokens from AAC */
     withdraw: (appTokenId: string, amount: string, targetChain: string) => Promise<boolean>;
+    /** Upload a blob and get its hash */
+    uploadBlob: (data: string) => Promise<string | null>;
     /** Trigger changes on Public Client */
     trigger: () => Promise<void>;
     // Loading states
@@ -107,6 +109,8 @@ export interface UseAuctionMutationsResult {
     isDepositing: boolean;
     /** Is withdrawal in progress? */
     isWithdrawing: boolean;
+    /** Is blob upload in progress? */
+    isUploadingBlob: boolean;
 
     // Error state
     /** Last mutation error */
@@ -124,17 +128,21 @@ export function useAuctionMutations(
     const { address } = useWalletConnection();
     const { walletChainId } = useLineraClient();
     // Get sync status
-    const { isWalletClientSyncing } = useSyncStatus();
+    const { isWalletClientSyncing, isClientSyncing } = useSyncStatus();
 
     // Get store actions for cache invalidation and refresh
     const {
-        invalidateAndRefreshActiveAuctions,
-        invalidateAndRefreshAuctionsByCreator,
+        invalidateAuctionDetailBatch,
+        invalidateUserPortfolioBatch,
+        invalidateDashboardBatch,
         invalidateAuction,
-        invalidateAndRefreshAuction,
-        invalidateAndRefreshBidHistory,
-        invalidateAndRefreshUserBids,
-        invalidateAndRefreshUserBalances
+
+        // invalidateAndRefreshActiveAuctions,
+        // invalidateAndRefreshAuctionsByCreator,
+        // invalidateAndRefreshAuction,
+        // invalidateAndRefreshBidHistory,
+        // invalidateAndRefreshUserBids,
+        // invalidateAndRefreshUserBalances
     } = useAuctionStore();
 
     const {
@@ -151,6 +159,7 @@ export function useAuctionMutations(
     const [isPruning, setIsPruning] = useState(false);
     const [isDepositing, setIsDepositing] = useState(false);
     const [isWithdrawing, setIsWithdrawing] = useState(false);
+    const [isUploadingBlob, setIsUploadingBlob] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
     const trigger = useCallback(
@@ -159,11 +168,11 @@ export function useAuctionMutations(
                 await aacApp?.public?.systemMutate<string>(
                     JSON.stringify(AAC_MUTATION.Trigger())
                 );
-                const result = await aacApp?.public?.systemMutate<string>(
-                    JSON.stringify(AAC_MUTATION.Trigger())
-                );
+                // const result = await aacApp?.public?.systemMutate<string>(
+                //     JSON.stringify(AAC_MUTATION.Trigger())
+                // );
 
-                console.log('[useAuctionMutations] Trigger:', result);
+                // console.log('[useAuctionMutations] Trigger:', result);
 
             } catch (err) {
                 console.error('[useAuctionMutations] Trigger failed:', err);
@@ -199,7 +208,7 @@ export function useAuctionMutations(
                     JSON.stringify(AAC_MUTATION.CreateAuction(params)), 
                     { owner: address }
                 );
-                console.log('📥 CreateAuction raw result:', result);
+                // console.log('📥 CreateAuction raw result:', result);
 
                 const parsed = JSON.parse(result) as { data: unknown | null, errors?: unknown[] };
                 // console.log('📊 Parsed result:', parsed);
@@ -216,10 +225,9 @@ export function useAuctionMutations(
                 await trigger();
 
                 // Invalidate active auctions list to trigger refetch
-                await invalidateAndRefreshAuctionsByCreator(address, aacApp);
-                await invalidateAndRefreshActiveAuctions(0, 20, aacApp);
-                const auctionId = ''; // Auction ID will be generated by AAC
-                onSuccess?.({ type: 'create', data: { auctionId } });
+                invalidateUserPortfolioBatch(address);
+                invalidateDashboardBatch();
+                onSuccess?.({ type: 'create', data: { auctionId: '' } });
 
                 return true;
             } catch (err: any) {
@@ -266,39 +274,19 @@ export function useAuctionMutations(
             setError(null);
 
             try {
-                const result = await aacApp.wallet.mutate<string>(
+                await aacApp.wallet.mutate<string>(
                     JSON.stringify(AAC_MUTATION.Buy(auctionId.toString(), quantity.toString())),
                     { owner: address }
                 );
 
-                console.log('[useAuctionMutations] Buy result:', result);
+                // console.log('[useAuctionMutations] Buy result:', result);
 
                 // Trigger publicClient
                 await trigger();
-
-                const tokenApps = getTokenList().map(token => token.appId);
-                await trigger();
-                // Invalidate and force refresh affected caches
-                await invalidateAndRefreshAuction(auctionId.toString(), aacApp);
-                await invalidateAndRefreshUserBids(auctionId.toString(), address, aacApp);
-                await invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp);
-                await invalidateAndRefreshUserBalances(
-                        aacApp.wallet.getAddress(), 
-                        tokenApps, 
-                        aacApp
-                    ) // on aac hain
-
-                // await Promise.all([
-                //     invalidateAndRefreshAuction(auctionId.toString(), aacApp),
-                //     invalidateAndRefreshUserBids(auctionId.toString(), address, aacApp),
-                //     invalidateAndRefreshBidHistory(auctionId.toString(), 0, 50, aacApp),
-                //     invalidateAndRefreshUserBalances(
-                //         aacApp.wallet.getAddress(), 
-                //         tokenApps, 
-                //         aacApp
-                //     ) // on aac hain
-                // ]);
-
+                
+                invalidateDashboardBatch();
+                invalidateAuctionDetailBatch(auctionId.toString());
+               
                 onSuccess?.({ type: 'buy', data: { auctionId, quantity } });
                 return true;
             } catch (err) {
@@ -338,8 +326,7 @@ export function useAuctionMutations(
 
             try {
                 const result = await aacApp.wallet.mutate<string>(
-                    JSON.stringify(AAC_MUTATION.ClaimSettlement(auctionId)),
-                    { owner: address }
+                    JSON.stringify(AAC_MUTATION.ClaimSettlement(auctionId))
                 );
 
                 console.log('[useAuctionMutations] Claim settlement result:', result);
@@ -347,14 +334,8 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate and force refresh user balances
-                const tokenApps = getTokenList().map(token => token.appId);
-                await invalidateAndRefreshUserBalances(
-                    aacApp.wallet.getAddress(), // checksum address
-                    tokenApps, 
-                    aacApp
-                ); // on aac-chain
-
+                invalidateUserPortfolioBatch(address);
+          
                 onSuccess?.({ type: 'claim', data: { auctionId } });
                 return true;
             } catch (err) {
@@ -403,14 +384,10 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
+                invalidateUserPortfolioBatch(address);
+
                 // Invalidate and force refresh user balances
-                const tokenApps = getTokenList().map(token => token.appId);
                 await Promise.all([
-                    invalidateAndRefreshUserBalances(
-                        aacApp.wallet.getAddress(), // checksum address only
-                        tokenApps, aacApp
-                    ), 
-                        // on aac-chain
                     invalidateAndRefreshBalanceOnUic(
                         appTokenId, // tokenId
                         aacApp.wallet.getChainId(), // UIC chain (User Chain)
@@ -474,10 +451,10 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
+                invalidateUserPortfolioBatch(address);
+
                 // Invalidate and force refresh user balances
-                const tokenApps = getTokenList().map(token => token.appId);
                 await Promise.all([
-                    invalidateAndRefreshUserBalances(aacApp.wallet.getAddress(), tokenApps, aacApp), // on aac-chain
                     invalidateAndRefreshBalanceOnUic(
                         appTokenId, // tokenId
                         aacApp.wallet.getChainId(), // UIC chain (User Chain)
@@ -533,10 +510,7 @@ export function useAuctionMutations(
 
                 // Trigger publicClient
                 await trigger();
-
-                // Invalidate affected caches
-                invalidateAuction(auctionId.toString());
-                invalidateAndRefreshActiveAuctions(0, 20, aacApp);
+                invalidateAuctionDetailBatch(auctionId.toString());
 
                 onSuccess?.({ type: 'cancel', data: { auctionId } });
                 return true;
@@ -586,9 +560,7 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate and force refresh user balances (proceeds goes to user's balance)
-                const tokenApps = getTokenList().map(token => token.appId);
-                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac chain
+                invalidateUserPortfolioBatch(address); // on aac chain
 
                 onSuccess?.({ type: 'withdrawProceed', data: { auctionId } });
                 return true;
@@ -638,9 +610,7 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
 
-                // Invalidate and force refresh user balances (unsold tokens go to user's balance)
-                const tokenApps = getTokenList().map(token => token.appId);
-                await invalidateAndRefreshUserBalances(address, tokenApps, aacApp); // on aac-chain
+                invalidateUserPortfolioBatch(address); // on aac-chain
 
                 onSuccess?.({ type: 'withdrawUnsoldToken', data: { auctionId } });
                 return true;
@@ -708,6 +678,65 @@ export function useAuctionMutations(
         [aacApp, address, onSuccess, onError, trigger, isWalletClientSyncing]
     );
 
+    /**
+     * Upload a blob (image) and get its hash
+     * @param data Base64-encoded blob data
+     * @returns The blob hash string, or null if upload failed
+     */
+    const uploadBlob = useCallback(
+        async (data: string): Promise<string | null> => {
+            if (!aacApp?.public) {
+                const err = new Error('Client not found');
+                setError(err);
+                onError?.({ type: 'uploadBlob', error: err });
+                return null;
+            }
+
+            if (isClientSyncing) {
+                const err = new Error('Client is syncing, please wait');
+                setError(err);
+                onError?.({ type: 'uploadBlob', error: err });
+                return null;
+            }
+
+            setIsUploadingBlob(true);
+            setError(null);
+
+            try {
+                const result = await aacApp?.public.systemMutate<string>(
+                    JSON.stringify(AAC_MUTATION.UploadBlob(data))
+                );
+
+                console.log('[useAuctionMutations] Upload blob result:', result);
+
+                const parsed = JSON.parse(result) as { data: { uploadBlob: string } | null, errors?: unknown[] };
+                
+                if (parsed.errors && parsed.errors.length > 0) {
+                    console.error('❌ GraphQL errors:', parsed.errors);
+                    throw new Error(`GraphQL error: ${JSON.stringify(parsed.errors)}`);
+                }
+
+                if (!parsed.data?.uploadBlob) {
+                    throw new Error('Blob upload returned null');
+                }
+
+                const blobHash = parsed.data.uploadBlob;
+
+                onSuccess?.({ type: 'uploadBlob', data: { blobHash } });
+                return blobHash;
+            } catch (err) {
+                const error = err instanceof Error ? err : new Error('Failed to upload blob');
+                setError(error);
+                console.error('[useAuctionMutations] Upload blob failed:', error);
+                onError?.({ type: 'uploadBlob', error });
+                return null;
+            } finally {
+                setIsUploadingBlob(false);
+            }
+        },
+        [aacApp, address, onSuccess, onError, isWalletClientSyncing]
+    );
+
     return {
         createAuction,
         buy,
@@ -718,6 +747,7 @@ export function useAuctionMutations(
         pruneSettledAuction,
         deposit,
         withdraw,
+        uploadBlob,
         trigger,
         isCreating,
         isBuying,
@@ -728,6 +758,7 @@ export function useAuctionMutations(
         isPruning,
         isDepositing,
         isWithdrawing,
+        isUploadingBlob,
         error
     };
 }

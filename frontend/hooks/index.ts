@@ -26,6 +26,12 @@ export type {
     UseCachedAuctionSummaryResult
 } from './use-cached-auction-summary';
 
+export { useAuctionImage } from './use-auction-image';
+export type {
+    UseAuctionImageOptions,
+    UseAuctionImageResult
+} from './use-auction-image';
+
 export { useCachedBidHistory } from './use-cached-bid-bistory';
 export type {
     UseCachedBidHistoryOptions,
@@ -37,6 +43,13 @@ export type {
     UseCachedUserBidRecordOptions,
     UseCachedUserBidRecordResult
 } from './use-cached-my-bids';
+
+export type {
+    UseCachedAllUserBidsResult,
+    UseCachedAllUserBidsOptions
+} from './use-cached-all-user-bids';
+
+export { useCachedAllUserBids } from './use-cached-all-user-bids';
 
 export { useCachedSettledAuctions } from './use-cached-settled-auctions';
 export type {
@@ -89,3 +102,21 @@ export {
     type UseCachedGlobalStatsOptions,
     type UseCachedGlobalStatsResult
 } from './use-cached-global-stats';
+
+export { useAuctionDetail } from './use-auction-detail';
+export type {
+    UseAuctionDetailOptions,
+    UseAuctionDetailResult
+} from './use-auction-detail';
+
+export { useDashboard } from './use-dashboard';
+export type {
+    UseDashboardOptions,
+    UseDashboardResult
+} from './use-dashboard';
+
+export { useUserPortfolio } from './use-user-portfolio';
+export type {
+    UseUserPortfolioOptions,
+    UseUserPortfolioResult
+} from './use-user-portfolio';

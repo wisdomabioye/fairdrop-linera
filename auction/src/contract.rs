@@ -5,12 +5,12 @@ mod state;
 use self::state::{AuctionData, AuctionState};
 use auction::{AuctionAbi, AuctionOperation, AuctionResponse};
 use fungible::{FungibleOperation, FungibleResponse, FungibleTokenAbi};
-use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, StreamUpdate, WithContractAbi};
+use linera_sdk::linera_base_types::{Account, AccountOwner, Amount, ApplicationId, ChainId, DataBlobHash, StreamUpdate, WithContractAbi};
 use linera_sdk::views::{RootView, View};
 use linera_sdk::{Contract, ContractRuntime};
 use shared::events::{AuctionEvent, AUCTION_STREAM,};
 use shared::messages::AuctionMessage;
-use shared::types::{AuctionParams, BidRecord, AuctionStatus, AuctionParameters};
+use shared::types::{AuctionParams, AuctionParamsInput, BidRecord, AuctionStatus, AuctionParameters};
 
 pub struct AuctionContract {
     state: AuctionState,
@@ -53,7 +53,7 @@ impl Contract for AuctionContract {
         match operation {
             AuctionOperation::CreateAuction { params } => {
                 if current_chain == app_params.aac_chain {
-                    self.handle_create_auction(params.into()).await
+                    self.handle_create_auction(params).await
                 } else {
                     let message = AuctionMessage::CreateAuction { params };
 
@@ -142,7 +142,19 @@ impl Contract for AuctionContract {
             }
 
             AuctionOperation::ClaimSettlement { auction_id } => {
-                self.handle_claim_settlement(auction_id).await
+                if current_chain == app_params.aac_chain {
+                    self.handle_claim_settlement(auction_id).await
+                } else {
+                    let message = AuctionMessage::ClaimSettlement { auction_id };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .with_tracking()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
             AuctionOperation::WithdrawProceed { auction_id } => {
@@ -273,14 +285,13 @@ impl Contract for AuctionContract {
                     AuctionResponse::Ok
                 }
             }
-
         }
     }
 
     async fn execute_message(&mut self, message: Self::Message) {
         match message {
             AuctionMessage::CreateAuction { params } => {
-                self.handle_create_auction(params.into()).await;
+                self.handle_create_auction(params).await;
             }
 
             AuctionMessage::CancelAuction { auction_id } => {
@@ -419,12 +430,12 @@ impl AuctionContract {
     // ═══════════════════════════════════════════════════════════
 
     /// Handle auction creation on AAC chain
-    async fn handle_create_auction(&mut self, params: AuctionParams) -> AuctionResponse {
+    async fn handle_create_auction(&mut self, input: AuctionParamsInput) -> AuctionResponse {
         let user_account = self.runtime.authenticated_signer().expect("Caller must be authenticated");
 
         // Validate both tokens are supported
-        let auction_token_app = self.validate_supported_token(params.auction_token_app);
-        let _payment_token_app = self.validate_supported_token(params.payment_token_app);
+        let auction_token_app = self.validate_supported_token(input.auction_token_app);
+        let _payment_token_app = self.validate_supported_token(input.payment_token_app);
 
         // Convert to untyped for state operations
         let auction_token_app_untyped = auction_token_app.forget_abi();
@@ -432,9 +443,9 @@ impl AuctionContract {
         // Validate creator has deposited auction tokens
         let creator_balance = self.get_balance(user_account, auction_token_app_untyped).await;
         assert!(
-            creator_balance >= params.total_supply,
+            creator_balance >= input.total_supply,
             "Insufficient auction token balance. Have: {}, Need: {}. Please deposit auction tokens first.",
-            creator_balance, params.total_supply
+            creator_balance, input.total_supply
         );
 
         // Lock auction tokens in app escrow
@@ -443,7 +454,7 @@ impl AuctionContract {
             user_account,
             app_escrow,
             auction_token_app_untyped,
-            params.total_supply,
+            input.total_supply,
             "lock_auction_tokens".to_string(),
         )
         .await
@@ -453,15 +464,35 @@ impl AuctionContract {
         let auction_id = *self.state.next_auction_id.get();
         self.state.next_auction_id.set(auction_id + 1);
 
+        // Upload image blob and get hash (base64 string → DataBlobHash)
+        let image_blob_hash = self.upload_image_blob(&input.image);
+
+        // Create AuctionParams with DataBlobHash
+        let params = AuctionParams {
+            item_name: input.item_name,
+            image: image_blob_hash,
+            total_supply: input.total_supply,
+            max_bid_amount: input.max_bid_amount,
+            start_price: input.start_price,
+            floor_price: input.floor_price,
+            price_decay_interval: input.price_decay_interval,
+            price_decay_amount: input.price_decay_amount,
+            start_time: input.start_time,
+            end_time: input.end_time,
+            creator: input.creator,
+            payment_token_app: input.payment_token_app,
+            auction_token_app: input.auction_token_app,
+        };
+
         let auction = AuctionData::new(params.clone(), self.runtime.system_time());
 
         self.state.auctions.insert(&auction_id, auction).unwrap();
 
-        // Emit creation event with full params
+        // Emit creation event (image as hex string for indexer)
         let event = AuctionEvent::AuctionCreated {
             auction_id,
             item_name: params.item_name.clone(),
-            image: params.image.clone(),
+            image: format!("{:?}", params.image),
             max_bid_amount: params.max_bid_amount,
             total_supply: params.total_supply,
             start_price: params.start_price,
@@ -476,7 +507,7 @@ impl AuctionContract {
         };
         self.runtime.emit(AUCTION_STREAM.into(), &event);
 
-        AuctionResponse::AuctionCreated { auction_id }
+        AuctionResponse::AuctionCreated(auction_id)
     }
 
     /// Handle auction cancellation by creator (before start, AAC only)
@@ -612,6 +643,9 @@ impl AuctionContract {
         let user_account = self.runtime.authenticated_signer()
             .expect("Caller must be authenticated");
 
+        // 0. LAZY SETTLEMENT - if auction ended but not yet settled, settle it now
+        self.try_lazy_settle(auction_id).await;
+
         // 1. VALIDATE & LOAD - single auction read with all needed data
         let claim_data = match self.load_claim_data(auction_id, user_account).await {
             Ok(data) => data,
@@ -664,22 +698,11 @@ impl AuctionContract {
 
         // 4. SETTLE - explicit settlement check (not hidden)
         if validation.should_settle {
-            // Set clearing price and settle
-            let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
-            auction.clearing_price = Some(validation.current_price);
-            
+            // clearing_price already set in execute_bid, just settle
             self.settle_auction(auction_id).await;
         }
 
-        AuctionResponse::BidPlaced { 
-            auction_id, 
-            bid_id: bid.bid_id, 
-            user_account: bidder, 
-            quantity: bid.quantity, 
-            amount_paid: bid.amount_paid, 
-            timestamp: bid.timestamp, 
-            claimed: bid.claimed 
-        }
+        AuctionResponse::BidPlaced(auction_id, bid.bid_id)
     }
 
     /// Settle auction (manual claim-based settlement - no auto-messaging)
@@ -942,6 +965,46 @@ impl AuctionContract {
     // Helper Functions
     // ═══════════════════════════════════════════════════════════
 
+    /// Lazy settlement: if auction is Active but time has expired, settle it
+    /// This allows claims to work even if no one triggered settlement via a bid attempt
+    async fn try_lazy_settle(&mut self, auction_id: u64) {
+        let now = self.runtime.system_time();
+
+        // Read auction to check if lazy settlement is needed
+        let auction = match self.state.auctions.get(&auction_id).await {
+            Ok(Some(a)) => a,
+            _ => return, // Auction not found, will be handled by load_claim_data
+        };
+
+        // Only proceed if auction is Active and time has expired
+        if auction.status != AuctionStatus::Active || now <= auction.params.end_time {
+            return;
+        }
+
+        // Auction needs lazy settlement
+        // clearing_price should already be set from execute_bid if any bids exist
+        // If no bids, set it to the price at end_time
+        if auction.clearing_price.is_none() {
+            let price_at_end = shared::calculate_current_price(
+                auction.params.start_price,
+                auction.params.floor_price,
+                auction.params.price_decay_amount,
+                auction.params.price_decay_interval,
+                auction.params.start_time,
+                auction.params.end_time,
+                auction.params.end_time, // Use end_time as current_time
+                AuctionStatus::Active,
+            );
+
+            if let Ok(Some(auction_mut)) = self.state.auctions.get_mut(&auction_id).await {
+                auction_mut.clearing_price = Some(price_at_end);
+            }
+        }
+
+        // Now settle the auction
+        self.settle_auction(auction_id).await;
+    }
+
     /// Load and validate claim data (single auction read)
     async fn load_claim_data(&mut self, auction_id: u64, user_account: AccountOwner) -> Result<ClaimData, ()> {
         // Verify auction is settled
@@ -1124,16 +1187,21 @@ impl AuctionContract {
             price_decay_amount,
             price_decay_interval,
             start_time,
+            end_time,
             now,
+            current_status,
         );
 
         // 3. Check time expiration - handle settlement if needed
         if now > end_time && current_status == AuctionStatus::Active {
-            // Set clearing price
+            // Only set clearing_price if no bids were placed (it's None)
+            // If bids exist, clearing_price was already set in execute_bid
             if let Ok(Some(auction_mut)) = self.state.auctions.get_mut(&auction_id).await {
-                auction_mut.clearing_price = Some(current_price);
+                if auction_mut.clearing_price.is_none() {
+                    auction_mut.clearing_price = Some(current_price);
+                }
             }
-            
+
             // Settle auction (separate mutable borrow)
             self.settle_auction(auction_id).await;
 
@@ -1192,7 +1260,7 @@ impl AuctionContract {
 
         let mut accepted_quantity = quantity.min(remaining);
 
-        // 6. Check user's cumulative bid against max_bid_amount
+        // 6. Check user's cumulative bid against max_bid_amount (0 = unlimited)
         let user_current_total = self.state.user_totals
             .get(&(auction_id, bidder))
             .await
@@ -1202,7 +1270,8 @@ impl AuctionContract {
 
         let new_total = user_current_total.saturating_add(accepted_quantity);
 
-        if new_total > max_bid_amount {
+        // Only enforce limit if max_bid_amount > 0 (0 means unlimited)
+        if max_bid_amount > Amount::ZERO && new_total > max_bid_amount {
             let allowed = max_bid_amount.saturating_sub(user_current_total);
             accepted_quantity = allowed.min(accepted_quantity);
 
@@ -1272,6 +1341,8 @@ impl AuctionContract {
         if is_first_bid {
             auction.total_bidders += 1;
         }
+        // Update clearing_price on every bid - ensures fair clearing price based on last bid
+        auction.clearing_price = Some(validation.current_price);
         let total_sold = auction.sold;
         let remaining = auction.total_supply.saturating_sub(auction.sold);
 
@@ -1396,6 +1467,16 @@ impl AuctionContract {
     // ═══════════════════════════════════════════════════════════
     // Token Application Helpers
     // ═══════════════════════════════════════════════════════════
+
+    fn upload_image_blob(&mut self, image_base64: &str) -> DataBlobHash {
+        use base64::{Engine, engine::general_purpose};
+
+        let bytes = general_purpose::STANDARD
+            .decode(image_base64)
+            .expect("Invalid base64 data");
+
+        self.runtime.create_data_blob(bytes)
+    }
 
     /// Validate that a token application is supported
     fn validate_supported_token(&mut self, app_token_id: ApplicationId) -> ApplicationId<FungibleTokenAbi> {

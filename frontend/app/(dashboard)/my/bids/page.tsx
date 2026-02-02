@@ -1,8 +1,9 @@
-import { ComingSoon } from '@/components/loading';
+import MyBids from '@/app-dashboard/my-bids';
 
 export const dynamic = 'force-static';
 export const revalidate = false;
 
 export default function MyBidsPage() {
-  return <ComingSoon title="My Bids" />;
+
+  return <MyBids />;
 }

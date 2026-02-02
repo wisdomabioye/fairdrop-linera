@@ -23,6 +23,7 @@ export interface AuctionParam {
     auctionTokenApp: string;
     startPrice: number;
     floorPrice: number;
+    /** Decay interval is collected in seconds and return from contract in microseconds */
     priceDecayInterval: number;
     priceDecayAmount: number;
     startTime: number;

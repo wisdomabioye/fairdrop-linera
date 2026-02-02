@@ -16,6 +16,11 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
         return this.addFragment(queryBody);
     }
 
+    auctionImage(auction_id: number): this {
+        const queryBody = `auctionImage(auctionId: ${auction_id})`;
+        return this.addFragment(queryBody);
+    }
+
     auctionInfo(auction_id: number): this {
         const queryBody = `auctionInfo(auctionId: ${auction_id}) {
                     auctionId
@@ -130,6 +135,19 @@ export class AACQueryBatchBuilder extends QueryBatchBuilder {
 
     userBids(user: string, auction_id: number): this {
         const queryBody = `userBids(user: ${formatGraphQLValue(user)}, auctionId: ${auction_id}) {
+                    bidId
+                    auctionId
+                    userAccount
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }`;
+        return this.addFragment(queryBody);
+    }
+
+    allUserBids(user: string): this {
+        const queryBody = `allUserBids(user: ${formatGraphQLValue(user)}) {
                     bidId
                     auctionId
                     userAccount
@@ -433,6 +451,12 @@ export const AAC_QUERY = {
         }
     },
 
+    AuctionImage (auction_id: number) {
+        return {
+            query: `query { auctionImage(auctionId: ${auction_id}) }`
+        }
+    },
+
     AuctionInfo (auction_id: string) {
         return {
             query: `query {
@@ -581,6 +605,22 @@ export const AAC_QUERY = {
         }
     },
 
+    AllUserBids (user: string) {
+        return {
+            query: `query {
+                allUserBids(user: ${formatGraphQLValue(user)}) {
+                    bidId
+                    auctionId
+                    userAccount
+                    quantity
+                    amountPaid
+                    timestamp
+                    claimed
+                }
+            }`
+        }
+    },
+
     UserBalance (user: string, token_app: string) {
         return {
             query: `query {
@@ -682,7 +722,7 @@ export const AAC_MUTATION = {
 
     ClaimSettlement (auction_id: number) {
         return {
-            query: `mutation { claimSettlement(auctionId: ${auction_id}) }`
+            query: `mutation { claimSettlement(auctionId: ${formatGraphQLValue(auction_id)}) }`
         }
     },
 
@@ -707,6 +747,12 @@ export const AAC_MUTATION = {
     Withdraw (app_token_id: string, amount: string, target_chain: string) {
         return {
             query: `mutation { withdraw(appTokenId: ${formatGraphQLValue(app_token_id)}, amount: ${formatGraphQLValue(amount)}, targetChain: ${formatGraphQLValue(target_chain)}) }`
+        }
+    },
+
+    UploadBlob (data: string) {
+        return {
+            query: `mutation { uploadBlob(data: ${formatGraphQLValue(data)}) }`
         }
     }
 }

@@ -9,8 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WalletConnectButton } from '@/components/wallet';
-import { useSyncStatus } from '@/providers';
-import { useCachedUserBidRecord } from '@/hooks/use-cached-my-bids';
+import { useBatchPolling, useSyncStatus } from '@/providers';
 import { useAuctionMutations } from '@/hooks/use-auction-mutations';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
 import { getTokenByAppId } from '@/config/app.token-store';
@@ -37,18 +36,21 @@ export function ClaimForm({
   const { isClientSyncing } = useSyncStatus();
   const paymentToken = getTokenByAppId(auction?.paymentTokenApp);
   // Fetch user's commitment
+  const { 
+    userPortfolio: {
+      error: fetchError,
+      getBidsByAuctionId,
+      loading,
+      isFetching
+    }
+  } = useBatchPolling();
+
   const {
-    userBidRecord,
-    totalQuantity = 0,
-    totalPaid = 0,
-    loading,
-    error: fetchError,
-    isFetching
-  } = useCachedUserBidRecord({
-    auctionId: auction.auctionId.toString(),
-    aacApp,
-    skip: !auction || !aacApp
-  });
+    totalQuantity,
+    totalPaid,
+    bids: userBidRecord
+  } = getBidsByAuctionId(auction.auctionId.toString());
+
 
   const { claimSettlement, isClaiming, error: claimError } = useAuctionMutations({
     aacApp,
@@ -60,7 +62,7 @@ export function ClaimForm({
     },
     onError: (event) => {
       if (event.type === 'claim') {
-        toast.error(event.error.message || 'Failed to claim settlement');
+        toast.error(event.error.message.split(':')[0] || 'Failed to claim settlement');
       }
     }
   });
@@ -169,12 +171,17 @@ export function ClaimForm({
     );
   }
 
-  const claimed = userBidRecord.filter(c => c.claimed).length === 0;
-  const hasAllocation = (totalQuantity || 0) > 0;
-  const hasRefund = totalPaid && totalPaid > 0;
-  const pricePerItem = (totalQuantity || 0) / (totalPaid || 0)
+  const clearingPrice = Number(auction.clearingPrice) > 0 ? Number(auction.clearingPrice) : auction.currentPrice;
+  const hasClaim = userBidRecord.length > 0 && userBidRecord.some(c => !c.claimed);
+  const hasAllocation = totalQuantity > 0;
+  const pricePerItem = clearingPrice;
+  const actualCost = totalQuantity * Number(clearingPrice);
+  const refundAmount = totalPaid - actualCost;
+  const hasRefund = refundAmount > 0;
+
+
   // State 6: No claimable items
-  if (!hasAllocation && !hasRefund) {
+  if (!hasAllocation) {
     return (
       <Card>
         <CardHeader>
@@ -192,7 +199,7 @@ export function ClaimForm({
     );
   }
 
-  if (claimed) {
+  if (!hasClaim) {
     return (
       <Card className="border-green-500/20 bg-green-500/5">
         <CardHeader>
@@ -215,7 +222,7 @@ export function ClaimForm({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Refund Claimed</span>
               <span className="font-semibold font-mono">
-                {formatTokenAmount('0', 18, 4)} {paymentToken.symbol}
+                {formatTokenAmount(refundAmount, 18, 4)} {paymentToken.symbol}
               </span>
             </div>
           )}
@@ -274,7 +281,7 @@ export function ClaimForm({
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Refund</span>
                     <span className="font-mono text-green-600">
-                      +{formatTokenAmount((pricePerItem || 0).toString(), 18, 4)} {paymentToken.symbol}
+                      +{formatTokenAmount((refundAmount).toString(), 18, 4)} {paymentToken.symbol}
                     </span>
                   </div>
                 )}
@@ -287,7 +294,7 @@ export function ClaimForm({
         {claimError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{claimError.message}</AlertDescription>
+            <AlertDescription>{claimError.message.split(':')[0]}</AlertDescription>
           </Alert>
         )}
 

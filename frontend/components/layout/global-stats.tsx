@@ -11,9 +11,9 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useCachedGlobalStats, useAacApp } from '@/hooks';
 import { getTokenByAppId } from '@/config/app.token-store';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
+import { useBatchPolling } from '@/providers';
 
 interface GlobalActivityBarProps {
   className?: string;
@@ -117,18 +117,16 @@ function TokenBalanceDisplay({ balances, loading }: TokenBalanceDisplayProps) {
 }
 
 export function GlobalActivityBar({ className }: GlobalActivityBarProps) {
-  const aacApp = useAacApp();
-  
-  const { stats, loading } = useCachedGlobalStats({
-    aacApp: aacApp.app,
-    enablePolling: false,
-    pollInterval: 30000,
-    skip: !aacApp.app
-  });
+  const { 
+    dashboardData: {
+      globalStats, 
+      loading
+    }
+  } = useBatchPolling();
 
   // Memoize formatted values
   const formattedStats = useMemo(() => {
-    if (!stats) {
+    if (!globalStats) {
       return {
         totalAuctions: '0',
         totalBids: '0',
@@ -139,19 +137,19 @@ export function GlobalActivityBar({ className }: GlobalActivityBarProps) {
     }
 
     return {
-      totalAuctions: stats.totalAuctions?.toLocaleString() || '0',
-      totalBids: stats.totalBids?.toLocaleString() || '0',
-      deposited: stats.depositedByToken || [],
-      withdrawn: stats.withdrawnByToken || [],
-      tvl: stats.totalValueLocked || []
+      totalAuctions: globalStats.totalAuctions?.toLocaleString() || '0',
+      totalBids: globalStats.totalBids?.toLocaleString() || '0',
+      deposited: globalStats.depositedByToken || [],
+      withdrawn: globalStats.withdrawnByToken || [],
+      tvl: globalStats.totalValueLocked || []
     };
-  }, [stats]);
+  }, [globalStats]);
 
   // Calculate total TVL for tooltip
-  const tvlTooltip = useMemo(() => {
-    if (!formattedStats.tvl.length) return undefined;
-    return `Total Value Locked across ${formattedStats.tvl.length} token(s)`;
-  }, [formattedStats.tvl]);
+  // const tvlTooltip = useMemo(() => {
+  //   if (!formattedStats.tvl.length) return undefined;
+  //   return `Total Value Locked across ${formattedStats.tvl.length} token(s)`;
+  // }, [formattedStats.tvl]);
 
   return (
     <div className={cn(

@@ -14,49 +14,16 @@ export interface ImageUploadProps {
    * Upload function that takes a File and returns a Promise<string> with the uploaded image URL
    * Placeholder implementation that should be replaced with actual upload logic
    */
-  onUpload?: (file: File) => Promise<string>;
+  onUpload: (file: File) => Promise<string>;
 }
 
-/**
- * Default upload function using Next.js API route
- */
-const defaultUploadPlaceholder = async (file: File): Promise<string> => {
-  try {
-    // Create form data with the file
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // Upload via our API route to avoid CORS issues
-    const response = await fetch('/api/uploader', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Upload failed with status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.ok || !data.url) {
-      throw new Error(data.error || 'Failed to upload image');
-    }
-    console.log('data')
-    // Return the image URL
-    return data.url;
-  } catch (error) {
-    console.error('[ImageUpload] Upload failed:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to upload image to storage service');
-  }
-};
 
 export function ImageUpload({
   value,
   onChange,
   disabled,
   error,
-  onUpload = defaultUploadPlaceholder
+  onUpload
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);

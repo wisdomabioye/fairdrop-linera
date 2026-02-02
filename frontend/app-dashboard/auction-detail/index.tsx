@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';	
 import { useParams, useRouter } from 'next/navigation';	
 import { ArrowLeft, Share2, Clock, TrendingDown, Package2, Users, Zap, Trophy } from 'lucide-react';	
-import { useAacApp, useCachedAuctionSummary, useCachedUserBidRecord } from '@/hooks';	
+import { useAacApp, useAuctionDetail, useAuctionImage } from '@/hooks';	
+import { useBatchPolling } from '@/providers';
 import { BidHistory } from '@/components/auction/bid-history';	
 import { Button } from '@/components/ui/button';	
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';	
@@ -22,38 +23,42 @@ import {
   calculateSupplyPercentage,	
   formatTokenAmount,	
   formatAbsoluteTime,	
-  isEndingVerySoon	
+  isEndingVerySoon,	
+  microsecondsToMilliseconds
 } from '@/lib/utils/auction-utils';	
 import { getTokenByAppId } from '@/config/app.token-store';
 
 export default function AuctionDetailPage() {	
   const router = useRouter();	
+  const aacApp = useAacApp();	
   const params = useParams();	
   const auctionId = params?.auctionId as string || '';	
-  const aacApp = useAacApp();	
 
-  // Fetch auction details - NO POLLING here, EagerLoader handles list polling
-  // This fetches individual auction which isn't covered by EagerLoader
   const {	
-    auction,	
+    auction,
     loading,	
     error,	
     refetch	
-  } = useCachedAuctionSummary({	
+  } = useAuctionDetail({	
     auctionId,	
     aacApp: aacApp.app,	
-    enablePolling: true, // Keep polling for individual auction detail
+    enablePolling: false,
     pollInterval: 10_000, // 10s
     skip: !auctionId || !aacApp.app	
   });	
 
-  // Fetch user's commitment - no polling needed, refetch on success
-  const { totalQuantity } = useCachedUserBidRecord({	
-    auctionId,	
-    aacApp: aacApp.app,	
-    skip: !auctionId || !aacApp.app?.wallet	
-  });	
+  const { 
+    userPortfolio: { getBidsByAuctionId },
+  } = useBatchPolling();
 
+  const { totalQuantity } = getBidsByAuctionId(auctionId);
+
+  // Fetch auction image from blob storage (cached permanently)
+  const { imageUrl, loading: imageLoading } = useAuctionImage({
+    auctionId,
+    aacApp: aacApp.app,
+    skip: !auctionId || !aacApp.app
+  });	
 
   const handleShare = useCallback(() => {	
     if (navigator.share) {	
@@ -157,24 +162,39 @@ export default function AuctionDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">	
         {/* Main Content */}	
         <div className="lg:col-span-2 space-y-6">	
-          {/* Auction Visual */}	
-          <Card className="overflow-hidden">	
-            <div className="relative w-full h-[400px] bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center group">	
-              <div className="absolute inset-0 bg-grid-white/5" />	
-              <Package2 className="h-32 w-32 text-muted-foreground/20 group-hover:scale-110 transition-transform duration-500" />	
+          {/* Auction Visual */}
+          <Card className="overflow-hidden">
+            <div className="relative w-full h-[400px] bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center group">
+              {imageUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={imageUrl}
+                  alt={auction.itemName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-grid-white/5" />
+                  {imageLoading ? (
+                    <Skeleton className="h-32 w-32 rounded-lg" />
+                  ) : (
+                    <Package2 className="h-32 w-32 text-muted-foreground/20 group-hover:scale-110 transition-transform duration-500" />
+                  )}
+                </>
+              )}
 
-              {/* Floating Stats */}	
-              <div className="absolute bottom-4 left-4 right-4 flex gap-2">	
-                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">	
-                  <p className="text-xs text-muted-foreground mb-1">Supply</p>	
-                  <p className="text-lg font-bold">{auction.sold.toLocaleString()} / {auction.totalSupply.toLocaleString()} {auctionTokenInfo.symbol}</p>	
-                </div>	
-                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">	
-                  <p className="text-xs text-muted-foreground mb-1">Bids</p>	
-                  <p className="text-lg font-bold">{auction.totalBids}</p>	
-                </div>	
-              </div>	
-            </div>	
+              {/* Floating Stats */}
+              <div className="absolute bottom-4 left-4 right-4 flex gap-2">
+                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">
+                  <p className="text-xs text-muted-foreground mb-1">Supply</p>
+                  <p className="text-lg font-bold">{auction.sold.toLocaleString()} / {auction.totalSupply.toLocaleString()} {auctionTokenInfo.symbol}</p>
+                </div>
+                <div className="flex-1 bg-background/80 backdrop-blur-sm rounded-lg p-3 border border-border/50">
+                  <p className="text-xs text-muted-foreground mb-1">Bids</p>
+                  <p className="text-lg font-bold">{auction.totalBids}</p>
+                </div>
+              </div>
+            </div>
           </Card>	
 
           {/* Key Stats Grid */}	
@@ -273,7 +293,7 @@ export default function AuctionDetailPage() {
                 <div className="space-y-1">	
                   <p className="text-muted-foreground">Price Decay</p>	
                   <p className="text-base font-mono">	
-                    -{formatTokenAmount(auction.priceDecayAmount, 18, 4)} {paymentTokenInfo.symbol} / {auction.priceDecayInterval}s	
+                    -{formatTokenAmount(auction.priceDecayAmount, 18, 4)} {paymentTokenInfo.symbol} / {microsecondsToMilliseconds(auction.priceDecayInterval/1000)}s	
                   </p>	
                 </div>	
                 <div className="space-y-1">	
@@ -345,7 +365,7 @@ export default function AuctionDetailPage() {
           />	
 
           {/* User's Commitment */}	
-          {totalQuantity && totalQuantity > 0 && (	
+          {!!totalQuantity && totalQuantity > 0 && (	
             <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">	
               <CardHeader>	
                 <CardTitle className="flex items-center gap-2 text-lg">	

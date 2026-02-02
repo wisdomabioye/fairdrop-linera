@@ -1,6 +1,6 @@
 use async_graphql::{scalar, InputObject, SimpleObject};
 use fungible::FungibleTokenAbi;
-use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, Timestamp};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ApplicationId, ChainId, DataBlobHash, Timestamp};
 use serde::{Deserialize, Serialize};
 
 pub type AuctionId = u64;
@@ -28,7 +28,7 @@ pub struct AuctionParamsInput {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, SimpleObject)]
 pub struct AuctionParams {
     pub item_name: String,
-    pub image: String,
+    pub image: DataBlobHash,
     pub total_supply: Amount,
     pub max_bid_amount: Amount,
     pub start_price: Amount,
@@ -42,26 +42,8 @@ pub struct AuctionParams {
     pub auction_token_app: ApplicationId,
 }
 
-// Conversion from input to internal type
-impl From<AuctionParamsInput> for AuctionParams {
-    fn from(input: AuctionParamsInput) -> Self {
-        Self {
-            item_name: input.item_name,
-            image: input.image,
-            max_bid_amount: input.max_bid_amount,
-            total_supply: input.total_supply,
-            start_price: input.start_price,
-            floor_price: input.floor_price,
-            price_decay_interval: input.price_decay_interval,
-            price_decay_amount: input.price_decay_amount,
-            start_time: input.start_time,
-            end_time: input.end_time,
-            creator: input.creator,
-            payment_token_app: input.payment_token_app,
-            auction_token_app: input.auction_token_app,
-        }
-    }
-}
+// Note: No automatic From<AuctionParamsInput> for AuctionParams
+// because image conversion (base64 String → DataBlobHash) happens in the contract
 
 scalar!(AuctionStatus);
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]

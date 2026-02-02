@@ -9,32 +9,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { WalletConnectionPrompt } from '@/components/wallet';
 import { useWalletConnection } from 'linera-react-client';
-import { useAacApp, useCachedUserBalances } from '@/hooks';
-import { useSyncStatus } from '@/providers';
+import { useSyncStatus, useBatchPolling } from '@/providers';
 import { getTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { DepositDialog } from './deposit-dialog';
 import { WithdrawDialog } from './withdraw-dialog';
 
 export default function AACBalances() {
-  const { isConnected, address } = useWalletConnection();
+  const { isConnected } = useWalletConnection();
   const { isPublicClientSyncing } = useSyncStatus();
   const tokens = getTokenList();
-  const aacApp = useAacApp();
-  
-  // Fetch balances - NO polling here, EagerLoader handles it
-  // Just read from cache
+
+  // Fetch current AAC balance for deposit dialog
+  const { 
+    userPortfolio
+  } = useBatchPolling();
+
   const {
     balances,
     loading,
     error,
-    refetch: refetchAacBalance,
-  } = useCachedUserBalances({
-    address: address || '',
-    tokenApps: tokens.map(t => t.appId),
-    aacApp: aacApp.app,
-    skip: !address || !aacApp.app
-    // No enablePolling - EagerLoader handles background updates
-  });
+    refetch: refetchAacBalance
+  } = userPortfolio
 
   // Dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);

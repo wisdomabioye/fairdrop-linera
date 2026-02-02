@@ -18,6 +18,10 @@ export interface UseCachedActiveAuctionsOptions {
   limit: number;
   aacApp: ApplicationClient | null;
   skip?: boolean;
+  /** Enable polling - ON by default */
+  enablePolling?: boolean;
+  /** Polling interval in ms (default: 10000) */
+  pollInterval?: number;
 }
 
 export interface UseCachedActiveAuctionsResult {
@@ -33,7 +37,14 @@ export interface UseCachedActiveAuctionsResult {
 export function useCachedActiveAuctions(
   options: UseCachedActiveAuctionsOptions
 ): UseCachedActiveAuctionsResult {
-  const { offset, limit, aacApp, skip = false } = options;
+  const {
+    offset,
+    limit,
+    aacApp,
+    skip = false,
+    enablePolling = true,
+    pollInterval = 10000
+  } = options;
 
   const { isPublicClientSyncing } = useSyncStatus();
 
@@ -41,11 +52,13 @@ export function useCachedActiveAuctions(
     activeAuctions,
     allAuctionsCache,
     fetchActiveAuctions,
+    startPollingActiveAuctions,
     isStale: checkIsStale,
   } = useAuctionStore();
 
   // Use ref to track first load (no re-renders)
   const hasLoadedOnce = useRef(false);
+  const pollingUnsubscribe = useRef<(() => void) | null>(null);
 
   // Derive auctions from normalized cache
   const auctions = activeAuctions?.auctionIds
@@ -85,6 +98,28 @@ export function useCachedActiveAuctions(
       refetch();
     }
   }, [skip, aacApp, isStale, isPublicClientSyncing, activeAuctions, isFetching]);
+
+  // Polling setup - enabled by default
+  useEffect(() => {
+    // Cleanup previous
+    if (pollingUnsubscribe.current) {
+      pollingUnsubscribe.current();
+      pollingUnsubscribe.current = null;
+    }
+
+    if (!enablePolling || !aacApp || skip) {
+      return;
+    }
+
+    pollingUnsubscribe.current = startPollingActiveAuctions(offset, limit, aacApp, pollInterval);
+
+    return () => {
+      if (pollingUnsubscribe.current) {
+        pollingUnsubscribe.current();
+        pollingUnsubscribe.current = null;
+      }
+    };
+  }, [enablePolling, skip, aacApp, offset, limit, pollInterval, startPollingActiveAuctions]);
 
   return {
     auctions,

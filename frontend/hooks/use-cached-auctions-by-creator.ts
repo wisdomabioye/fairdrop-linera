@@ -17,6 +17,10 @@ export interface UseCachedAuctionsByCreatorOptions {
   creator: string;
   aacApp: ApplicationClient | null;
   skip?: boolean;
+  /** Enable polling - ON by default */
+  enablePolling?: boolean;
+  /** Polling interval in ms (default: 10000) */
+  pollInterval?: number;
 }
 
 export interface UseCachedAuctionsByCreatorResult {
@@ -32,7 +36,13 @@ export interface UseCachedAuctionsByCreatorResult {
 export function useCachedAuctionsByCreator(
   options: UseCachedAuctionsByCreatorOptions
 ): UseCachedAuctionsByCreatorResult {
-  const { creator, aacApp, skip = false } = options;
+  const {
+    creator,
+    aacApp,
+    skip = false,
+    enablePolling = true,
+    pollInterval = 10000
+  } = options;
 
   const { isPublicClientSyncing } = useSyncStatus();
 
@@ -40,6 +50,7 @@ export function useCachedAuctionsByCreator(
     auctionsByCreator,
     allAuctionsCache,
     fetchAuctionsByCreator,
+    startPollingAuctionsByCreator,
     isStale: checkIsStale
   } = useAuctionStore();
 
@@ -47,6 +58,7 @@ export function useCachedAuctionsByCreator(
   const hasLoadedOnce = useRef(false);
   // Track if this is initial mount to force fetch
   const isInitialMount = useRef(true);
+  const pollingUnsubscribe = useRef<(() => void) | null>(null);
 
   // Get auctions for this specific creator
   const creatorEntry = creator ? auctionsByCreator.get(creator) : null;
@@ -94,6 +106,28 @@ export function useCachedAuctionsByCreator(
       }
     }
   }, [skip, aacApp, creator, isPublicClientSyncing, creatorEntry, isStale, isFetching, refetch]);
+
+  // Polling setup - enabled by default
+  useEffect(() => {
+    // Cleanup previous
+    if (pollingUnsubscribe.current) {
+      pollingUnsubscribe.current();
+      pollingUnsubscribe.current = null;
+    }
+
+    if (!enablePolling || !aacApp || !creator || skip) {
+      return;
+    }
+
+    pollingUnsubscribe.current = startPollingAuctionsByCreator(creator, aacApp, pollInterval);
+
+    return () => {
+      if (pollingUnsubscribe.current) {
+        pollingUnsubscribe.current();
+        pollingUnsubscribe.current = null;
+      }
+    };
+  }, [enablePolling, skip, aacApp, creator, pollInterval, startPollingAuctionsByCreator]);
 
   return {
     auctions,

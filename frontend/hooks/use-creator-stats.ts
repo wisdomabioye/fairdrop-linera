@@ -1,7 +1,6 @@
 'use client';
 
-import { useWalletConnection } from 'linera-react-client';
-import { useCachedAuctionsByCreator } from '@/hooks';
+import { useBatchPolling } from '@/providers';
 
 interface CreatorStats {
   totalRevenue: string;
@@ -13,19 +12,21 @@ interface CreatorStats {
 }
 
 export function useCreatorStats() {
-  const { address } = useWalletConnection();
+  const { 
+    userPortfolio: {
+      creatorAuctions, 
+      loading,
+      error
+    }
+  } = useBatchPolling();
 
-  const { auctions, loading, error } = useCachedAuctionsByCreator({
-    creator: address || '',
-    aacApp: null,
-  });
 
   const stats: CreatorStats = {
     totalRevenue: '0', // TODO: Calculate total revenue
     pendingRevenue: '0', // TODO: Calculate pending withdrawals
     withdrawnRevenue: '0', // TODO: Calculate withdrawn amount
-    activeAuctionsCount: auctions?.filter(a => a.status === 'Active').length || 0,
-    totalBidsReceived: auctions?.reduce((sum, auction) => sum + (auction.totalBids || 0), 0) || 0,
+    activeAuctionsCount: creatorAuctions?.filter(a => a.status === 'Active').length || 0,
+    totalBidsReceived: creatorAuctions?.reduce((sum, auction) => sum + (auction.totalBids || 0), 0) || 0,
     successRate: '0', // TODO: Calculate success rate
   };
 
@@ -33,6 +34,6 @@ export function useCreatorStats() {
     stats,
     loading,
     error,
-    hasCreatedAuctions: (auctions?.length || 0) > 0,
+    hasCreatedAuctions: (creatorAuctions?.length || 0) > 0,
   };
 }

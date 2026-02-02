@@ -293,6 +293,7 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "async-trait",
+ "base64 0.22.1",
  "fungible",
  "linera-sdk",
  "serde",

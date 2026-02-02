@@ -7,12 +7,12 @@ export type TokenInfo = {
 }
 
 
-const LUSD_APP_ID = 'b1c4bab3cfd110483ccae7ce34f49d175001e4ca15e60c73b495e4d317f7296f';
-const FUSD_APP_ID = 'bbc1f2463322145869dfbc92531ee8179f7fd33c3a4f1138824976dcb329bff6';
-const XUSD_APP_ID = '441a74103ad629d68492dd3aef06527e5e0968e8d8bd6ebcda245d19753971bb';
-const SPL_APP_ID = '88482a20daab9be60921e7d9bd8daa94753c779c855fac6e32890606122d11ec';
-const DIGI_APP_ID = '3064eeb745aed61f14782c6bc4826e2d55712ca93f7805a86b8727f94a0afb75';
-const FAIR_APP_ID = '1c2686a275dfa34110f483a755b048c1ed32f0b136d8a84ce52b4dd2df592d62';
+const LUSD_APP_ID = '0dd7d7cc44f6d39aefb523ff35799317171871f19ae7986188329bbe18d400df';
+const FUSD_APP_ID = '94270beb3ed4cc20086ff7f7c93f136acba8f9593a26a7f28a2742b2d20a53b4';
+const XUSD_APP_ID = '216cf9a3ba751985c3a3d2a1dd3932bf9d6056503ecca240e21f6539ebd1d9cd';
+const SPL_APP_ID = '24ed70e663bf7da8e5ec128a8d5eae1b126de3b3857f610a3996505fa0065ca4';
+const DIGI_APP_ID = '3c8bd6cbacc0ee6d028daba8dd4abd84b782077eb5f6a935ea3464729ee9efed';
+const FAIR_APP_ID = '9bf7002f3a59f5899664f7cbcf4313cad6b3fb9057c3e4c0c04a55f26114e99d';
 
 /** List of supported tokens for auction payment */
 export const PAYMENT_TOKEN: Record<ApplicationId, TokenInfo> = {

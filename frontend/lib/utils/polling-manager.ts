@@ -146,8 +146,8 @@ export class PollingManager {
       return;
     }
 
-    // Execute immediately on start
-    this.scheduleNext(subscription, 0);
+    // Start with full interval delay - initial fetch already handles first data load
+    this.scheduleNext(subscription, subscription.interval);
   }
 
   /**

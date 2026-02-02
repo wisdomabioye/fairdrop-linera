@@ -14,9 +14,9 @@ import { Spinner } from '@/components/ui/spinner';
 import { 
   useAuctionMutations, 
   useAacApp, 
-  useCachedUserBalances, 
   usePersistedAuctionForm 
 } from '@/hooks';
+import { useSyncStatus, useBatchPolling } from '@/providers';
 import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import { TokenSelector } from '@/components/shared';
 import { ImageUpload } from '@/components/shared';
@@ -24,12 +24,10 @@ import { StepIndicator, type Step } from '@/components/shared';
 import { AuctionPreview } from './auction-preview';
 import { CreatorBalanceCheck } from './creator-balance-check';
 import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
-import { getAuctionTokenList, getPaymentTokenList, getTokenList, getTokenByAppId } from '@/config/app.token-store';
+import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { APP_ROUTES } from '@/config/app.route';
-import { useSyncStatus } from '@/providers';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
-
 
 export interface CreateAuctionFormProps {
   onSuccess?: (auctionId: string) => void | Promise<void>;
@@ -114,12 +112,11 @@ export function CreateAuctionFormMultistep({
   const auctionTokenList = getAuctionTokenList();
 
   // Fetch current AAC balance for deposit dialog
-  const { balances: aacBalances } = useCachedUserBalances({
-    address: address || '',
-    tokenApps: getTokenList().map(t => t.appId),
-    aacApp: aacApp.app,
-    skip: !address || !aacApp.app
-  });
+  const { 
+    userPortfolio: {
+      balances: aacBalances, 
+    }
+  } = useBatchPolling();
 
   const currentAACBalance = aacBalances?.get(formData.auctionTokenApp) ?? 0;
 
@@ -156,6 +153,20 @@ export function CreateAuctionFormMultistep({
       }
     }
   });
+
+
+  /**
+   * Convert image file to data URL for preview
+   * Actual blob upload happens on submit via the contract
+   */
+  const UploadAuctionImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string); // data:image/png;base64,...
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -248,6 +259,10 @@ export function CreateAuctionFormMultistep({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prefetch destination page in parallel with delay
+    router.prefetch(APP_ROUTES.creatorAuctions);
+
+
     if (!startDate || !endDate || !aacApp.app) {
       return;
     }
@@ -259,16 +274,23 @@ export function CreateAuctionFormMultistep({
     // Convert dates to microseconds
     const startTime = millisecondsToMicroseconds(startDate.getTime());
     const endTime = millisecondsToMicroseconds(endDate.getTime());
+    const _priceDecayMilliseconds = (formData.priceDecayInterval * 1000);
+    const priceDecayInterval = millisecondsToMicroseconds(_priceDecayMilliseconds)
+
+    // Extract base64 from data URL: "data:image/png;base64,ABC123" → "ABC123"
+    const imageBase64 = formData.image.includes(',')
+      ? formData.image.split(',')[1]
+      : formData.image;
 
     const params: AuctionParam = {
       itemName: formData.itemName.trim(),
-      image: formData.image.trim(),
+      image: imageBase64,
       maxBidAmount: Number(formData.maxBidAmount),
       totalSupply: Number(formData.totalSupply),
       startPrice: formData.startPrice,
       floorPrice: formData.floorPrice,
       priceDecayAmount: formData.priceDecayAmount,
-      priceDecayInterval: Number(formData.priceDecayInterval),
+      priceDecayInterval,
       startTime,
       endTime,
       creator: address!,
@@ -326,6 +348,7 @@ export function CreateAuctionFormMultistep({
                 <div className="space-y-2">
                   <Label>Item Image *</Label>
                   <ImageUpload
+                    onUpload={UploadAuctionImage}
                     value={formData.image}
                     onChange={(value) => {
                       setFormData(prev => ({ ...prev, image: value }));
@@ -540,7 +563,13 @@ export function CreateAuctionFormMultistep({
                     <DateTimePicker
                       date={endDate}
                       setDate={setEndDate}
-                      disabled={(date) => !startDate || date <= startDate}
+                      disabled={(date) => {
+                        if (!startDate) return true;
+                        // Compare dates only (not times) - allow same day selection
+                        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                        return dateOnly < startDateOnly;
+                      }}
                       formatDate={(date) => formatAbsoluteTime(date.getTime())}
                     />
                     {errors.endTime && (
