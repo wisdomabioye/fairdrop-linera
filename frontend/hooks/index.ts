@@ -120,3 +120,5 @@ export type {
     UseUserPortfolioOptions,
     UseUserPortfolioResult
 } from './use-user-portfolio';
+
+export { useAacTrigger } from './use-aac-trigger';

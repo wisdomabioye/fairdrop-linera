@@ -18,6 +18,7 @@ import { useUIStore } from '@/store/ui-store';
 import type { AuctionSummary } from '@/lib/gql/types';
 import { APP_ROUTES } from '@/config/app.route';
 import { useBatchPolling } from '@/providers';
+import { useAacTrigger } from '@/hooks';
 // import { useAuctionStore } from '@/store/auction-store';
 
 export default function DashboardOverview() {
@@ -34,7 +35,7 @@ export default function DashboardOverview() {
     auction: null,
   });
 
-  // const { invalidateAuctionDetailBatch } = useAuctionStore();
+  useAacTrigger();
 
   const { 
     dashboardData: {

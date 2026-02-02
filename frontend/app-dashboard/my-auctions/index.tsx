@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useWalletConnection } from 'linera-react-client';
 import { Plus, Gavel } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -12,29 +12,22 @@ import { AuctionTable } from '@/components/auction/auction-table';
 import { ViewToggle } from '@/components/dashboard/filter/view-toggle';
 import { EmptyState } from '@/components/loading/empty-state';
 import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/auction-skeleton';
-import { useBatchPolling } from '@/providers';
 import { useUIStore } from '@/store/ui-store';
 import { APP_ROUTES } from '@/config/app.route';
-import { useAuctionStore } from '@/store/auction-store';
+import { useBatchPolling } from '@/providers';
+import { useAacTrigger } from '@/hooks';
 
 export default function MyAuctionsPage() {
   const router = useRouter();
-  const { isConnected, address } = useWalletConnection();
+  const { isConnected } = useWalletConnection();
   const { viewMode } = useUIStore();
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'scheduled' | 'ended'>('all');
 
-  const { 
-      invalidateUserPortfolioBatch
-  } = useAuctionStore();
+  useAacTrigger();
+
   const { 
     userPortfolio: { creatorAuctions, loading }
   } = useBatchPolling();
-
-  useEffect(() => {
-    if (address) {
-      invalidateUserPortfolioBatch(address);
-    }
-  }, [address])
 
   if (!isConnected) {
     return (
