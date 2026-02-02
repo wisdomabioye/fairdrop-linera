@@ -11,7 +11,7 @@ export function AppLineraProvider({ children }: {children: React.ReactNode}) {
     <LineraProvider
       faucetUrl={process.env.NEXT_PUBLIC_FAUCET_URL!}
       readOnlyWallet={{
-        constantAddress: '0x0000000000000000000000000000000000000012'
+        constantAddress: '0x0000000000000000000000000000000000000013'
       }}
       fallback={<PageLoading />}
       errorFallback={() => <ErrorFallback />}
