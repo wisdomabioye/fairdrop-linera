@@ -284,6 +284,7 @@ export function useAuctionMutations(
                 // Trigger publicClient
                 await trigger();
                 
+                invalidateUserPortfolioBatch(address);
                 invalidateDashboardBatch();
                 invalidateAuctionDetailBatch(auctionId.toString());
                

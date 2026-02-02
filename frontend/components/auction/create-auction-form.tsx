@@ -11,21 +11,21 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Spinner } from '@/components/ui/spinner';
+import { TokenSelector } from '@/components/shared';
+import { ImageUpload } from '@/components/shared';
+import { StepIndicator, type Step } from '@/components/shared';
+import { useSyncStatus, useBatchPolling } from '@/providers';
 import { 
   useAuctionMutations, 
   useAacApp, 
   usePersistedAuctionForm 
 } from '@/hooks';
-import { useSyncStatus, useBatchPolling } from '@/providers';
-import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
-import { TokenSelector } from '@/components/shared';
-import { ImageUpload } from '@/components/shared';
-import { StepIndicator, type Step } from '@/components/shared';
+import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
 import { AuctionPreview } from './auction-preview';
 import { CreatorBalanceCheck } from './creator-balance-check';
-import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
 import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { APP_ROUTES } from '@/config/app.route';
+import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
 
@@ -135,11 +135,6 @@ export function CreateAuctionFormMultistep({
         if (onAuctionCreateSuccess) {
           await onAuctionCreateSuccess(auctionId);
         }
-
-        // Small delay to let blockchain state settle before redirect
-        // The mutation already refreshed the cache, but we need time for
-        // the new auction to appear in subsequent queries
-        await new Promise(resolve => setTimeout(resolve, 300));
 
         router.push(APP_ROUTES.creatorAuctions);
       }

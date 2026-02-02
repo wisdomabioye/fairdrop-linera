@@ -15,11 +15,10 @@ import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/
 import { ErrorState } from '@/components/loading/error-state';
 import { EmptyState } from '@/components/loading/empty-state';
 import { useUIStore } from '@/store/ui-store';
-
 import type { AuctionSummary } from '@/lib/gql/types';
 import { APP_ROUTES } from '@/config/app.route';
 import { useBatchPolling } from '@/providers';
-import { useAuctionStore } from '@/store/auction-store';
+// import { useAuctionStore } from '@/store/auction-store';
 
 export default function DashboardOverview() {
   const router = useRouter();
@@ -35,7 +34,7 @@ export default function DashboardOverview() {
     auction: null,
   });
 
-  const { invalidateAuctionDetailBatch } = useAuctionStore();
+  // const { invalidateAuctionDetailBatch } = useAuctionStore();
 
   const { 
     dashboardData: {
@@ -152,9 +151,9 @@ export default function DashboardOverview() {
         auction={bidDialog.auction}
         open={bidDialog.open}
         onOpenChange={(open) => setBidDialog({ ...bidDialog, open })}
-        onSuccess={() => {
-          invalidateAuctionDetailBatch(bidDialog.auction?.auctionId.toString() as string)
-        }}
+        // onSuccess={() => {
+        //   invalidateAuctionDetailBatch(bidDialog.auction?.auctionId.toString() as string)
+        // }}
       />
     </div>
   );

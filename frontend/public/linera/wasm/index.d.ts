@@ -27,12 +27,12 @@ export interface AddOwnerOptions {
     weight?: number;
 }
 
-import type { Signer } from '../signer/index.js';
-
 export interface QueryOptions {
     blockHash?: string | undefined;
     owner?: AccountOwner | undefined;
 }
+
+import type { Signer } from '../signer/index.js';
 
 export interface Options extends ChainListenerConfig {
     /**
@@ -69,6 +69,11 @@ export interface Options extends ChainListenerConfig {
      * messages have been delivered.
      */
     waitForOutgoingMessages?: boolean;
+    /**
+     * Whether to allow creating blocks in the fast round. Fast blocks have lower latency but
+     * must be used carefully so that there are never any conflicting fast block proposals.
+     */
+    allowFastBlocks?: boolean;
     /**
      * (EXPERIMENTAL) Whether application services can persist in some cases between queries.
      */
@@ -168,6 +173,9 @@ export interface ChainListenerConfig {
     delayAfterMs?: number;
 }
 
+/**
+ * A blanket policy to apply to all messages by default.
+ */
 export type BlanketMessagePolicy = "Accept" | "Reject" | "Ignore";
 
 export type ApplicationId = string;
@@ -384,10 +392,6 @@ export interface InitOutput {
   readonly chain_addOwner: (a: number, b: any, c: number) => any;
   readonly chain_validatorVersionInfo: (a: number) => any;
   readonly chain_application: (a: number, b: number, c: number) => any;
-  readonly __wbg_faucet_free: (a: number, b: number) => void;
-  readonly faucet_new: (a: number, b: number) => number;
-  readonly faucet_createWallet: (a: number) => any;
-  readonly faucet_claimChain: (a: number, b: number, c: any) => any;
   readonly __wbg_client_free: (a: number, b: number) => void;
   readonly client_new: (a: number, b: any, c: number) => any;
   readonly client_chain: (a: number, b: any) => any;
@@ -396,6 +400,10 @@ export interface InitOutput {
   readonly application_query: (a: number, b: number, c: number, d: number) => any;
   readonly __wbg_wallet_free: (a: number, b: number) => void;
   readonly wallet_setOwner: (a: number, b: any, c: any) => any;
+  readonly __wbg_faucet_free: (a: number, b: number) => void;
+  readonly faucet_new: (a: number, b: number) => number;
+  readonly faucet_createWallet: (a: number) => any;
+  readonly faucet_claimChain: (a: number, b: number, c: any) => any;
   readonly __web_thread_worker_entry_point: (a: any, b: any) => any;
   readonly __wbg_intounderlyingsource_free: (a: number, b: number) => void;
   readonly intounderlyingsource_pull: (a: number, b: any) => any;
@@ -421,10 +429,13 @@ export interface InitOutput {
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export_7: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h6c108f0cdc15a49a: (a: number, b: number) => void;
-  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h82e53cc2539c8fc5_multivalue_shim: (a: number, b: number) => [number, number];
-  readonly closure3289_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure3779_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure786_externref_shim_multivalue_shim: (a: number, b: number, c: any) => [number, number];
+  readonly closure789_externref_shim: (a: number, b: number, c: any) => void;
+  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hce326e238b83e2f8: (a: number, b: number) => void;
+  readonly closure2739_externref_shim: (a: number, b: number, c: any) => void;
+  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hdfb756f5be6f518f_multivalue_shim: (a: number, b: number) => [number, number];
+  readonly closure3272_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure3891_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_thread_destroy: (a?: number, b?: number, c?: number) => void;
   readonly __wbindgen_start: (a: number) => void;
 }
