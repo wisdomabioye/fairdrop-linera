@@ -1452,7 +1452,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
                 const result = await aacApp.public.query<string>(JSON.stringify(batchQuery));
 
-                console.log('fetchAuctionDetailBatch', result)
+                // console.log('fetchAuctionDetailBatch', result)
 
                 const { data } = JSON.parse(result) as {
                     data: {
@@ -1591,7 +1591,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
                 const result = await aacApp.public.query<string>(JSON.stringify(batchQuery));
 
-                console.log('fetchUserPortfolioBatch', result)
+                // console.log('fetchUserPortfolioBatch', result)
 
                 const { data } = JSON.parse(result) as {
                     data: {
@@ -1754,7 +1754,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
                 const result = await aacApp.public.query<string>(JSON.stringify(batchQuery));
 
-                console.log('fetchDashboardBatch', result)
+                // console.log('fetchDashboardBatch', result)
 
                 const { data } = JSON.parse(result) as {
                     data: {

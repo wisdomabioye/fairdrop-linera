@@ -76,7 +76,7 @@ export function BidForm({
     }
   });
   // Calculations
-  const maxQuantity = auction.maxBidAmount;
+  const maxQuantity = auction.maxBidAmount > 0 ? auction.maxBidAmount : auction.totalSupply;
   const currentCommitment = totalQuantity || 0;
   const remainingLimit = maxQuantity - currentCommitment;
   const remainingSupply = auction.totalSupply - auction.sold;

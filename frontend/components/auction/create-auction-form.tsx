@@ -559,7 +559,13 @@ export function CreateAuctionFormMultistep({
                     <DateTimePicker
                       date={endDate}
                       setDate={setEndDate}
-                      disabled={(date) => !startDate || date <= startDate}
+                      disabled={(date) => {
+                        if (!startDate) return true;
+                        // Compare dates only (not times) - allow same day selection
+                        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                        return dateOnly < startDateOnly;
+                      }}
                       formatDate={(date) => formatAbsoluteTime(date.getTime())}
                     />
                     {errors.endTime && (

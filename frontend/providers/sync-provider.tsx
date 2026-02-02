@@ -88,7 +88,8 @@ export function SyncProvider({
   const { address } = useWalletConnection();
   const { 
     invalidateDashboardBatch,
-    invalidateUserPortfolioBatch
+    invalidateUserPortfolioBatch,
+    invalidateAll
   } = useAuctionStore();
   const { invalidateAll: invalidateAllFungibleData } = useTokenStore();
 
@@ -132,6 +133,7 @@ export function SyncProvider({
 
     invalidationTimerRef.current = setTimeout(() => {
       console.log('[SyncProvider] Executing debounced cache invalidation');
+      invalidateAll();
       invalidateDashboardBatch();
       if (address) {
         invalidateUserPortfolioBatch(address);

@@ -365,7 +365,7 @@ export default function AuctionDetailPage() {
           />	
 
           {/* User's Commitment */}	
-          {totalQuantity && totalQuantity > 0 && (	
+          {!!totalQuantity && totalQuantity > 0 && (	
             <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">	
               <CardHeader>	
                 <CardTitle className="flex items-center gap-2 text-lg">	
