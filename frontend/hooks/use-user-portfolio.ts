@@ -141,14 +141,16 @@ export function useUserPortfolio(
     };
   }, [allUserBids]);
 
-  // Initial fetch
+  // Initial fetch - runs on mount and when explicitly invalidated by SyncProvider
   useEffect(() => {
     if (skip || !aacApp || !address || isPublicClientSyncing || tokenApps.length === 0) return;
 
-    if ((!batchMeta || isStale) && !isFetching) {
+    // Fetch if no data yet, or if explicitly invalidated (timestamp = 0)
+    // const isInvalidated = batchMeta?.timestamp === 0;
+    if ((!batchMeta /* || isInvalidated */ || isStale) && !isFetching) {
       fetchUserPortfolioBatch(address, tokenApps, aacApp);
     }
-  }, [skip, aacApp, address, isPublicClientSyncing, tokenApps, batchMeta, isStale, isFetching, fetchUserPortfolioBatch]);
+  }, [skip, aacApp, address, isPublicClientSyncing, isStale, tokenApps, batchMeta, isFetching, fetchUserPortfolioBatch]);
 
   // Polling setup with debounce to prevent rapid subscribe/unsubscribe cycles
   useEffect(() => {

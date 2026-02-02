@@ -109,11 +109,13 @@ export function useAuctionDetail(
     }
   }, [aacApp, skip, isPublicClientSyncing, auctionId, bidOffset, bidLimit, fetchAuctionDetailBatch]);
 
-  // Initial fetch
+  // Initial fetch - runs on mount and when explicitly invalidated by SyncProvider
   useEffect(() => {
     if (skip || !aacApp || isPublicClientSyncing) return;
 
-    if ((!batchMeta || isStale) && !isFetching) {
+    // Fetch if no data yet, or if explicitly invalidated (timestamp = 0)
+    // const isInvalidated = batchMeta?.timestamp === 0;
+    if ((!batchMeta /* || isInvalidated */ || isStale) && !isFetching) {
       fetchAuctionDetailBatch(auctionId, bidOffset, bidLimit, aacApp);
     }
   }, [skip, aacApp, isPublicClientSyncing, batchMeta, isStale, isFetching, auctionId, bidOffset, bidLimit, fetchAuctionDetailBatch]);

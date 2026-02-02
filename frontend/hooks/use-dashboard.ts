@@ -116,11 +116,13 @@ export function useDashboard(
     }
   }, [aacApp, skip, isPublicClientSyncing, offset, limit, fetchDashboardBatch]);
 
-  // Initial fetch
+  // Initial fetch - runs on mount and when explicitly invalidated by SyncProvider
   useEffect(() => {
     if (skip || !aacApp || isPublicClientSyncing) return;
 
-    if ((!batchDashboard || isStale) && !isFetching) {
+    // Fetch if no data yet, or if explicitly invalidated (timestamp = 0)
+    // const isInvalidated = batchDashboard?.timestamp === 0;
+    if ((!batchDashboard /* || isInvalidated */ || isStale) && !isFetching) {
       fetchDashboardBatch(offset, limit, aacApp);
     }
   }, [skip, aacApp, isPublicClientSyncing, batchDashboard, isStale, isFetching, offset, limit, fetchDashboardBatch]);

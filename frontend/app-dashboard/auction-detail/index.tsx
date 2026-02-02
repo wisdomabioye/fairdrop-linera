@@ -41,8 +41,8 @@ export default function AuctionDetailPage() {
   } = useAuctionDetail({	
     auctionId,	
     aacApp: aacApp.app,	
-    enablePolling: true,
-    pollInterval: 15_000, // 10s
+    enablePolling: false,
+    pollInterval: 10_000, // 10s
     skip: !auctionId || !aacApp.app	
   });	
 

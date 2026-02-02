@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useReducer, useRef, useCallback } from 'react';
+import { useWalletConnection } from 'linera-react-client';
 import { useAuctionStore } from '@/store/auction-store';
 import { useChain } from '@/hooks/use-chain';
 import { useTokenStore } from '@/store/token-store';
@@ -84,7 +85,11 @@ export function SyncProvider({
   children: React.ReactNode;
 } & SyncProviderOptions) {
   const { publicChain, walletChain, isConnected, isInitialized } = useChain();
-  const { invalidateAll } = useAuctionStore();
+  const { address } = useWalletConnection();
+  const { 
+    invalidateDashboardBatch,
+    invalidateUserPortfolioBatch
+  } = useAuctionStore();
   const { invalidateAll: invalidateAllFungibleData } = useTokenStore();
 
   const [state, dispatch] = useReducer(syncReducer, initialState);
@@ -127,10 +132,13 @@ export function SyncProvider({
 
     invalidationTimerRef.current = setTimeout(() => {
       console.log('[SyncProvider] Executing debounced cache invalidation');
-      invalidateAll();
+      invalidateDashboardBatch();
+      if (address) {
+        invalidateUserPortfolioBatch(address);
+      }
       invalidateAllFungibleData();
     }, 100); // Small delay to batch simultaneous sync completions
-  }, [clearInvalidationTimer, invalidateAll, invalidateAllFungibleData]);
+  }, [clearInvalidationTimer, invalidateDashboardBatch, invalidateUserPortfolioBatch, address, invalidateAllFungibleData]);
 
   /**
    * Handle sync completion - detect transitions and invalidate
