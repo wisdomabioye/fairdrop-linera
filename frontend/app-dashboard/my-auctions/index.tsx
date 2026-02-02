@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useWalletConnection } from 'linera-react-client';
 import { Plus, Gavel } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -23,9 +23,12 @@ export default function MyAuctionsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'scheduled' | 'ended'>('all');
 
   const { 
-    userPortfolio: { creatorAuctions, loading }
+    userPortfolio: { creatorAuctions, loading, refetch }
   } = useBatchPolling();
 
+  useEffect(() => {
+    refetch();
+  }, [])
 
   if (!isConnected) {
     return (

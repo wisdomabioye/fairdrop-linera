@@ -643,6 +643,9 @@ impl AuctionContract {
         let user_account = self.runtime.authenticated_signer()
             .expect("Caller must be authenticated");
 
+        // 0. LAZY SETTLEMENT - if auction ended but not yet settled, settle it now
+        self.try_lazy_settle(auction_id).await;
+
         // 1. VALIDATE & LOAD - single auction read with all needed data
         let claim_data = match self.load_claim_data(auction_id, user_account).await {
             Ok(data) => data,
@@ -695,10 +698,7 @@ impl AuctionContract {
 
         // 4. SETTLE - explicit settlement check (not hidden)
         if validation.should_settle {
-            // Set clearing price and settle
-            let auction = self.state.auctions.get_mut(&auction_id).await.unwrap().unwrap();
-            auction.clearing_price = Some(validation.current_price);
-            
+            // clearing_price already set in execute_bid, just settle
             self.settle_auction(auction_id).await;
         }
 
@@ -965,6 +965,46 @@ impl AuctionContract {
     // Helper Functions
     // ═══════════════════════════════════════════════════════════
 
+    /// Lazy settlement: if auction is Active but time has expired, settle it
+    /// This allows claims to work even if no one triggered settlement via a bid attempt
+    async fn try_lazy_settle(&mut self, auction_id: u64) {
+        let now = self.runtime.system_time();
+
+        // Read auction to check if lazy settlement is needed
+        let auction = match self.state.auctions.get(&auction_id).await {
+            Ok(Some(a)) => a,
+            _ => return, // Auction not found, will be handled by load_claim_data
+        };
+
+        // Only proceed if auction is Active and time has expired
+        if auction.status != AuctionStatus::Active || now <= auction.params.end_time {
+            return;
+        }
+
+        // Auction needs lazy settlement
+        // clearing_price should already be set from execute_bid if any bids exist
+        // If no bids, set it to the price at end_time
+        if auction.clearing_price.is_none() {
+            let price_at_end = shared::calculate_current_price(
+                auction.params.start_price,
+                auction.params.floor_price,
+                auction.params.price_decay_amount,
+                auction.params.price_decay_interval,
+                auction.params.start_time,
+                auction.params.end_time,
+                auction.params.end_time, // Use end_time as current_time
+                AuctionStatus::Active,
+            );
+
+            if let Ok(Some(auction_mut)) = self.state.auctions.get_mut(&auction_id).await {
+                auction_mut.clearing_price = Some(price_at_end);
+            }
+        }
+
+        // Now settle the auction
+        self.settle_auction(auction_id).await;
+    }
+
     /// Load and validate claim data (single auction read)
     async fn load_claim_data(&mut self, auction_id: u64, user_account: AccountOwner) -> Result<ClaimData, ()> {
         // Verify auction is settled
@@ -1154,11 +1194,14 @@ impl AuctionContract {
 
         // 3. Check time expiration - handle settlement if needed
         if now > end_time && current_status == AuctionStatus::Active {
-            // Set clearing price
+            // Only set clearing_price if no bids were placed (it's None)
+            // If bids exist, clearing_price was already set in execute_bid
             if let Ok(Some(auction_mut)) = self.state.auctions.get_mut(&auction_id).await {
-                auction_mut.clearing_price = Some(current_price);
+                if auction_mut.clearing_price.is_none() {
+                    auction_mut.clearing_price = Some(current_price);
+                }
             }
-            
+
             // Settle auction (separate mutable borrow)
             self.settle_auction(auction_id).await;
 
@@ -1298,6 +1341,8 @@ impl AuctionContract {
         if is_first_bid {
             auction.total_bidders += 1;
         }
+        // Update clearing_price on every bid - ensures fair clearing price based on last bid
+        auction.clearing_price = Some(validation.current_price);
         let total_sold = auction.sold;
         let remaining = auction.total_supply.saturating_sub(auction.sold);
 

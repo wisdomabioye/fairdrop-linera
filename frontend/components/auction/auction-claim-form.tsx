@@ -10,7 +10,6 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WalletConnectButton } from '@/components/wallet';
 import { useBatchPolling, useSyncStatus } from '@/providers';
-import { useCachedUserBidRecord } from '@/hooks/use-cached-my-bids';
 import { useAuctionMutations } from '@/hooks/use-auction-mutations';
 import { formatTokenAmount } from '@/lib/utils/auction-utils';
 import { getTokenByAppId } from '@/config/app.token-store';
@@ -172,10 +171,11 @@ export function ClaimForm({
     );
   }
 
+  const clearingPrice = Number(auction.clearingPrice) > 0 ? Number(auction.clearingPrice) : auction.currentPrice;
   const hasClaim = userBidRecord.length > 0 && userBidRecord.some(c => !c.claimed);
   const hasAllocation = totalQuantity > 0;
-  const pricePerItem = Number(auction.clearingPrice) > 0 ? Number(auction.clearingPrice) : totalQuantity / totalPaid
-  const actualCost = Number(auction.clearingPrice) > 0 ? totalQuantity * Number(auction.clearingPrice) : totalPaid;
+  const pricePerItem = clearingPrice;
+  const actualCost = totalQuantity * Number(clearingPrice);
   const refundAmount = totalPaid - actualCost;
   const hasRefund = refundAmount > 0;
 

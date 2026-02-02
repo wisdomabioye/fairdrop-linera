@@ -259,6 +259,10 @@ export function CreateAuctionFormMultistep({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prefetch destination page in parallel with delay
+    router.prefetch(APP_ROUTES.creatorAuctions);
+
+
     if (!startDate || !endDate || !aacApp.app) {
       return;
     }
