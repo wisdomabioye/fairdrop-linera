@@ -722,7 +722,7 @@ export const AAC_MUTATION = {
 
     ClaimSettlement (auction_id: number) {
         return {
-            query: `mutation { claimSettlement(auctionId: ${auction_id}) }`
+            query: `mutation { claimSettlement(auctionId: ${formatGraphQLValue(auction_id)}) }`
         }
     },
 

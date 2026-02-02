@@ -142,7 +142,19 @@ impl Contract for AuctionContract {
             }
 
             AuctionOperation::ClaimSettlement { auction_id } => {
-                self.handle_claim_settlement(auction_id).await
+                if current_chain == app_params.aac_chain {
+                    self.handle_claim_settlement(auction_id).await
+                } else {
+                    let message = AuctionMessage::ClaimSettlement { auction_id };
+
+                    self.runtime
+                        .prepare_message(message)
+                        .with_authentication()
+                        .with_tracking()
+                        .send_to(app_params.aac_chain);
+
+                    AuctionResponse::Ok
+                }
             }
 
             AuctionOperation::WithdrawProceed { auction_id } => {

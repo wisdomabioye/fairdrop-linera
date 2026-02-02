@@ -63,7 +63,7 @@ export function ClaimForm({
     },
     onError: (event) => {
       if (event.type === 'claim') {
-        toast.error(event.error.message || 'Failed to claim settlement');
+        toast.error(event.error.message.split(':')[0] || 'Failed to claim settlement');
       }
     }
   });
@@ -172,12 +172,16 @@ export function ClaimForm({
     );
   }
 
-  const claimed = userBidRecord.filter(c => c.claimed).length === 0;
-  const hasAllocation = (totalQuantity || 0) > 0;
-  const hasRefund = totalPaid && totalPaid > 0;
-  const pricePerItem = (totalQuantity || 0) / (totalPaid || 0)
+  const hasClaim = userBidRecord.length > 0 && userBidRecord.some(c => !c.claimed);
+  const hasAllocation = totalQuantity > 0;
+  const pricePerItem = Number(auction.clearingPrice) > 0 ? Number(auction.clearingPrice) : totalQuantity / totalPaid
+  const actualCost = Number(auction.clearingPrice) > 0 ? totalQuantity * Number(auction.clearingPrice) : totalPaid;
+  const refundAmount = totalPaid - actualCost;
+  const hasRefund = refundAmount > 0;
+
+
   // State 6: No claimable items
-  if (!hasAllocation && !hasRefund) {
+  if (!hasAllocation) {
     return (
       <Card>
         <CardHeader>
@@ -195,7 +199,7 @@ export function ClaimForm({
     );
   }
 
-  if (claimed) {
+  if (!hasClaim) {
     return (
       <Card className="border-green-500/20 bg-green-500/5">
         <CardHeader>
@@ -218,7 +222,7 @@ export function ClaimForm({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Refund Claimed</span>
               <span className="font-semibold font-mono">
-                {formatTokenAmount('0', 18, 4)} {paymentToken.symbol}
+                {formatTokenAmount(refundAmount, 18, 4)} {paymentToken.symbol}
               </span>
             </div>
           )}
@@ -277,7 +281,7 @@ export function ClaimForm({
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Refund</span>
                     <span className="font-mono text-green-600">
-                      +{formatTokenAmount((pricePerItem || 0).toString(), 18, 4)} {paymentToken.symbol}
+                      +{formatTokenAmount((refundAmount).toString(), 18, 4)} {paymentToken.symbol}
                     </span>
                   </div>
                 )}
@@ -290,7 +294,7 @@ export function ClaimForm({
         {claimError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{claimError.message}</AlertDescription>
+            <AlertDescription>{claimError.message.split(':')[0]}</AlertDescription>
           </Alert>
         )}
 

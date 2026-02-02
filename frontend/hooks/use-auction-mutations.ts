@@ -326,8 +326,7 @@ export function useAuctionMutations(
 
             try {
                 const result = await aacApp.wallet.mutate<string>(
-                    JSON.stringify(AAC_MUTATION.ClaimSettlement(auctionId)),
-                    { owner: address }
+                    JSON.stringify(AAC_MUTATION.ClaimSettlement(auctionId))
                 );
 
                 console.log('[useAuctionMutations] Claim settlement result:', result);

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useWalletConnection } from 'linera-react-client';
 import { useSyncStatus, useBatchPolling } from '@/providers';
-import { useAuctionMutations, useCachedUserBidRecord, useAacApp } from '@/hooks';
+import { useAuctionMutations, useAacApp } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import { getTokenByAppId } from '@/config/app.token-store';
 import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
