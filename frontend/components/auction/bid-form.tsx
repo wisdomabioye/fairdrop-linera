@@ -76,10 +76,10 @@ export function BidForm({
     }
   });
   // Calculations
-  const maxQuantity = auction.maxBidAmount > 0 ? auction.maxBidAmount : auction.totalSupply;
+  const remainingSupply = auction.totalSupply - auction.sold;
+  const maxQuantity = auction.maxBidAmount > 0 ? auction.maxBidAmount : remainingSupply;
   const currentCommitment = totalQuantity || 0;
   const remainingLimit = maxQuantity - currentCommitment;
-  const remainingSupply = auction.totalSupply - auction.sold;
   const effectiveMax = Math.min(remainingLimit, remainingSupply);
   const totalCost = calculateBidCost(quantity, auction.currentPrice);
   const totalCostNum = Number(totalCost);

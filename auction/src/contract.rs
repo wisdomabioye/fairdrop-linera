@@ -1217,7 +1217,7 @@ impl AuctionContract {
 
         let mut accepted_quantity = quantity.min(remaining);
 
-        // 6. Check user's cumulative bid against max_bid_amount
+        // 6. Check user's cumulative bid against max_bid_amount (0 = unlimited)
         let user_current_total = self.state.user_totals
             .get(&(auction_id, bidder))
             .await
@@ -1227,7 +1227,8 @@ impl AuctionContract {
 
         let new_total = user_current_total.saturating_add(accepted_quantity);
 
-        if new_total > max_bid_amount {
+        // Only enforce limit if max_bid_amount > 0 (0 means unlimited)
+        if max_bid_amount > Amount::ZERO && new_total > max_bid_amount {
             let allowed = max_bid_amount.saturating_sub(user_current_total);
             accepted_quantity = allowed.min(accepted_quantity);
 
