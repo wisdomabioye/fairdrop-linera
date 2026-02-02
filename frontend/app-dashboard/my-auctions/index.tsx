@@ -15,7 +15,7 @@ import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/
 import { useBatchPolling } from '@/providers';
 import { useUIStore } from '@/store/ui-store';
 import { APP_ROUTES } from '@/config/app.route';
-// import { useAuctionStore } from '@/store/auction-store';
+import { useAuctionStore } from '@/store/auction-store';
 
 export default function MyAuctionsPage() {
   const router = useRouter();
@@ -23,18 +23,18 @@ export default function MyAuctionsPage() {
   const { viewMode } = useUIStore();
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'scheduled' | 'ended'>('all');
 
-  // const { 
-  //     invalidateUserPortfolioBatch
-  // } = useAuctionStore();
+  const { 
+      invalidateUserPortfolioBatch
+  } = useAuctionStore();
   const { 
     userPortfolio: { creatorAuctions, loading }
   } = useBatchPolling();
 
-  // useEffect(() => {
-  //   if (address) {
-  //     invalidateUserPortfolioBatch(address);
-  //   }
-  // }, [address])
+  useEffect(() => {
+    if (address) {
+      invalidateUserPortfolioBatch(address);
+    }
+  }, [address])
 
   if (!isConnected) {
     return (
