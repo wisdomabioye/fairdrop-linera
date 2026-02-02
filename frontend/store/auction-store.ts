@@ -181,6 +181,7 @@ export interface AuctionStore {
     allAuctionsCache: Map<string, AuctionCacheEntry>; // auctionId -> auction (normalized, single source of truth)
     allAuctionsMeta: AllAuctionsMetadata | null; // metadata for allAuctions fetches
     activeAuctions: AuctionListCacheEntry | null;
+    allAuctions: AuctionListCacheEntry | null;
     settledAuctions: AuctionListCacheEntry | null;
     auctionsByCreator: Map<string, AuctionListCacheEntry>; // creator -> auctions
     bidHistory: Map<string, BidHistoryCacheEntry>; // auctionId -> bids
@@ -338,6 +339,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     allAuctionsCache: new Map(),
     allAuctionsMeta: null,
     activeAuctions: null,
+    allAuctions: null,
     settledAuctions: null,
     auctionsByCreator: new Map(),
     bidHistory: new Map(),
@@ -1799,6 +1801,14 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
                             offset,
                             limit,
                             fetchedIds,
+                        },
+                        allAuctions: {
+                            auctionIds: fetchedIds,
+                            timestamp: now,
+                            status: 'success',
+                            error: null,
+                            offset,
+                            limit,
                         },
                         activeAuctions: {
                             auctionIds: activeAuctionIds,
