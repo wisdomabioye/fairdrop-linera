@@ -1135,7 +1135,9 @@ impl AuctionContract {
             price_decay_amount,
             price_decay_interval,
             start_time,
+            end_time,
             now,
+            current_status,
         );
 
         // 3. Check time expiration - handle settlement if needed

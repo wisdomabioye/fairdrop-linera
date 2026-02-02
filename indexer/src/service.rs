@@ -270,7 +270,9 @@ impl QueryRoot {
             summary.price_decay_amount,
             summary.price_decay_interval,
             summary.start_time,
+            summary.end_time,
             current_time,
+            summary.status
         );
 
         Ok(price)

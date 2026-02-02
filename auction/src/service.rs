@@ -91,7 +91,9 @@ impl QueryRoot {
                     auction.params.price_decay_amount,
                     auction.params.price_decay_interval,
                     auction.params.start_time,
+                    auction.params.end_time,
                     now,
+                    auction.status
                 )
             }
             AuctionStatus::Settled | AuctionStatus::Cancelled | AuctionStatus::Pruned => {
@@ -124,7 +126,9 @@ impl QueryRoot {
                     auction.params.price_decay_amount,
                     auction.params.price_decay_interval,
                     auction.params.start_time,
+                    auction.params.end_time,
                     now,
+                    auction.status
                 );
             }
             _ => {
@@ -267,7 +271,9 @@ impl QueryRoot {
                             auction.params.price_decay_amount,
                             auction.params.price_decay_interval,
                             auction.params.start_time,
+                            auction.params.end_time,
                             now,
+                            auction.status
                         );
                     }
                     _ => {}
@@ -318,7 +324,9 @@ impl QueryRoot {
                                 auction.params.price_decay_amount,
                                 auction.params.price_decay_interval,
                                 auction.params.start_time,
+                                auction.params.end_time,
                                 now,
+                                auction.status
                             );
                         }
                         _ => {}
