@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useWalletConnection } from 'linera-react-client';
-import { Plus, Gavel, RefreshCw } from 'lucide-react';
+import { Plus, Gavel, RefreshCw, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -99,6 +99,12 @@ function AuctionsContent({
             Create Auction
           </Button>
         </div>
+      </div>
+
+      {/* Sync Notice */}
+      <div className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800/50">
+        <Info className="h-4 w-4 flex-shrink-0" />
+        <span>Newly created auctions may take a few minutes to appear. We&apos;re working to improve sync times.</span>
       </div>
 
       {/* Stats Summary */}
