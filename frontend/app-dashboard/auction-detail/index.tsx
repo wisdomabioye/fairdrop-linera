@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';	
 import { useParams, useRouter } from 'next/navigation';	
 import { ArrowLeft, Share2, Clock, TrendingDown, Package2, Users, Zap, Trophy } from 'lucide-react';	
-import { useAacApp, useAacTrigger, useAuctionDetail, useAuctionImage } from '@/hooks';	
+import { useAacApp, useAuctionDetail, useAuctionImage } from '@/hooks';	
 import { useBatchPolling } from '@/providers';
 import { BidHistory } from '@/components/auction/bid-history';	
 import { Button } from '@/components/ui/button';	
@@ -33,8 +33,6 @@ export default function AuctionDetailPage() {
   const aacApp = useAacApp();	
   const params = useParams();	
   const auctionId = params?.auctionId as string || '';	
-
-  useAacTrigger();
 
   const {	
     auction,

@@ -18,7 +18,6 @@ import { useUIStore } from '@/store/ui-store';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 import { APP_ROUTES } from '@/config/app.route';
 import { useBatchPolling } from '@/providers';
-import { useAacTrigger } from '@/hooks';
 import { microsecondsToMilliseconds } from '@/lib/utils/auction-utils';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +28,6 @@ const VALID_FILTERS: AuctionFilter[] = ['active', 'ending-soon', 'settled'];
 // Time threshold for "ending soon" (1 hour in milliseconds)
 const ENDING_SOON_THRESHOLD = 60 * 60 * 1000;
 
-/** Inner component that uses useAacTrigger - will re-run on key change */
 function DashboardContent({
   onRefresh,
   isRefreshing,
@@ -65,9 +63,6 @@ function DashboardContent({
     open: false,
     auction: null,
   });
-
-  // This will re-run when parent key changes (on refresh)
-  useAacTrigger();
 
   const {
     dashboardData: {
@@ -268,20 +263,16 @@ function DashboardContent({
 }
 
 export default function DashboardOverview() {
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-    // Increment key to force re-mount, triggering useAacTrigger
-    setRefreshKey(k => k + 1);
     // Reset refreshing state after a delay
     setTimeout(() => setIsRefreshing(false), 1500);
   }, []);
 
   return (
     <DashboardContent
-      key={refreshKey}
       onRefresh={handleRefresh}
       isRefreshing={isRefreshing}
     />

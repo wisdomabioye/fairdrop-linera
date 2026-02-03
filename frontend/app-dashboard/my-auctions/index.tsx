@@ -15,12 +15,10 @@ import { AuctionSkeletonGrid, AuctionSkeletonTable } from '@/components/loading/
 import { useUIStore } from '@/store/ui-store';
 import { APP_ROUTES } from '@/config/app.route';
 import { useBatchPolling } from '@/providers';
-import { useAacTrigger } from '@/hooks';
 import { AuctionStatus, type AuctionSummary } from '@/lib/gql/types';
 
 type StatusFilter = 'all' | 'active' | 'scheduled' | 'ended';
 
-/** Inner component that uses useAacTrigger - will re-run on key change */
 function AuctionsContent({
   statusFilter,
   setStatusFilter,
@@ -34,9 +32,6 @@ function AuctionsContent({
 }) {
   const router = useRouter();
   const { viewMode } = useUIStore();
-
-  // This will re-run when parent key changes (on refresh)
-  useAacTrigger();
 
   const {
     userPortfolio: { creatorAuctions, loading }
@@ -195,14 +190,10 @@ function AuctionsContent({
 export default function MyAuctionsPage() {
   const { isConnected } = useWalletConnection();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-    // Increment key to force re-mount of AuctionsContent, triggering useAacTrigger
-    setRefreshKey(k => k + 1);
-    // Reset refreshing state after a short delay
     setTimeout(() => setIsRefreshing(false), 1500);
   }, []);
 
@@ -219,7 +210,6 @@ export default function MyAuctionsPage() {
 
   return (
     <AuctionsContent
-      key={refreshKey}
       statusFilter={statusFilter}
       setStatusFilter={setStatusFilter}
       onRefresh={handleRefresh}
