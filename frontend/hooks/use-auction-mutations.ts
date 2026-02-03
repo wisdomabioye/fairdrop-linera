@@ -223,7 +223,6 @@ export function useAuctionMutations(
                 }
                 // Trigger publicClient
                 await trigger();
-
                 // Invalidate active auctions list to trigger refetch
                 invalidateUserPortfolioBatch(address);
                 invalidateDashboardBatch();

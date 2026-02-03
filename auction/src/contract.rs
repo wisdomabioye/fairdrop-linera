@@ -60,7 +60,6 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
-                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -76,7 +75,6 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
-                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -92,7 +90,6 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
-                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -102,7 +99,7 @@ impl Contract for AuctionContract {
             AuctionOperation::Trigger {} => {
                 AuctionResponse::Ok
             }
-
+        
             AuctionOperation::Buy { auction_id, quantity } => {
                 if current_chain == app_params.aac_chain {
                     self.handle_place_bid(auction_id, quantity).await
@@ -112,7 +109,6 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
-                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -150,7 +146,6 @@ impl Contract for AuctionContract {
                     self.runtime
                         .prepare_message(message)
                         .with_authentication()
-                        .with_tracking()
                         .send_to(app_params.aac_chain);
 
                     AuctionResponse::Ok
@@ -368,7 +363,6 @@ impl Contract for AuctionContract {
                     }
                 }
             }
-
           
         }
     }
@@ -466,6 +460,8 @@ impl AuctionContract {
 
         // Upload image blob and get hash (base64 string → DataBlobHash)
         let image_blob_hash = self.upload_image_blob(&input.image);
+        // Make the image blob available locally
+        self.runtime.assert_data_blob_exists(image_blob_hash);
 
         // Create AuctionParams with DataBlobHash
         let params = AuctionParams {

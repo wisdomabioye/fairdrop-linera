@@ -52,7 +52,6 @@ pub enum AuctionMessage {
         amount: Amount,
         target_chain: ChainId
     },
-
 }
 
 /// Messages sent to Indexer (not used - Indexer uses events only)
