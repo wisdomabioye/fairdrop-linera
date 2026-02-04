@@ -63,125 +63,20 @@ A decentralized, transparent Dutch auction protocol on Linera blockchain. Unifor
 
 ---
 
-## Build & Deploy
+## Build & Deploy 
 
 ### Build
 ```bash
 cargo build --release --target wasm32-unknown-unknown
 ```
 
-### Deploy Auction Application
+### Deploy Auction Application (On Conway Testnet)
 
-**⚠️ Critical**: Must include `--required-application-ids` for token operations to work.
+**⚠️ Critical**: To deploy on a different network other than Conway, we must run `sh deploy-tokens.sh` to deploy supported tokens then update `supported_tokens` and `aac_chain` in `json-parameter.json` for auction and token operations to work. We can now deploy the auction application like so:
 
 ```bash
-linera publish-and-create \
-  target/wasm32-unknown-unknown/release/auction-contract.wasm \
-  target/wasm32-unknown-unknown/release/auction-service.wasm \
-  --json-parameters-path json-parameter.json \
-  --required-application-ids <TOKEN_1_APP_ID> \
-  --required-application-ids <TOKEN_2_APP_ID>
+sh deploy-auction.sh
 ```
-
-**Parameters (`json-parameter.json`):**
-```json
-{
-  "aac_chain": "<AAC_CHAIN_ID>",
-  "supported_tokens": [
-    "<TOKEN_1_APP_ID>",
-    "<TOKEN_2_APP_ID>"
-  ]
-}
-```
-
-**Note**: Tokens are accessed by index (0, 1) in deposit/withdraw operations. Max 2 tokens supported.
-
-### Deploy Indexer
-```bash
-cd indexer
-linera publish-and-create \
-  target/wasm32-unknown-unknown/release/indexer-contract.wasm \
-  target/wasm32-unknown-unknown/release/indexer-service.wasm
-
----
-
-## Usage Examples
-
-### Deposit Tokens
-```graphql
-mutation {
-  deposit(tokenIndex: 0, amount: "1000")
-}
-```
-- `tokenIndex: 0` = First token in `supported_tokens` array
-- Transfers from user chain → AAC internal balance
-
-### Create Auction
-```graphql
-mutation {
-  createAuction(params: {
-    itemName: "NFT #123"
-    totalSupply: 100
-    startPrice: "10.0"
-    floorPrice: "1.0"
-    priceDecayInterval: 60
-    priceDecayAmount: "0.5"
-    startTime: 1704067200
-    endTime: 1704153600
-    creator: "Owner:7b91..."
-    paymentTokenApp: "90c35bf5..."  # Must be in supported_tokens[0] or [1]
-    auctionTokenApp: "b025bec5..."  # Must be in supported_tokens[0] or [1]
-  })
-}
-```
-
-### Place Bid
-```graphql
-mutation {
-  buy(auctionId: 1, quantity: "5")
-}
-```
-- Deducts from internal balance
-- Automatic refunds if price drops
-
-### Withdraw Tokens
-```graphql
-mutation {
-  withdraw(
-    tokenIndex: 0
-    amount: "500"
-    targetChain: "e476187f6ddfeb9d588c7b45d3df334d5501d6499b3f9ad5595cae86cce16a65"
-  )
-}
-```
-
----
-
-## Token Index Mapping
-
-When deploying with 2 tokens:
-```json
-"supported_tokens": [
-  "90c35bf5f9f580bfe75c38f3fd6ec07e2386d43a3e561d9b9a3b47eabc96be2d",  // Index 0
-  "b025bec560dffb150616b687b0aff00c94dd46f4448a5929e3c6d4b35712e386"   // Index 1
-]
-```
-
-**Operations use indices:**
-- `deposit(tokenIndex: 0, ...)` - First token
-- `withdraw(tokenIndex: 1, ...)` - Second token
-
-**Query supported tokens:**
-```graphql
-query {
-  supportedTokens {
-    index
-    tokenApp
-  }
-}
-```
-
----
 
 ## Module Structure
 
@@ -220,8 +115,8 @@ cargo test --package indexer
 
 ## Requirements
 
-- **Linera SDK**: 0.15.5+
-- **Rust**: 1.85.0+
+- **Linera SDK**: 0.15.11+
+- **Rust**: 1.86.0+
 - **Target**: wasm32-unknown-unknown
 
 ### Frontend Stack
