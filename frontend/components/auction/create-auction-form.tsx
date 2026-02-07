@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWalletConnection } from 'linera-react-client';
+import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Info, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -591,6 +592,19 @@ export function CreateAuctionFormMultistep({
                   currentAACBalance={currentAACBalance}
                 />
               )}
+
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-4 flex gap-2">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-900 dark:text-blue-100">
+                  <p>
+                    Need Auction Tokens for testing? Get them from the{' '}
+                    <Link href={APP_ROUTES.faucet} className="font-medium underline underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300">
+                      Faucet
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
 
               {/* Auction Preview */}
               <AuctionPreview
