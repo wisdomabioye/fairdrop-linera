@@ -43,7 +43,7 @@ export const navigation: NavSection[] = [
         title: 'Collector',
         show: true,
         items: [
-        { name: 'My Dashboard', href: APP_ROUTES.bidSummary, icon: LayoutDashboard },
+        // { name: 'My Dashboard', href: APP_ROUTES.bidSummary, icon: LayoutDashboard },
         { name: 'My Bids', href: APP_ROUTES.myBids, icon: TrendingUp },
         ],
     },

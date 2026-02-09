@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWalletConnection } from 'linera-react-client';
+import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Info, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -11,21 +12,21 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DateTimePicker } from '@/components/ui/datetime-picker';
 import { Spinner } from '@/components/ui/spinner';
+import { TokenSelector } from '@/components/shared';
+import { ImageUpload } from '@/components/shared';
+import { StepIndicator, type Step } from '@/components/shared';
+import { useSyncStatus, useBatchPolling } from '@/providers';
 import { 
   useAuctionMutations, 
   useAacApp, 
   usePersistedAuctionForm 
 } from '@/hooks';
-import { useSyncStatus, useBatchPolling } from '@/providers';
-import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
-import { TokenSelector } from '@/components/shared';
-import { ImageUpload } from '@/components/shared';
-import { StepIndicator, type Step } from '@/components/shared';
+import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
 import { AuctionPreview } from './auction-preview';
 import { CreatorBalanceCheck } from './creator-balance-check';
-import { DepositDialog } from '@/app-dashboard/aac-balances/deposit-dialog';
 import { getAuctionTokenList, getPaymentTokenList, getTokenByAppId } from '@/config/app.token-store';
 import { APP_ROUTES } from '@/config/app.route';
+import { millisecondsToMicroseconds, formatAbsoluteTime } from '@/lib/utils/auction-utils';
 import type { AuctionParam } from '@/lib/gql/types';
 import { cn } from '@/lib/utils';
 
@@ -135,11 +136,6 @@ export function CreateAuctionFormMultistep({
         if (onAuctionCreateSuccess) {
           await onAuctionCreateSuccess(auctionId);
         }
-
-        // Small delay to let blockchain state settle before redirect
-        // The mutation already refreshed the cache, but we need time for
-        // the new auction to appear in subsequent queries
-        await new Promise(resolve => setTimeout(resolve, 300));
 
         router.push(APP_ROUTES.creatorAuctions);
       }
@@ -596,6 +592,19 @@ export function CreateAuctionFormMultistep({
                   currentAACBalance={currentAACBalance}
                 />
               )}
+
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-4 flex gap-2">
+                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-900 dark:text-blue-100">
+                  <p>
+                    Need Auction Tokens for testing? Get them from the{' '}
+                    <Link href={APP_ROUTES.faucet} className="font-medium underline underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300">
+                      Faucet
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
 
               {/* Auction Preview */}
               <AuctionPreview

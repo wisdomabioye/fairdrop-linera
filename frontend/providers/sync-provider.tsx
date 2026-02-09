@@ -1,9 +1,10 @@
 'use client';
 
 import { createContext, useContext, useEffect, useReducer, useRef, useCallback } from 'react';
+import { useWalletConnection } from 'linera-react-client';
 import { useAuctionStore } from '@/store/auction-store';
-import { useChain } from '@/hooks/use-chain';
 import { useTokenStore } from '@/store/token-store';
+import { useChain } from '@/hooks/use-chain';
 
 // ============ Types ============
 export interface SyncStatus {
@@ -79,12 +80,17 @@ const SyncContext = createContext<SyncStatus | undefined>(undefined);
 // ============ Provider ============
 export function SyncProvider({
   children,
-  debounceTimeout = 2000,
+  debounceTimeout = 4000,
 }: {
   children: React.ReactNode;
 } & SyncProviderOptions) {
+  const { address } = useWalletConnection();
   const { publicChain, walletChain, isConnected, isInitialized } = useChain();
-  const { invalidateAll } = useAuctionStore();
+  const { 
+    invalidateAll,
+    invalidateDashboardBatch,
+    invalidateUserPortfolioBatch
+  } = useAuctionStore();
   const { invalidateAll: invalidateAllFungibleData } = useTokenStore();
 
   const [state, dispatch] = useReducer(syncReducer, initialState);
@@ -128,9 +134,19 @@ export function SyncProvider({
     invalidationTimerRef.current = setTimeout(() => {
       console.log('[SyncProvider] Executing debounced cache invalidation');
       invalidateAll();
+      invalidateDashboardBatch();
       invalidateAllFungibleData();
+
+      if (address) {
+        invalidateUserPortfolioBatch(address);
+      }
     }, 100); // Small delay to batch simultaneous sync completions
-  }, [clearInvalidationTimer, invalidateAll, invalidateAllFungibleData]);
+  }, [
+    clearInvalidationTimer, 
+    invalidateAll, 
+    invalidateDashboardBatch,
+    invalidateUserPortfolioBatch,
+    invalidateAllFungibleData]);
 
   /**
    * Handle sync completion - detect transitions and invalidate

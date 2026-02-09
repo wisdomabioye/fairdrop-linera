@@ -30,6 +30,7 @@ export interface UseDashboardOptions {
 }
 
 export interface UseDashboardResult {
+  allAuctions: AuctionSummary[] | null;
   activeAuctions: AuctionSummary[] | null;
   globalStats: AuctionGlobalStats | null;
   loading: boolean;
@@ -56,15 +57,28 @@ export function useDashboard(
 
   // Select only the specific data entries we need (not entire Maps)
   const {
+    allAuctionsEntry,
     activeAuctionsEntry,
     globalStatsEntry,
     batchDashboard,
   } = useAuctionStore(
     useShallow((state) => ({
+      allAuctionsEntry: state.allAuctions,
       activeAuctionsEntry: state.activeAuctions,
       globalStatsEntry: state.globalStats,
       batchDashboard: state.batchDashboard,
     }))
+  );
+
+  // Select all auction data from normalized cache
+  const allAuctionIds = allAuctionsEntry?.auctionIds;
+  const allAuctionsData = useAuctionStore(
+    useShallow((state) => {
+      if (!allAuctionIds) return null;
+      return allAuctionIds
+        .map(id => state.allAuctionsCache.get(id)?.data)
+        .filter(Boolean) as AuctionSummary[];
+    })
   );
 
   // Select active auction data from normalized cache
@@ -87,6 +101,7 @@ export function useDashboard(
   const hasLoadedOnce = useRef(false);
   const pollingUnsubscribe = useRef<(() => void) | null>(null);
 
+  const allAuctions = allAuctionsData ?? null;
   const activeAuctions = activeAuctionsData ?? null;
   const globalStats = globalStatsEntry?.data ?? null;
 
@@ -159,6 +174,7 @@ export function useDashboard(
   }, [enablePolling, skip, aacApp, offset, limit, pollInterval, startPollingDashboardBatch]);
 
   return {
+    allAuctions,
     activeAuctions,
     globalStats,
     loading,

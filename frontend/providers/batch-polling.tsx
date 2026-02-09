@@ -70,6 +70,7 @@ export function BatchPollingProvider({children}: {children: ReactNode}) {
         userPortfolio.refetch,
         userPortfolio.getBidsByAuctionId,
         // Dashboard data
+        dashboardData.allAuctions,
         dashboardData.activeAuctions,
         dashboardData.globalStats,
         dashboardData.loading,

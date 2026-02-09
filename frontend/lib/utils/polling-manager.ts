@@ -9,49 +9,60 @@
  *   stops when last unsubscribes
  * - Adaptive polling: slows down when tab is inactive
  * - Uses setTimeout instead of setInterval to prevent overlapping executions
- * - Efficient resource management
+ * - Per-subscriber callbacks to avoid overwrite issues
+ * - Error backoff on consecutive failures
+ * - Execution time compensation for accurate intervals
  */
 
 type UnsubscribeFn = () => void;
+type CallbackFn = () => Promise<void> | void;
+
+interface SubscriberInfo {
+  callback: CallbackFn;
+}
 
 interface PollingSubscription {
   key: string;
-  callback: () => Promise<void> | void;
   interval: number;
   timeoutId: ReturnType<typeof setTimeout> | null;
-  subscribers: Set<string>;
+  subscribers: Map<string, SubscriberInfo>;
   isPaused: boolean;
   isExecuting: boolean;
+  /**
+   * Generation token - incremented on state changes (pause, resume, trigger, unsubscribe, interval change)
+   * to invalidate stale scheduled timeouts. Not incremented when scheduling, only when state changes.
+   */
+  token: number;
+  lastPollTime: number;
+  consecutiveErrors: number;
 }
+
+const MAX_BACKOFF_MS = 60000; // 1 minute max backoff
+const BACKOFF_MULTIPLIER = 2;
 
 export class PollingManager {
   private subscriptions: Map<string, PollingSubscription> = new Map();
   private subscriberCounter = 0;
   private isTabActive = true;
+  private isDestroyed = false;
 
   constructor() {
-    // Listen for tab visibility changes
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleVisibilityChange);
     }
   }
 
-  /**
-   * Handle tab visibility changes (slow down polling when tab is inactive)
-   */
   private handleVisibilityChange = () => {
     this.isTabActive = !document.hidden;
 
     if (this.isTabActive) {
-      // Tab became active - resume all paused subscriptions
       console.debug('[PollingManager] Tab active - resuming all polling');
       this.subscriptions.forEach((sub) => {
-        if (sub.isPaused) {
+        if (sub.isPaused && sub.subscribers.size > 0) {
           this.resumePolling(sub);
         }
       });
     } else {
-      // Tab became inactive - pause all subscriptions
       console.debug('[PollingManager] Tab inactive - pausing all polling');
       this.subscriptions.forEach((sub) => {
         this.pausePolling(sub);
@@ -59,76 +70,71 @@ export class PollingManager {
     }
   };
 
-  /**
-   * Subscribe to polling for a resource
-   * @param key - Unique identifier for this resource
-   * @param callback - Function to call on each poll
-   * @param interval - Polling interval in milliseconds
-   * @returns Unsubscribe function
-   */
   subscribe(
     key: string,
-    callback: () => Promise<void> | void,
+    callback: CallbackFn,
     interval: number
   ): UnsubscribeFn {
-    // Generate unique subscriber ID
     const subscriberId = `sub-${++this.subscriberCounter}`;
 
-    // Get or create subscription
     let subscription = this.subscriptions.get(key);
 
     if (!subscription) {
-      // Create new subscription
       subscription = {
         key,
-        callback,
         interval,
         timeoutId: null,
-        subscribers: new Set([subscriberId]),
+        subscribers: new Map([[subscriberId, { callback }]]),
         isPaused: false,
         isExecuting: false,
+        token: 0,
+        lastPollTime: 0,
+        consecutiveErrors: 0,
       };
 
       this.subscriptions.set(key, subscription);
-
-      // Start polling immediately
       this.startPolling(subscription);
 
       console.debug(`[PollingManager] Started polling for key: ${key} (${interval}ms)`);
     } else {
-      // Add subscriber to existing subscription
-      subscription.subscribers.add(subscriberId);
+      subscription.subscribers.set(subscriberId, { callback });
+
+      const intervalChanged = subscription.interval !== interval;
+      if (intervalChanged) {
+        subscription.interval = interval;
+
+        if (!subscription.isPaused && !subscription.isExecuting) {
+          subscription.token++;
+          // Account for elapsed time since last poll
+          const elapsed = Date.now() - subscription.lastPollTime;
+          const remaining = Math.max(0, interval - elapsed);
+          this.scheduleNext(subscription, remaining);
+        }
+      }
 
       console.debug(
         `[PollingManager] Added subscriber to key: ${key} (total: ${subscription.subscribers.size})`
       );
     }
 
-    // Return unsubscribe function
     return () => {
       this.unsubscribe(key, subscriberId);
     };
   }
 
-  /**
-   * Unsubscribe from polling
-   * @param key - Resource key
-   * @param subscriberId - Subscriber ID
-   */
   private unsubscribe(key: string, subscriberId: string): void {
     const subscription = this.subscriptions.get(key);
-
     if (!subscription) return;
 
-    // Remove subscriber
     subscription.subscribers.delete(subscriberId);
 
     console.debug(
       `[PollingManager] Removed subscriber from key: ${key} (remaining: ${subscription.subscribers.size})`
     );
 
-    // If no more subscribers, stop polling
     if (subscription.subscribers.size === 0) {
+      subscription.token++;
+      subscription.isPaused = true;
       this.stopPolling(subscription);
       this.subscriptions.delete(key);
 
@@ -136,62 +142,101 @@ export class PollingManager {
     }
   }
 
-  /**
-   * Start polling using setTimeout (non-overlapping)
-   */
   private startPolling(subscription: PollingSubscription): void {
-    // Don't start if tab is inactive
+    if (this.isDestroyed) return;
     if (!this.isTabActive) {
       subscription.isPaused = true;
       return;
     }
-
-    // Start with full interval delay - initial fetch already handles first data load
+    subscription.isPaused = false;
     this.scheduleNext(subscription, subscription.interval);
   }
 
-  /**
-   * Schedule the next poll execution
-   */
   private scheduleNext(subscription: PollingSubscription, delay: number): void {
-    // Clear any existing timeout
+    if (this.isDestroyed) return;
+
     if (subscription.timeoutId) {
       clearTimeout(subscription.timeoutId);
       subscription.timeoutId = null;
     }
 
-    // Don't schedule if paused or no subscribers
     if (subscription.isPaused || subscription.subscribers.size === 0) {
       return;
     }
 
+    // Capture current token - timeout will only execute if token hasn't changed
+    // Token is incremented by state changes (pause/resume/trigger/unsubscribe), not by scheduling
+    const tokenAtSchedule = subscription.token;
+    const subscriptionKey = subscription.key;
+
     subscription.timeoutId = setTimeout(async () => {
-      // Skip if already executing (shouldn't happen with setTimeout, but safety check)
-      if (subscription.isExecuting) {
-        this.scheduleNext(subscription, subscription.interval);
+      // Early exit checks - get fresh reference from map
+      const currentSub = this.subscriptions.get(subscriptionKey);
+      if (this.isDestroyed || !currentSub || currentSub.token !== tokenAtSchedule) {
         return;
       }
 
-      subscription.isExecuting = true;
+      // Skip if already executing - the running execution's finally block will reschedule
+      if (currentSub.isExecuting) {
+        return;
+      }
 
+      currentSub.isExecuting = true;
+      const startTime = Date.now();
+      currentSub.lastPollTime = startTime;
+
+      let hasError = false;
       try {
-        await subscription.callback();
+        await this.executeCallbacks(currentSub);
+        currentSub.consecutiveErrors = 0;
       } catch (error) {
-        console.error(`[PollingManager] Error in callback for key: ${subscription.key}`, error);
+        hasError = true;
+        currentSub.consecutiveErrors++;
+        console.error(`[PollingManager] Error in callbacks for key: ${subscriptionKey}`, error);
       } finally {
-        subscription.isExecuting = false;
+        currentSub.isExecuting = false;
 
-        // Schedule next only if still active
-        if (!subscription.isPaused && subscription.subscribers.size > 0) {
-          this.scheduleNext(subscription, subscription.interval);
+        // Re-check conditions after async work
+        const stillValid =
+          !this.isDestroyed &&
+          this.subscriptions.has(subscriptionKey) &&
+          currentSub.token === tokenAtSchedule &&
+          !currentSub.isPaused &&
+          currentSub.subscribers.size > 0;
+
+        if (stillValid) {
+          // Compensate for execution time
+          const executionTime = Date.now() - startTime;
+          let nextDelay = Math.max(0, currentSub.interval - executionTime);
+
+          // Apply backoff on errors (starts at 2x interval on first error)
+          if (hasError && currentSub.consecutiveErrors > 0) {
+            const backoff = Math.min(
+              MAX_BACKOFF_MS,
+              currentSub.interval * Math.pow(BACKOFF_MULTIPLIER, currentSub.consecutiveErrors)
+            );
+            nextDelay = Math.max(nextDelay, backoff);
+          }
+
+          this.scheduleNext(currentSub, nextDelay);
         }
       }
     }, delay);
   }
 
-  /**
-   * Stop polling for a subscription
-   */
+  private async executeCallbacks(subscription: PollingSubscription): Promise<void> {
+    const callbacks = Array.from(subscription.subscribers.values()).map((s) => s.callback);
+    const results = await Promise.allSettled(callbacks.map((cb) => cb()));
+
+    const errors = results.filter((r) => r.status === 'rejected');
+    if (errors.length > 0) {
+      throw new AggregateError(
+        errors.map((e) => (e as PromiseRejectedResult).reason),
+        `${errors.length} callback(s) failed`
+      );
+    }
+  }
+
   private stopPolling(subscription: PollingSubscription): void {
     if (subscription.timeoutId) {
       clearTimeout(subscription.timeoutId);
@@ -199,66 +244,128 @@ export class PollingManager {
     }
   }
 
-  /**
-   * Pause polling for a subscription
-   */
   private pausePolling(subscription: PollingSubscription): void {
     if (subscription.timeoutId) {
       clearTimeout(subscription.timeoutId);
       subscription.timeoutId = null;
     }
+    subscription.token++;
     subscription.isPaused = true;
   }
 
-  /**
-   * Resume polling for a subscription
-   */
   private resumePolling(subscription: PollingSubscription): void {
+    if (this.isDestroyed || subscription.subscribers.size === 0) return;
+
     subscription.isPaused = false;
-    // Resume with full interval delay (not immediately)
-    this.scheduleNext(subscription, subscription.interval);
+    subscription.token++;
+
+    // Account for time elapsed while paused
+    const elapsed = Date.now() - subscription.lastPollTime;
+    const remaining = Math.max(0, subscription.interval - elapsed);
+
+    this.scheduleNext(subscription, remaining);
   }
 
   /**
-   * Manually trigger a poll for a key (useful for refresh)
-   * @param key - Resource key
+   * Manually trigger a poll for a key
+   * @returns true if triggered, false if already executing or not found
    */
-  async trigger(key: string): Promise<void> {
+  async trigger(key: string): Promise<boolean> {
     const subscription = this.subscriptions.get(key);
-    if (subscription && !subscription.isExecuting) {
-      subscription.isExecuting = true;
-      try {
-        await subscription.callback();
-      } catch (error) {
-        console.error(`[PollingManager] Error in trigger for key: ${key}`, error);
-      } finally {
-        subscription.isExecuting = false;
+    if (!subscription || this.isDestroyed) return false;
+
+    if (subscription.isExecuting) {
+      // Return false to indicate trigger was skipped
+      return false;
+    }
+
+    if (subscription.timeoutId) {
+      clearTimeout(subscription.timeoutId);
+      subscription.timeoutId = null;
+    }
+
+    const tokenAtTrigger = ++subscription.token;
+    subscription.isExecuting = true;
+    const startTime = Date.now();
+    subscription.lastPollTime = startTime;
+
+    let hasError = false;
+    try {
+      await this.executeCallbacks(subscription);
+      subscription.consecutiveErrors = 0;
+    } catch (error) {
+      hasError = true;
+      subscription.consecutiveErrors++;
+      console.error(`[PollingManager] Error in trigger for key: ${key}`, error);
+    } finally {
+      subscription.isExecuting = false;
+
+      const stillValid =
+        !this.isDestroyed &&
+        this.subscriptions.has(key) &&
+        subscription.token === tokenAtTrigger &&
+        !subscription.isPaused &&
+        subscription.subscribers.size > 0;
+
+      if (stillValid) {
+        const executionTime = Date.now() - startTime;
+        let nextDelay = Math.max(0, subscription.interval - executionTime);
+
+        // Apply backoff on errors (starts at 2x interval on first error)
+        if (hasError && subscription.consecutiveErrors > 0) {
+          const backoff = Math.min(
+            MAX_BACKOFF_MS,
+            subscription.interval * Math.pow(BACKOFF_MULTIPLIER, subscription.consecutiveErrors)
+          );
+          nextDelay = Math.max(nextDelay, backoff);
+        }
+
+        this.scheduleNext(subscription, nextDelay);
       }
     }
+
+    return true;
   }
 
   /**
-   * Get number of active subscriptions
+   * Wait for current execution to complete, then trigger
    */
+  async triggerWhenReady(key: string, timeoutMs = 30000): Promise<boolean> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      if (this.isDestroyed) return false;
+      if (!this.subscriptions.has(key)) return false;
+
+      // Attempt trigger - it returns false if executing or not found
+      const triggered = await this.trigger(key);
+      if (triggered) {
+        return true;
+      }
+
+      // trigger returned false, likely due to isExecuting - wait and retry
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    return false;
+  }
+
   getActiveCount(): number {
     return this.subscriptions.size;
   }
 
-  /**
-   * Get subscriber count for a key
-   */
   getSubscriberCount(key: string): number {
     return this.subscriptions.get(key)?.subscribers.size ?? 0;
   }
 
-  /**
-   * Clean up all subscriptions (call on unmount/cleanup)
-   */
   destroy(): void {
+    this.isDestroyed = true;
     this.subscriptions.forEach((sub) => {
+      sub.token++;
       this.stopPolling(sub);
     });
     this.subscriptions.clear();
+    this.subscriberCounter = 0;
 
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleVisibilityChange);
@@ -266,5 +373,4 @@ export class PollingManager {
   }
 }
 
-// Export singleton instance
 export const pollingManager = new PollingManager();
